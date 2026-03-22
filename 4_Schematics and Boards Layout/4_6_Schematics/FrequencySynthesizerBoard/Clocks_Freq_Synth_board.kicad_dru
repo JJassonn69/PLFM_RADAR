@@ -1,4 +1,29 @@
 (version 1)
-(rule "class 1:1"
+
+# ============================================================
+# JLCPCB 6-Layer DRC Rules for Freq Synth Board
+# Based on JLCPCB 6-layer capabilities (March 2026)
+# ============================================================
+
+# Differential pair clearance exception
+# AD9523-1 OUT8/OUT9 diff pairs have tight routing
+(rule "Differential pair clearance"
   (condition "A.NetClass == 'Differential' && B.NetClass == 'Differential'")
-  (constraint clearance (min 0.15mm)))
+  (constraint clearance (min 0.1mm)))
+
+# Via-to-via clearance
+# JLCPCB min hole-to-hole: 0.20mm for small vias (0.15mm drill)
+# Board uses mix of 0.15mm and 0.30mm drill vias
+(rule "Via to via clearance"
+  (condition "A.Type == 'Via' && B.Type == 'Via'")
+  (constraint hole_clearance (min 0.20mm)))
+
+# Track-to-via clearance
+(rule "Track to via clearance"
+  (condition "A.Type == 'Track' && B.Type == 'Via'")
+  (constraint clearance (min 0.1mm)))
+
+# Pad-to-pad clearance for SMD components
+(rule "SMD pad clearance"
+  (condition "A.Type == 'Pad' && B.Type == 'Pad'")
+  (constraint clearance (min 0.1mm)))
