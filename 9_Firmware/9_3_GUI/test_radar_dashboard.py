@@ -10,6 +10,7 @@ Run: python -m pytest test_radar_dashboard.py -v
 import struct
 import time
 import queue
+import json
 import os
 import tempfile
 import unittest
@@ -17,7 +18,7 @@ import numpy as np
 
 from radar_protocol import (
     RadarProtocol, FT601Connection, DataRecorder, RadarAcquisition,
-    RadarFrame, StatusResponse, Opcode,
+    RadarFrame, StatusResponse, Opcode, ReplayConnection,
     HEADER_BYTE, FOOTER_BYTE, STATUS_HEADER_BYTE,
     NUM_RANGE_BINS, NUM_DOPPLER_BINS, NUM_CELLS,
     _HARDWARE_ONLY_OPCODES, _REPLAY_ADJUSTABLE_OPCODES,
@@ -737,6 +738,157 @@ class TestStatusResponseDefaults(unittest.TestCase):
         self.assertEqual(sr.self_test_flags, 0x1F)
         self.assertEqual(sr.self_test_detail, 0xAB)
         self.assertEqual(sr.self_test_busy, 1)
+
+
+class TestRadarConfig(unittest.TestCase):
+    """Test radar config parameterization for physical axis labels."""
+
+    def test_cn0566_config_defaults(self):
+        """CN0566_CONFIG has all required keys with correct types."""
+        cfg = ReplayConnection.CN0566_CONFIG
+        self.assertEqual(cfg["sample_rate"], 4e6)
+        self.assertEqual(cfg["bandwidth"], 500e6)
+        self.assertEqual(cfg["ramp_time"], 300e-6)
+        self.assertEqual(cfg["center_freq"], 9.9e9)
+        self.assertEqual(cfg["fft_size"], 1024)
+        self.assertEqual(cfg["decimation"], 16)
+        self.assertEqual(cfg["num_chirps"], 32)
+        self.assertEqual(cfg["range_formula"], "baseband")
+
+    def test_replay_connection_has_radar_config(self):
+        """ReplayConnection exposes radar_config dict."""
+        # Use a dummy dir (we won't call open())
+        conn = ReplayConnection("/tmp/nonexistent", use_mti=True)
+        self.assertIsInstance(conn.radar_config, dict)
+        self.assertEqual(conn.radar_config["sample_rate"], 4e6)
+        self.assertEqual(conn.radar_config["range_formula"], "baseband")
+
+    def test_replay_config_is_copy(self):
+        """radar_config is a copy, not a reference to CN0566_CONFIG."""
+        conn = ReplayConnection("/tmp/nonexistent")
+        conn.radar_config["sample_rate"] = 999
+        self.assertEqual(ReplayConnection.CN0566_CONFIG["sample_rate"], 4e6)
+
+    def test_replay_loads_config_json(self):
+        """radar_config.json sidecar overrides defaults."""
+        tmpdir = tempfile.mkdtemp()
+        try:
+            # Create minimal npy files
+            for name in ["fullchain_mti_doppler_i", "fullchain_mti_doppler_q",
+                         "doppler_map_i", "doppler_map_q"]:
+                np.save(os.path.join(tmpdir, f"{name}.npy"),
+                        np.zeros((NUM_RANGE_BINS, NUM_DOPPLER_BINS), dtype=np.int64))
+
+            # Create radar_config.json
+            custom_cfg = {"center_freq": 77e9, "bandwidth": 4e9}
+            with open(os.path.join(tmpdir, "radar_config.json"), "w") as f:
+                json.dump(custom_cfg, f)
+
+            conn = ReplayConnection(tmpdir, use_mti=True)
+            conn.open()
+            self.assertEqual(conn.radar_config["center_freq"], 77e9)
+            self.assertEqual(conn.radar_config["bandwidth"], 4e9)
+            # Non-overridden keys retain defaults
+            self.assertEqual(conn.radar_config["sample_rate"], 4e6)
+            conn.close()
+        finally:
+            import shutil
+            shutil.rmtree(tmpdir)
+
+    def test_replay_no_config_json(self):
+        """Without radar_config.json, defaults are used."""
+        tmpdir = tempfile.mkdtemp()
+        try:
+            for name in ["fullchain_mti_doppler_i", "fullchain_mti_doppler_q",
+                         "doppler_map_i", "doppler_map_q"]:
+                np.save(os.path.join(tmpdir, f"{name}.npy"),
+                        np.zeros((NUM_RANGE_BINS, NUM_DOPPLER_BINS), dtype=np.int64))
+
+            conn = ReplayConnection(tmpdir, use_mti=True)
+            conn.open()
+            self.assertEqual(conn.radar_config["center_freq"], 9.9e9)
+            self.assertEqual(conn.radar_config["range_formula"], "baseband")
+            conn.close()
+        finally:
+            import shutil
+            shutil.rmtree(tmpdir)
+
+
+class TestAxisCalculations(unittest.TestCase):
+    """Test physical axis calculations for both radar architectures."""
+
+    C = 3e8
+
+    def _calc_range_per_bin(self, cfg):
+        """Replicate the dashboard's range_per_bin calculation."""
+        formula = cfg.get("range_formula", "baseband")
+        if formula == "if":
+            range_per_fft_bin = self.C / (2.0 * cfg["bandwidth"])
+        else:
+            range_per_fft_bin = ((cfg["sample_rate"] / cfg["fft_size"])
+                                 * self.C * cfg["ramp_time"]
+                                 / (2.0 * cfg["bandwidth"]))
+        return range_per_fft_bin * cfg["decimation"]
+
+    def _calc_max_vel(self, cfg):
+        """Replicate the dashboard's max_vel calculation."""
+        wavelength = self.C / cfg["center_freq"]
+        return wavelength / (4.0 * cfg["ramp_time"])
+
+    def test_cn0566_range_per_bin(self):
+        """CN0566 baseband: range_per_bin = 5.625 m."""
+        cfg = dict(ReplayConnection.CN0566_CONFIG)
+        rpb = self._calc_range_per_bin(cfg)
+        self.assertAlmostEqual(rpb, 5.625, places=3)
+
+    def test_cn0566_max_range(self):
+        """CN0566 baseband: max_range = 360.0 m (64 bins * 5.625 m)."""
+        cfg = dict(ReplayConnection.CN0566_CONFIG)
+        rpb = self._calc_range_per_bin(cfg)
+        max_range = rpb * NUM_RANGE_BINS
+        self.assertAlmostEqual(max_range, 360.0, places=1)
+
+    def test_cn0566_max_velocity(self):
+        """CN0566: max_vel = lambda/(4*T) = 0.0303/(4*300e-6) = 25.25 m/s."""
+        cfg = dict(ReplayConnection.CN0566_CONFIG)
+        max_vel = self._calc_max_vel(cfg)
+        self.assertAlmostEqual(max_vel, 25.25, places=1)
+
+    def test_aeris10_range_per_bin(self):
+        """AERIS-10 IF mode: range_per_bin = c/(2*BW)*16 = 4.8 m."""
+        from radar_dashboard import RadarDashboard
+        cfg = dict(RadarDashboard.AERIS10_CONFIG)
+        rpb = self._calc_range_per_bin(cfg)
+        self.assertAlmostEqual(rpb, 4.8, places=3)
+
+    def test_aeris10_max_range(self):
+        """AERIS-10: max_range = 307.2 m (64 * 4.8)."""
+        from radar_dashboard import RadarDashboard
+        cfg = dict(RadarDashboard.AERIS10_CONFIG)
+        rpb = self._calc_range_per_bin(cfg)
+        max_range = rpb * NUM_RANGE_BINS
+        self.assertAlmostEqual(max_range, 307.2, places=1)
+
+    def test_aeris10_max_velocity(self):
+        """AERIS-10: max_vel = lambda/(4*T) ≈ 23.8 m/s."""
+        from radar_dashboard import RadarDashboard
+        cfg = dict(RadarDashboard.AERIS10_CONFIG)
+        max_vel = self._calc_max_vel(cfg)
+        self.assertAlmostEqual(max_vel, 23.8, places=0)
+
+    def test_baseband_different_from_if(self):
+        """baseband and IF formulas give different range_per_bin."""
+        cfg_bb = dict(ReplayConnection.CN0566_CONFIG)
+        cfg_if = dict(cfg_bb)
+        cfg_if["range_formula"] = "if"
+        rpb_bb = self._calc_range_per_bin(cfg_bb)
+        rpb_if = self._calc_range_per_bin(cfg_if)
+        self.assertNotAlmostEqual(rpb_bb, rpb_if, places=1)
+
+    def test_ft601_connection_no_radar_config(self):
+        """FT601Connection does not have radar_config attr."""
+        conn = FT601Connection(mock=True)
+        self.assertFalse(hasattr(conn, 'radar_config'))
 
 
 if __name__ == "__main__":

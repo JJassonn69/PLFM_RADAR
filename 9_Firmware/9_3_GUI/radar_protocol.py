@@ -15,6 +15,7 @@ USB Packet Protocol:
     Command word:  {opcode[31:24], addr[23:16], value[15:0]}
 """
 
+import json
 import os
 import struct
 import time
@@ -634,7 +635,30 @@ class ReplayConnection:
       fullchain_mti_doppler_q.npy (64, 32) int   — Doppler Q  (with MTI)
       fullchain_cfar_flags.npy    (64, 32) bool  — CFAR detections
       fullchain_cfar_mag.npy      (64, 32) int   — CFAR |I|+|Q| magnitude
+
+    Optional sidecar:
+      radar_config.json           — radar parameters for physical axis labels
+        Keys: sample_rate, bandwidth, ramp_time, center_freq,
+              fft_size, decimation, num_chirps
+        If absent, defaults to ADI CN0566 parameters.
     """
+
+    # Default radar config for ADI CN0566 phased-array data
+    # range_per_bin: derived from (Fs/N_FFT) * c * T_ramp / (2 * BW) * decimation
+    #   = (4e6/1024) * 3e8 * 300e-6 / (2*500e6) * 16 = 5.625 m
+    # But peak decimation covers ALL 1024 FFT bins (complex IQ: bins 512-1023
+    # are negative freq / aliased). Only first 32 output bins are physical range.
+    # For display, we label the full 64-bin axis.
+    CN0566_CONFIG = {
+        "sample_rate": 4e6,         # Hz — baseband ADC sample rate
+        "bandwidth": 500e6,         # Hz — chirp bandwidth
+        "ramp_time": 300e-6,        # s  — chirp ramp time
+        "center_freq": 9.9e9,       # Hz — carrier frequency
+        "fft_size": 1024,           # FFT length (range)
+        "decimation": 16,           # peak decimation ratio
+        "num_chirps": 32,           # chirps per Doppler frame
+        "range_formula": "baseband",  # use baseband range formula
+    }
 
     def __init__(self, npy_dir: str, use_mti: bool = True,
                  replay_fps: float = 5.0):
@@ -643,6 +667,8 @@ class ReplayConnection:
         self._replay_fps = max(replay_fps, 0.1)
         self._lock = threading.Lock()
         self.is_open = False
+        # Radar config for physical axis labels (set during open)
+        self.radar_config: dict = dict(self.CN0566_CONFIG)
         self._packets: bytes = b""
         self._read_offset = 0
         self._frame_len = 0
@@ -764,8 +790,23 @@ class ReplayConnection:
         return True
 
     def _load_arrays(self):
-        """Load source npy arrays once."""
+        """Load source npy arrays once, plus optional radar_config.json."""
         npy = self._npy_dir
+
+        # Load radar config sidecar if present
+        config_path = os.path.join(npy, "radar_config.json")
+        if os.path.isfile(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    user_cfg = json.load(f)
+                self.radar_config.update(user_cfg)
+                log.info(f"Loaded radar config from {config_path}")
+            except Exception as e:
+                log.warning(f"Failed to load radar_config.json: {e} "
+                            f"(using CN0566 defaults)")
+        else:
+            log.info("No radar_config.json found, using CN0566 defaults")
+
         # MTI Doppler
         self._dop_mti_i = np.load(
             os.path.join(npy, "fullchain_mti_doppler_i.npy")).astype(np.int64)

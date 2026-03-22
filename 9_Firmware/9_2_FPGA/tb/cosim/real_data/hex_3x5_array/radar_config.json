@@ -1,0 +1,11 @@
+{
+    "description": "ADI CN0566 (Phaser) 3x5 array — ABCD combined outdoor capture",
+    "sample_rate": 4e6,
+    "bandwidth": 500e6,
+    "ramp_time": 300e-6,
+    "center_freq": 9.9e9,
+    "fft_size": 1024,
+    "decimation": 16,
+    "num_chirps": 32,
+    "range_formula": "baseband"
+}

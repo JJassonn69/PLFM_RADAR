@@ -74,25 +74,37 @@ SURFACE = "#313244"
 
 
 class RadarDashboard:
-    """Main tkinter application: real-time radar visualization and control."""
+    """Main tkinter application: real-time visualization and control."""
 
     UPDATE_INTERVAL_MS = 100  # 10 Hz display refresh
 
-    # Radar parameters for physical axis labels (ADI CN0566 defaults)
-    # Config: [sample_rate=4e6, IF=1e5, RF=9.9e9, chirps=256, BW=500e6,
-    #          ramp_time=300e-6, ...]
-    SAMPLE_RATE = 4e6        # Hz — ADC sample rate (baseband)
-    BANDWIDTH = 500e6        # Hz — chirp bandwidth
-    RAMP_TIME = 300e-6       # s  — chirp ramp time
-    CENTER_FREQ = 10.5e9     # Hz — X-band center frequency
-    NUM_CHIRPS_FRAME = 32    # chirps per Doppler frame
-    C = 3e8                  # m/s — speed of light
+    # Default radar parameters for physical axis labels (AERIS-10)
+    # Overridden by ReplayConnection.radar_config when in replay mode.
+    AERIS10_CONFIG = {
+        "sample_rate": 400e6,        # Hz — AERIS-10 ADC sample rate
+        "bandwidth": 500e6,          # Hz — chirp bandwidth
+        "ramp_time": 300e-6,         # s  — chirp ramp time
+        "center_freq": 10.5e9,       # Hz — X-band center frequency
+        "fft_size": 1024,            # FFT length (range)
+        "decimation": 16,            # peak decimation ratio
+        "num_chirps": 32,            # chirps per Doppler frame
+        "range_formula": "if",       # AERIS-10: range = c/(2*BW) * decimation per bin
+    }
+
+    C = 3e8  # m/s — speed of light
 
     def __init__(self, root: tk.Tk, connection: FT601Connection,
                  recorder: DataRecorder):
         self.root = root
         self.conn = connection
         self.recorder = recorder
+
+        # Determine radar config: use ReplayConnection's config if available,
+        # otherwise fall back to AERIS-10 defaults.
+        if hasattr(connection, 'radar_config'):
+            self._radar_cfg = connection.radar_config
+        else:
+            self._radar_cfg = dict(self.AERIS10_CONFIG)
 
         self.root.title("AERIS-10 Radar Dashboard — Bring-Up Edition")
         self.root.geometry("1600x950")
@@ -180,26 +192,51 @@ class RadarDashboard:
         self._build_log_tab(tab_log)
 
     def _build_display_tab(self, parent):
-        # Compute physical axis limits
-        # Range resolution: dR = c / (2 * BW) per range bin
-        # But we decimate 1024→64 bins, so each bin spans 16 FFT bins.
-        # Range per FFT bin = c / (2 * BW) * (Fs / FFT_SIZE) — simplified:
-        #   max_range = c * Fs / (4 * BW) for Fs-sampled baseband
-        #   range_per_bin = max_range / NUM_RANGE_BINS
-        range_res = self.C / (2.0 * self.BANDWIDTH)  # ~0.3 m per FFT bin
-        # After decimation 1024→64, each range bin = 16 FFT bins
-        range_per_bin = range_res * 16
+        # Compute physical axis limits from radar config
+        cfg = self._radar_cfg
+        sample_rate = cfg["sample_rate"]
+        bandwidth = cfg["bandwidth"]
+        ramp_time = cfg["ramp_time"]
+        center_freq = cfg["center_freq"]
+        fft_size = cfg["fft_size"]
+        decimation = cfg["decimation"]
+        formula = cfg.get("range_formula", "baseband")
+
+        # Range per output bin depends on the system architecture:
+        #
+        # "baseband" (CN0566): IQ baseband sampling at Fs. FFT resolves beat
+        #   frequencies with df = Fs/N_FFT. Range per FFT bin:
+        #     dR = (Fs/N) * c * T / (2 * BW)
+        #   After decimation:
+        #     range_per_bin = dR * decimation
+        #
+        # "if" (AERIS-10): IF sampling where N_FFT samples span one chirp.
+        #   Range per FFT bin = c / (2 * BW), independent of Fs.
+        #   After decimation:
+        #     range_per_bin = c / (2 * BW) * decimation
+        #
+        if formula == "if":
+            range_per_fft_bin = self.C / (2.0 * bandwidth)
+        else:  # "baseband"
+            range_per_fft_bin = (sample_rate / fft_size) * self.C * ramp_time / (2.0 * bandwidth)
+
+        range_per_bin = range_per_fft_bin * decimation
         max_range = range_per_bin * NUM_RANGE_BINS
 
-        # Velocity resolution: dv = lambda / (2 * N_chirps * T_chirp)
-        wavelength = self.C / self.CENTER_FREQ
-        # Max unambiguous velocity = lambda / (4 * T_chirp)
-        max_vel = wavelength / (4.0 * self.RAMP_TIME)
+        # Velocity: max unambiguous = lambda / (4 * T_chirp)
+        wavelength = self.C / center_freq
+        max_vel = wavelength / (4.0 * ramp_time)
         vel_per_bin = 2.0 * max_vel / NUM_DOPPLER_BINS
         # Doppler axis: bin 0 = 0 Hz (DC), wraps at Nyquist
         # For display: center DC, so shift axis to [-max_vel, +max_vel)
         vel_lo = -max_vel
         vel_hi = max_vel
+
+        log.info(f"Axis config: range_per_bin={range_per_bin:.3f} m, "
+                 f"max_range={max_range:.1f} m, "
+                 f"max_vel={max_vel:.1f} m/s, "
+                 f"Fs={sample_rate/1e6:.1f} MHz, BW={bandwidth/1e6:.0f} MHz, "
+                 f"fc={center_freq/1e9:.1f} GHz")
 
         # Matplotlib figure with 3 subplots
         self.fig = Figure(figsize=(14, 7), facecolor=BG)
