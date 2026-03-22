@@ -662,13 +662,24 @@ class ReplayConnection:
                 self._frame_len = len(self._packets)
                 self._read_offset = 0
                 self._needs_rebuild = False
-            end = self._read_offset + size
+            # Return complete packets only to maintain alignment
+            # Packet size is 35 bytes, so round size down to nearest multiple
+            packet_size = 35
+            num_packets = size // packet_size
+            bytes_to_read = num_packets * packet_size
+            if bytes_to_read == 0:
+                return b""
+            # Circular buffer read
+            end = self._read_offset + bytes_to_read
             if end <= self._frame_len:
                 chunk = self._packets[self._read_offset:end]
                 self._read_offset = end
             else:
-                chunk = self._packets[self._read_offset:]
-                self._read_offset = 0
+                # Wrap around
+                remainder = self._frame_len - self._read_offset
+                chunk = self._packets[self._read_offset:] + \
+                        self._packets[:bytes_to_read - remainder]
+                self._read_offset = bytes_to_read - remainder
             return chunk
 
     def write(self, data: bytes) -> bool:
