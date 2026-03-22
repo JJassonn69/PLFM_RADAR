@@ -292,6 +292,9 @@ set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst
 set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_rd_n_reg*}]
 set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_oe_n_reg*}]
 set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_siwu_n_reg*}]
+# Input pipeline registers (timing fix: breaks pad-to-fabric critical path)
+set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_txe_r_reg*}]
+set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_rxf_r_reg*}]
 
 # --------------------------------------------------------------------------
 # Async / false paths — chip reset and wakeup are not timing-critical

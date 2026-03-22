@@ -304,6 +304,16 @@ assign cfar_valid_ft    = cfar_valid_sync[1]     && !cfar_valid_sync_d;
 // FT601 data bus direction control
 assign ft601_data = ft601_data_oe ? ft601_data_out : 32'hzzzz_zzzz;
 
+// ========== INPUT PIPELINE REGISTERS (timing fix) ==========
+// ft601_txe and ft601_rxf are sampled directly from IOB pads. Without
+// registration they feed into FSM combinational logic that drives IOB
+// output register CE pins, creating a pad-to-pad path with only ~0.06 ns
+// slack.  A single pipeline stage gives a full clock period of margin.
+// The 1-cycle latency is transparent: FT601 FIFO flags stay asserted for
+// many cycles in normal operation.
+reg ft601_txe_r;
+reg ft601_rxf_r;
+
 always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
     if (!ft601_reset_n) begin
         current_state <= IDLE;
@@ -326,11 +336,17 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
         cmd_value <= 16'd0;
         doppler_data_pending <= 1'b0;
         cfar_data_pending <= 1'b0;
+        ft601_txe_r <= 1'b1;  // Default: FIFO not ready
+        ft601_rxf_r <= 1'b1;  // Default: no host data
         // NOTE: ft601_clk_out is driven by the clk-domain always block below.
         // Do NOT assign it here (ft601_clk_in domain) — causes multi-driven net.
     end else begin
         // Default: clear one-shot signals
         cmd_valid <= 1'b0;
+
+        // Input pipeline registers (timing fix: breaks pad-to-fabric critical path)
+        ft601_txe_r <= ft601_txe;
+        ft601_rxf_r <= ft601_rxf;
 
         // Data-pending flag management: set on valid edge, cleared when
         // consumed or skipped by write FSM. Must be in this always block
@@ -351,7 +367,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
             RD_IDLE: begin
                 // Only start reading if write FSM is idle and host has data.
                 // ft601_rxf active-low: 0 means data available from host.
-                if (current_state == IDLE && !ft601_rxf) begin
+                if (current_state == IDLE && !ft601_rxf_r) begin
                     ft601_oe_n <= 1'b0;     // Assert OE: tell FT601 to drive bus
                     ft601_data_oe <= 1'b0;  // FPGA releases bus (FT601 drives)
                     read_state <= RD_OE_ASSERT;
@@ -361,7 +377,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
             RD_OE_ASSERT: begin
                 // 1-cycle turnaround: OE_N asserted, bus settling.
                 // FT601 spec requires 1 clock of OE_N before RD_N assertion.
-                if (!ft601_rxf) begin
+                if (!ft601_rxf_r) begin
                     ft601_rd_n <= 1'b0;     // Assert RD: start reading
                     read_state <= RD_READING;
                 end else begin
@@ -410,7 +426,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                     ft601_wr_n <= 1;
                     ft601_data_oe <= 0;  // Release data bus
                     // Gap 2: Status readback takes priority
-                    if (status_req_ft601 && ft601_rxf) begin
+                    if (status_req_ft601 && ft601_rxf_r) begin
                         current_state <= SEND_STATUS;
                         status_word_idx <= 3'd0;
                     end
@@ -421,7 +437,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                     // would cause repeated packet starts without new range data.
                     else if (range_valid_ft && stream_range_en) begin
                         // Don't start write if a read is about to begin
-                        if (ft601_rxf) begin  // rxf=1 means no host data pending
+                        if (ft601_rxf_r) begin  // rxf=1 means no host data pending
                             current_state <= SEND_HEADER;
                             byte_counter <= 0;
                         end
@@ -429,7 +445,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                 end
                 
                 SEND_HEADER: begin
-                    if (!ft601_txe) begin  // FT601 TX FIFO not empty
+                    if (!ft601_txe_r) begin  // FT601 TX FIFO not empty
                         ft601_data_oe <= 1;
                         ft601_data_out <= {24'b0, HEADER};
                         ft601_be <= 4'b0001;  // Only lower byte valid
@@ -447,7 +463,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                 end
                 
                 SEND_RANGE_DATA: begin
-                    if (!ft601_txe) begin
+                    if (!ft601_txe_r) begin
                         ft601_data_oe <= 1;
                         ft601_be <= 4'b1111;  // All bytes valid for 32-bit word
                         
@@ -476,7 +492,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                 end
                 
                 SEND_DOPPLER_DATA: begin
-                    if (!ft601_txe && doppler_data_pending) begin
+                    if (!ft601_txe_r && doppler_data_pending) begin
                         ft601_data_oe <= 1;
                         ft601_be <= 4'b1111;
                         
@@ -510,7 +526,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                 end
                 
                 SEND_DETECTION_DATA: begin
-                    if (!ft601_txe && cfar_data_pending) begin
+                    if (!ft601_txe_r && cfar_data_pending) begin
                         ft601_data_oe <= 1;
                         ft601_be <= 4'b0001;
                         ft601_data_out <= {24'b0, 7'b0, cfar_detection_cap};
@@ -524,7 +540,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                 end
                 
                 SEND_FOOTER: begin
-                    if (!ft601_txe) begin
+                    if (!ft601_txe_r) begin
                         ft601_data_oe <= 1;
                         ft601_be <= 4'b0001;
                         ft601_data_out <= {24'b0, FOOTER};
@@ -536,7 +552,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                 // Gap 2: Status readback — send 6 x 32-bit status words
                 // Format: HEADER, status_words[0..5], FOOTER
                 SEND_STATUS: begin
-                    if (!ft601_txe) begin
+                    if (!ft601_txe_r) begin
                         ft601_data_oe <= 1;
                         ft601_be <= 4'b1111;
                         case (status_word_idx)

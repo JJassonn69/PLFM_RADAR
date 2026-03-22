@@ -327,13 +327,16 @@ module tb_usb_data_interface;
             // Data has been sampled. FPGA deasserts RD then OE.
             // Wait for RD_PROCESS or back to RD_IDLE
             wait_for_read_state(3'd4, 20); // RD_PROCESS = 3'd4
-            @(posedge ft601_clk_in); #1;
-            // Release bus and deassert RXF
+            // Release bus and deassert RXF early so ft601_rxf_r is
+            // updated by the time the read FSM returns to RD_IDLE
+            // (1-cycle input pipeline latency).
             host_data_drive_en = 0;
             host_data_drive = 32'h0;
             ft601_rxf = 1;
+            @(posedge ft601_clk_in); #1;
             // Wait for read FSM to return to idle
             wait_for_read_state(3'd0, 20); // RD_IDLE = 3'd0
+            // Extra cycle to ensure ft601_rxf_r has settled to 1
             @(posedge ft601_clk_in); #1;
         end
     endtask
@@ -417,9 +420,11 @@ module tb_usb_data_interface;
 
         // Release: FSM drives header then moves to SEND_RANGE_DATA
         ft601_txe = 0;
+        // +1 cycle for input pipeline register (ft601_txe_r)
         @(posedge ft601_clk_in); #1;
         // Now the FSM registered the header output and will transition
         // At the NEXT posedge the state becomes SEND_RANGE_DATA
+        @(posedge ft601_clk_in); #1;
         @(posedge ft601_clk_in); #1;
 
         check(uut.current_state === S_SEND_RANGE,
@@ -464,7 +469,9 @@ module tb_usb_data_interface;
               "Stalled in SEND_HEADER with backpressure");
 
         // Release backpressure - header will be latched at next posedge
+        // +1 cycle for input pipeline register (ft601_txe_r)
         ft601_txe = 0;
+        @(posedge ft601_clk_in); #1;
         @(posedge ft601_clk_in); #1;
 
         check(uut.ft601_data_out[7:0] === 8'hAA,
@@ -643,7 +650,7 @@ module tb_usb_data_interface;
               "ft601_wr_n not asserted during backpressure stall");
 
         ft601_txe = 0;
-        repeat (2) @(posedge ft601_clk_in); #1;
+        repeat (3) @(posedge ft601_clk_in); #1;  // +1 cycle for ft601_txe_r pipeline
 
         check(uut.current_state !== S_SEND_HEADER,
               "Resumed from SEND_HEADER after backpressure released");
@@ -784,24 +791,29 @@ module tb_usb_data_interface;
         // ════════════════════════════════════════════════════════
         $display("\n--- Test Group 14: Read/Write Interleave ---");
         apply_reset;
-        ft601_txe = 0;
+        ft601_txe = 1;  // Backpressure: stall write FSM at SEND_HEADER
 
-        // Start a write packet
+        // Start a write packet — FSM reaches SEND_HEADER and stalls
         preload_pending_data;
         assert_range_valid(32'hFACE_FEED);
         wait_for_state(S_SEND_HEADER, 50);
-        @(posedge ft601_clk_in); #1;
+        repeat (2) @(posedge ft601_clk_in); #1;
 
-        // While write FSM is active, assert RXF=0 (host has data)
+        // While write FSM is stalled in SEND_HEADER, assert RXF=0 (host has data)
         // Read FSM should NOT activate (read_state stays RD_IDLE)
+        // because the write FSM is not IDLE.
         ft601_rxf = 0;
-        repeat (5) @(posedge ft601_clk_in); #1;
+        // Wait for ft601_rxf_r pipeline (1 cycle) + 2 reaction cycles
+        repeat (3) @(posedge ft601_clk_in); #1;
 
         check(uut.read_state === 3'd0,
               "Read FSM stays in RD_IDLE while write FSM active");
 
-        // Deassert RXF, complete the write packet
+        // Deassert RXF, release backpressure, complete the write packet
         ft601_rxf = 1;
+        ft601_txe = 0;
+        // Wait for ft601_txe_r pipeline to register the release
+        repeat (2) @(posedge ft601_clk_in); #1;
         wait_for_state(S_SEND_DOPPLER, 100);
         pulse_doppler_once(16'hAAAA, 16'hBBBB);
         pulse_doppler_once(16'hAAAA, 16'hBBBB);
