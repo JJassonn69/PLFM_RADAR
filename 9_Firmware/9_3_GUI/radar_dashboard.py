@@ -472,7 +472,10 @@ class RadarDashboard:
 
     # --------------------------------------------------------- Display loop
     def _schedule_update(self):
-        self._update_display()
+        try:
+            self._update_display()
+        except Exception as e:
+            log.error(f"Display update error: {e}", exc_info=True)
         self.root.after(self.UPDATE_INTERVAL_MS, self._schedule_update)
 
     def _update_display(self):
@@ -618,6 +621,11 @@ def main():
     root.protocol("WM_DELETE_WINDOW", on_closing)
 
     log.info(f"Dashboard started (mode={mode_str})")
+
+    # Auto-connect in mock/replay mode so data shows immediately
+    if not args.live:
+        root.after(200, dashboard._on_connect)
+
     root.mainloop()
 
 

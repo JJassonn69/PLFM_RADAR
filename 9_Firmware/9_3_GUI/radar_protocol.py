@@ -366,11 +366,11 @@ class FT601Connection:
         Generate synthetic radar data packets for testing.
         Simulates a batch of packets with a target near range bin 20, Doppler bin 8.
         """
-        time.sleep(0.05)  # Simulate USB latency
+        time.sleep(0.01)  # Simulate USB latency
         self._mock_frame_num += 1
 
         buf = bytearray()
-        num_packets = min(32, size // 35)
+        num_packets = min(256, size // 35)
         for _ in range(num_packets):
             rbin = self._mock_rng.randint(0, NUM_RANGE_BINS)
             dbin = self._mock_rng.randint(0, NUM_DOPPLER_BINS)
