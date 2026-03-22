@@ -116,6 +116,9 @@ class RadarDashboard:
         self._vmax_ema = 1000.0
         self._vmax_alpha = 0.15  # smoothing factor (lower = more stable)
 
+        # Waterfall stable colorscale (prevents diagonal artifacts)
+        self._wf_vmax_ema = 5000.0
+
         # Status updates from acquisition thread (polled, never root.after)
         self._pending_status: Optional[StatusResponse] = None
 
@@ -561,12 +564,15 @@ class RadarDashboard:
         else:
             self._det_scatter.set_offsets(np.empty((0, 2)))
 
-        # Update waterfall
+        # Update waterfall - use stable colorscale (EMA) to avoid flicker/diagonal artifacts
         self._waterfall.append(frame.range_profile.copy())
         wf_arr = np.array(list(self._waterfall))
-        wf_max = max(np.max(wf_arr), 1.0)
+        # Smooth vmax to avoid frame-to-frame scaling artifacts that create diagonal appearance
+        wf_frame_max = np.max(wf_arr) if wf_arr.size > 0 else 1.0
+        self._wf_vmax_ema = 0.1 * wf_frame_max + 0.9 * self._wf_vmax_ema
+        wf_vmax_stable = max(self._wf_vmax_ema, 100.0)
         self._wf_img.set_data(wf_arr)
-        self._wf_img.set_clim(vmin=0, vmax=wf_max)
+        self._wf_img.set_clim(vmin=0, vmax=wf_vmax_stable)
 
         self._canvas.draw_idle()
 
