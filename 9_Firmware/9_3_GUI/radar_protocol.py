@@ -295,6 +295,7 @@ class FT601Connection:
         self.is_open = False
         # Mock state
         self._mock_frame_num = 0
+        self._mock_sample_idx = 0
         self._mock_rng = np.random.RandomState(42)
 
     def open(self, device_index: int = 0) -> bool:
@@ -364,55 +365,80 @@ class FT601Connection:
     def _mock_read(self, size: int) -> bytes:
         """
         Generate synthetic radar data packets for testing.
-        Simulates a batch of packets with a target near range bin 20, Doppler bin 8.
+
+        Packets are emitted **sequentially** — sample index 0, 1, 2, …
+        matching the order _ingest_sample() expects (rbin-major).
+        Each call returns a batch; a full frame needs NUM_CELLS packets.
+
+        Scene: two targets with noise floor
+          Target A — stationary: range bin ~20, Doppler bin 0 (DC)
+          Target B — moving:     range bin ~40, Doppler bin ~8
         """
         time.sleep(0.01)  # Simulate USB latency
-        self._mock_frame_num += 1
 
-        buf = bytearray()
         num_packets = min(256, size // 35)
+        buf = bytearray(num_packets * 35)
+        pos = 0
+
         for _ in range(num_packets):
-            rbin = self._mock_rng.randint(0, NUM_RANGE_BINS)
-            dbin = self._mock_rng.randint(0, NUM_DOPPLER_BINS)
+            rbin = self._mock_sample_idx // NUM_DOPPLER_BINS
+            dbin = self._mock_sample_idx % NUM_DOPPLER_BINS
 
-            # Simulate range profile with a target at bin ~20 and noise
-            range_i = int(self._mock_rng.normal(0, 100))
-            range_q = int(self._mock_rng.normal(0, 100))
-            if abs(rbin - 20) < 3:
-                range_i += 5000
-                range_q += 3000
+            # Noise floor
+            noise_i = int(self._mock_rng.normal(0, 30))
+            noise_q = int(self._mock_rng.normal(0, 30))
 
-            # Simulate Doppler with target at Doppler bin ~8
-            dop_i = int(self._mock_rng.normal(0, 50))
-            dop_q = int(self._mock_rng.normal(0, 50))
-            if abs(rbin - 20) < 3 and abs(dbin - 8) < 2:
-                dop_i += 8000
-                dop_q += 4000
+            # Range profile (sum across Doppler — peaks at target range bins)
+            range_i = noise_i
+            range_q = noise_q
+            if abs(rbin - 20) <= 1:
+                range_i += 4000 + int(self._mock_rng.normal(0, 200))
+                range_q += 2000 + int(self._mock_rng.normal(0, 200))
+            if abs(rbin - 40) <= 1:
+                range_i += 3000 + int(self._mock_rng.normal(0, 150))
+                range_q += 1500 + int(self._mock_rng.normal(0, 150))
 
-            detection = 1 if (abs(rbin - 20) < 2 and abs(dbin - 8) < 2) else 0
+            # Doppler response
+            dop_i = noise_i
+            dop_q = noise_q
+            # Target A: stationary at range ~20, Doppler bin 0 (DC)
+            if abs(rbin - 20) <= 1 and abs(dbin - 0) <= 1:
+                dop_i += 6000 + int(self._mock_rng.normal(0, 300))
+                dop_q += 3000 + int(self._mock_rng.normal(0, 300))
+            # Target B: moving at range ~40, Doppler bin ~8
+            if abs(rbin - 40) <= 1 and abs(dbin - 8) <= 1:
+                dop_i += 5000 + int(self._mock_rng.normal(0, 250))
+                dop_q += 2500 + int(self._mock_rng.normal(0, 250))
 
-            # Build packet
-            pkt = bytearray()
-            pkt.append(HEADER_BYTE)
+            # Detection flag (CFAR-like: flag cells with strong Doppler)
+            mag = abs(dop_i) + abs(dop_q)
+            detection = 1 if mag > 3000 else 0
+
+            # Build 35-byte packet
+            buf[pos] = HEADER_BYTE
+            pos += 1
 
             rword = (((range_q & 0xFFFF) << 16) | (range_i & 0xFFFF)) & 0xFFFFFFFF
-            pkt += struct.pack(">I", rword)
-            pkt += struct.pack(">I", ((rword << 8) & 0xFFFFFFFF))
-            pkt += struct.pack(">I", ((rword << 16) & 0xFFFFFFFF))
-            pkt += struct.pack(">I", ((rword << 24) & 0xFFFFFFFF))
+            struct.pack_into(">I", buf, pos, rword); pos += 4
+            struct.pack_into(">I", buf, pos, (rword << 8) & 0xFFFFFFFF); pos += 4
+            struct.pack_into(">I", buf, pos, (rword << 16) & 0xFFFFFFFF); pos += 4
+            struct.pack_into(">I", buf, pos, (rword << 24) & 0xFFFFFFFF); pos += 4
 
             dword = (((dop_i & 0xFFFF) << 16) | (dop_q & 0xFFFF)) & 0xFFFFFFFF
-            pkt += struct.pack(">I", dword)
-            pkt += struct.pack(">I", ((dword << 8) & 0xFFFFFFFF))
-            pkt += struct.pack(">I", ((dword << 16) & 0xFFFFFFFF))
-            pkt += struct.pack(">I", ((dword << 24) & 0xFFFFFFFF))
+            struct.pack_into(">I", buf, pos, dword); pos += 4
+            struct.pack_into(">I", buf, pos, (dword << 8) & 0xFFFFFFFF); pos += 4
+            struct.pack_into(">I", buf, pos, (dword << 16) & 0xFFFFFFFF); pos += 4
+            struct.pack_into(">I", buf, pos, (dword << 24) & 0xFFFFFFFF); pos += 4
 
-            pkt.append(detection & 0x01)
-            pkt.append(FOOTER_BYTE)
+            buf[pos] = detection & 0x01; pos += 1
+            buf[pos] = FOOTER_BYTE; pos += 1
 
-            buf += pkt
+            self._mock_sample_idx += 1
+            if self._mock_sample_idx >= NUM_CELLS:
+                self._mock_sample_idx = 0
+                self._mock_frame_num += 1
 
-        return bytes(buf)
+        return bytes(buf[:pos])
 
 
 # ============================================================================
