@@ -24,7 +24,6 @@ Usage:
 import sys
 import os
 import time
-import signal
 import queue
 import logging
 import argparse
@@ -357,10 +356,10 @@ class RadarDashboard:
         self.log_text.pack(fill="both", expand=True, padx=8, pady=8)
 
         # Redirect log handler to text widget
-        self._log_handler = _TextHandler(self.log_text)
-        self._log_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s",
-                                                          datefmt="%H:%M:%S"))
-        logging.getLogger().addHandler(self._log_handler)
+        handler = _TextHandler(self.log_text)
+        handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s",
+                                                datefmt="%H:%M:%S"))
+        logging.getLogger().addHandler(handler)
 
     # ------------------------------------------------------------ Actions
     def _on_connect(self):
@@ -546,15 +545,8 @@ class _TextHandler(logging.Handler):
     def __init__(self, text_widget: tk.Text):
         super().__init__()
         self._text = text_widget
-        self._closed = False
-
-    def shutdown(self):
-        """Disable the handler so emit() is a no-op during teardown."""
-        self._closed = True
 
     def emit(self, record):
-        if self._closed:
-            return
         msg = self.format(record)
         try:
             self._text.after(0, self._append, msg)
@@ -613,17 +605,7 @@ def main():
         )
         recorder.start(filepath)
 
-    _closing = False
-
     def on_closing():
-        nonlocal _closing
-        if _closing:
-            return
-        _closing = True
-        # Disable the tkinter log handler first to prevent background
-        # threads from calling widget.after() on a dying Tcl interpreter.
-        if hasattr(dashboard, '_log_handler') and dashboard._log_handler is not None:
-            dashboard._log_handler.shutdown()
         if dashboard._acq_thread is not None:
             dashboard._acq_thread.stop()
             dashboard._acq_thread.join(timeout=2)
@@ -634,13 +616,9 @@ def main():
         root.destroy()
 
     root.protocol("WM_DELETE_WINDOW", on_closing)
-    signal.signal(signal.SIGINT, lambda *_: root.after(0, on_closing))
 
     log.info(f"Dashboard started (mode={mode_str})")
-    try:
-        root.mainloop()
-    except KeyboardInterrupt:
-        on_closing()
+    root.mainloop()
 
 
 if __name__ == "__main__":
