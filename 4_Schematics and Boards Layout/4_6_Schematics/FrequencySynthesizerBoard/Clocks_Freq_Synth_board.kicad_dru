@@ -1,0 +1,34 @@
+(version 1)
+
+# AERIS-10 Freq Synth Board - JLCPCB 6-Layer DRC Rules
+# Manufacturer: JLCPCB (jlcpcb.com)
+# Layer stackup: 6-layer, 1.6mm, FR-4
+# Reference: https://jlcpcb.com/capabilities/pcb-capabilities
+
+# Global defaults matching JLCPCB 6-layer standard process
+(constraint clearance (min 0.09mm))
+(constraint track_width (min 0.09mm) (opt 0.1mm))
+(constraint via_diameter (min 0.45mm) (opt 0.5mm))
+(constraint hole_size (min 0.3mm) (opt 0.3mm))
+(constraint hole_clearance (min 0.25mm))
+(constraint hole_to_hole (min 0.25mm))
+(constraint edge_clearance (min 0.25mm))
+(constraint silk_clearance (min 0.0mm))
+(constraint silk_text_height (min 0.8mm))
+(constraint silk_text_thickness (min 0.1mm))
+(constraint solder_mask_clearance (min 0.05mm))
+(constraint solder_mask_min_width (min 0.05mm))
+(constraint courtyard_clearance (min 0.0mm))
+
+# Differential pair rule
+(rule "Diff pair 100 ohm"
+  (condition "A.NetClass == 'Differential' && B.NetClass == 'Differential'")
+  (constraint clearance (min 0.15mm)))
+
+# AD9523 clock output diff pairs — vias are intentionally close
+(rule "AD9523 diff pair vias"
+  (condition "A.NetName == 'AD9523_OUT8_P' && B.NetName == 'AD9523_OUT8_N'")
+  (constraint clearance (min 0.0mm)))
+(rule "AD9523 diff pair vias 2"
+  (condition "A.NetName == 'AD9523_OUT9_P' && B.NetName == 'AD9523_OUT9_N'")
+  (constraint clearance (min 0.0mm)))
