@@ -12,7 +12,7 @@
 |---|---------------|-----|---------|-----|----------|
 | 1 | `docs/artifacts/te0713-te0701-heartbeat-2026-03-21.bit` | v0.1.7 | First-power heartbeat only | +17.863 ns | **First ever power-on** — verifies JTAG, clock, config |
 | 2 | `docs/artifacts/te0713-te0701-umft601x-dev-2026-03-21.bit` | v0.1.8 | FT601 USB data path (pre-timing-fix) | +0.059 ns | Fallback if v0.1.9 build not available |
-| 3 | **TBD — needs Vivado rebuild** | v0.1.9 | FT601 USB + timing fix + self-test | ~+0.484 ns | **Primary smoke test image** |
+| 3 | `docs/artifacts/te0713-te0701-umft601x-dev-2026-03-22.bit` | v0.1.9 | FT601 USB + timing fix + self-test | +0.349 ns | **Primary smoke test image** |
 
 ### Building Bitstream #3 (v0.1.9)
 
@@ -108,8 +108,8 @@ Step 1.4  Verify heartbeat
 ### Stage 2: FT601 USB Integration — Dev Image
 
 **Purpose:** Verify FT601 USB 3.0 data path, host commands, synthetic data streaming.  
-**Bitstream:** `docs/artifacts/te0713-te0701-umft601x-dev-2026-03-22.bit` (v0.1.9 — build when available)  
-**Fallback:** `docs/artifacts/te0713-te0701-umft601x-dev-2026-03-21.bit` (v0.1.8)
+**Bitstream:** `docs/artifacts/te0713-te0701-umft601x-dev-2026-03-22.bit` (v0.1.9 — timing fix + real self-test)  
+**Fallback:** `docs/artifacts/te0713-te0701-umft601x-dev-2026-03-21.bit` (v0.1.8 — hardwired self-test)
 
 ```
 Step 2.1  Program FT601 dev bitstream
@@ -231,7 +231,7 @@ Step 3.4  Write channel 0 — send host command:
 
 1. **No real radar signal chain** — dev wrapper generates synthetic counter/XOR test data
 2. **ADC self-test will fail** — ADC inputs tied to 0 in dev wrapper (no AD9484 connected)
-3. **Self-test hardcoded** — `status_self_test_flags` is hardwired to `5'b11111` and `status_self_test_detail` to `8'hA5` in the dev wrapper (opcode 0x30 won't trigger actual self-test FSM unless wrapper is updated to instantiate `fpga_self_test.v`)
+3. **Self-test ADC limitation** — `fpga_self_test.v` is fully wired in v0.1.9. Tests 0-3 (BRAM, CIC, FFT, MTI arithmetic) run on real hardware. Test 4 (ADC capture) will timeout/fail because ADC inputs are tied to `16'd0` in the dev wrapper (no AD9484 connected). This is expected — all 4 logic tests should PASS.
 4. **Single clock domain** — dev wrapper runs everything on `ft601_clk_in` (100 MHz). Production design has separate 400 MHz ADC clock.
 
 ---
