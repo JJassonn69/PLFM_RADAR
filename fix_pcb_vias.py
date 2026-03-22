@@ -3,7 +3,7 @@
 import re
 import os
 
-PCB_FILE = "/Users/ganeshpanth/PLFM_RADAR/4_Schematics and Boards Layout/4_6_Schematics/FrequencySynthesizerBoard/.history/Clocks_Freq_Synth_board.kicad_pcb"
+PCB_FILE = "/Users/ganeshpanth/PLFM_RADAR/4_Schematics and Boards Layout/4_6_Schematics/FrequencySynthesizerBoard/Clocks_Freq_Synth_board.kicad_pcb"
 
 with open(PCB_FILE, 'r') as f:
     content = f.read()

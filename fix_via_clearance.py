@@ -21,7 +21,7 @@ import os
 PCB_FILE = (
     "/Users/ganeshpanth/PLFM_RADAR/"
     "4_Schematics and Boards Layout/4_6_Schematics/"
-    "FrequencySynthesizerBoard/.history/Clocks_Freq_Synth_board.kicad_pcb"
+    "FrequencySynthesizerBoard/Clocks_Freq_Synth_board.kicad_pcb"
 )
 
 MIN_CLEARANCE = 0.125  # mm — target clearance (JLCPCB min is 0.1)
