@@ -39,6 +39,18 @@ wire        ft601_clk_out_unused;
 wire        ft601_txe_n_unused;
 wire        ft601_rxf_n_unused;
 
+// Self-test wiring
+reg         self_test_trigger = 1'b0;
+wire        self_test_busy;
+wire        self_test_result_valid;
+wire [4:0]  self_test_result_flags;
+wire [7:0]  self_test_result_detail;
+wire        self_test_capture_active;
+wire [15:0] self_test_capture_data;
+wire        self_test_capture_valid;
+reg  [4:0]  self_test_flags_latched = 5'b00000;
+reg  [7:0]  self_test_detail_latched = 8'd0;
+
 assign sys_reset_n = por_counter[15];
 assign ft601_chip_reset_n = sys_reset_n;
 assign ft601_wakeup_n = 1'b1;
@@ -68,9 +80,18 @@ always @(posedge ft601_clk_in) begin
         doppler_valid_reg <= 1'b0;
         cfar_valid_reg <= 1'b0;
 
+        self_test_trigger <= 1'b0;
+
+        if (self_test_result_valid) begin
+            self_test_flags_latched  <= self_test_result_flags;
+            self_test_detail_latched <= self_test_result_detail;
+        end
+
         if (cmd_valid) begin
             case (cmd_opcode)
                 8'h04: stream_control_reg <= cmd_value[2:0];
+                8'h30: self_test_trigger  <= 1'b1;
+                8'h31: status_request_reg <= 1'b1;
                 8'hFF: status_request_reg <= 1'b1;
                 default: ;
             endcase
@@ -136,9 +157,26 @@ usb_data_interface usb_inst (
     .status_short_listen(16'd17450),
     .status_chirps_per_elev(6'd32),
     .status_range_mode(2'b01),
-    .status_self_test_flags(5'b11111),
-    .status_self_test_detail(8'hA5),
-    .status_self_test_busy(1'b0)
+    .status_self_test_flags(self_test_flags_latched),
+    .status_self_test_detail(self_test_detail_latched),
+    .status_self_test_busy(self_test_busy)
+);
+
+// Board bring-up self-test controller
+// ADC inputs tied to 0 (no AD9484 on dev board — Test 4 will timeout/fail)
+fpga_self_test self_test_inst (
+    .clk(ft601_clk_in),
+    .reset_n(sys_reset_n),
+    .trigger(self_test_trigger),
+    .busy(self_test_busy),
+    .result_valid(self_test_result_valid),
+    .result_flags(self_test_result_flags),
+    .result_detail(self_test_result_detail),
+    .adc_data_in(16'd0),
+    .adc_valid_in(1'b0),
+    .capture_active(self_test_capture_active),
+    .capture_data(self_test_capture_data),
+    .capture_valid(self_test_capture_valid)
 );
 
 endmodule

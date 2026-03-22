@@ -11,6 +11,7 @@ set reports_dir [file join $build_dir "reports"]
 
 set top_file [file join $project_root "radar_system_top_te0713_umft601x_dev.v"]
 set usb_file [file join $project_root "usb_data_interface.v"]
+set self_test_file [file join $project_root "fpga_self_test.v"]
 set xdc_file [file join $project_root "constraints" "te0713_te0701_umft601x.xdc"]
 
 file mkdir $build_dir
@@ -21,6 +22,7 @@ set_property target_language Verilog [current_project]
 
 add_files -norecurse $top_file
 add_files -norecurse $usb_file
+add_files -norecurse $self_test_file
 add_files -fileset constrs_1 -norecurse $xdc_file
 
 set_property top radar_system_top_te0713_umft601x_dev [current_fileset]
