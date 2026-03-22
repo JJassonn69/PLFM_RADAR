@@ -2620,19 +2620,25 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
-  /*Configure GPIO pin Output Level */
+  /*Configure GPIO pin Output Level -- non-CS pins LOW */
   HAL_GPIO_WritePin(GPIOF, AD9523_PD_Pin|AD9523_REF_SEL_Pin|AD9523_SYNC_Pin|AD9523_RESET_Pin
-                          |AD9523_CS_Pin|AD9523_EEPROM_SEL_Pin|LED_1_Pin|LED_2_Pin
+                          |AD9523_EEPROM_SEL_Pin|LED_1_Pin|LED_2_Pin
                           |LED_3_Pin|LED_4_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, ADAR_1_CS_3V3_Pin|ADAR_2_CS_3V3_Pin|ADAR_3_CS_3V3_Pin|ADAR_4_CS_3V3_Pin, GPIO_PIN_RESET);
+  /*Configure GPIO pin Output Level -- AD9523 CS HIGH (deasserted, active-low) */
+  HAL_GPIO_WritePin(GPIOF, AD9523_CS_Pin, GPIO_PIN_SET);
 
-  /*Configure GPIO pin Output Level */
+  /*Configure GPIO pin Output Level -- ADAR CS pins HIGH (deasserted, active-low) */
+  HAL_GPIO_WritePin(GPIOA, ADAR_1_CS_3V3_Pin|ADAR_2_CS_3V3_Pin|ADAR_3_CS_3V3_Pin|ADAR_4_CS_3V3_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level -- non-CS GPIOG pins LOW */
   HAL_GPIO_WritePin(GPIOG, EN_P_5V0_PA1_Pin|EN_P_5V0_PA2_Pin|EN_P_5V0_PA3_Pin|EN_P_5V5_PA_Pin
                           |EN_P_1V8_CLOCK_Pin|EN_P_3V3_CLOCK_Pin|ADF4382_RX_DELADJ_Pin|ADF4382_RX_DELSTR_Pin
-                          |ADF4382_RX_CE_Pin|ADF4382_RX_CS_Pin|ADF4382_TX_DELSTR_Pin|ADF4382_TX_DELADJ_Pin
-                          |ADF4382_TX_CS_Pin|ADF4382_TX_CE_Pin, GPIO_PIN_RESET);
+                          |ADF4382_RX_CE_Pin|ADF4382_TX_DELSTR_Pin|ADF4382_TX_DELADJ_Pin
+                          |ADF4382_TX_CE_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level -- ADF4382 CS pins HIGH (deasserted, active-low) */
+  HAL_GPIO_WritePin(GPIOG, ADF4382_RX_CS_Pin|ADF4382_TX_CS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, EN_P_1V0_FPGA_Pin|EN_P_1V8_FPGA_Pin|EN_P_3V3_FPGA_Pin|EN_P_5V0_ADAR_Pin

@@ -299,9 +299,13 @@ void hal_set_gpio_by_index(uint8_t idx, uint8_t value) {
 
 /* Stub SPI platform ops -- real adf4382a_manager.c references &stm32_spi_ops.
  * In tests, adf4382_init() is mocked so no_os_spi_init() is never called.
- * We provide a non-NULL struct so tests can assert platform_ops != NULL. */
+ * We provide a non-NULL struct so tests can assert platform_ops != NULL.
+ *
+ * Marked __attribute__((weak)) so that tests linking the real stm32_spi.o
+ * (e.g. test_bug18) get the real ops with actual CS logic. */
 static int mock_spi_init_stub(void) { return 0; }
 
+__attribute__((weak))
 const struct no_os_spi_platform_ops stm32_spi_ops = {
     .init = mock_spi_init_stub,
 };

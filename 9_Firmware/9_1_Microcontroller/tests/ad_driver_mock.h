@@ -42,6 +42,9 @@ struct no_os_spi_desc {
 
 struct no_os_spi_platform_ops {
     int (*init)(void);
+    int32_t (*write_and_read)(struct no_os_spi_desc *desc,
+                              uint8_t *data, uint16_t bytes_number);
+    int32_t (*remove)(struct no_os_spi_desc *desc);
 };
 
 struct no_os_spi_init_param {

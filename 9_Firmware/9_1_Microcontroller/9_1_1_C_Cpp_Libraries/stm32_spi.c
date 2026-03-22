@@ -3,6 +3,45 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * Peer CS table: all chip-select pins sharing SPI4 on GPIOG.
+ * Before asserting any CS, we deassert all peers on the same port to
+ * prevent SDO bus contention from devices that share the MISO line.
+ * Also includes AD9523 CS on GPIOF and ADAR CS pins on GPIOA.
+ */
+#include "main.h"
+
+typedef struct {
+    GPIO_TypeDef *port;
+    uint16_t      pin;
+} cs_peer_entry_t;
+
+static const cs_peer_entry_t spi_cs_peers[] = {
+    { GPIOG, ADF4382_TX_CS_Pin },   /* GPIO_PIN_14 */
+    { GPIOG, ADF4382_RX_CS_Pin },   /* GPIO_PIN_10 */
+    { GPIOF, AD9523_CS_Pin },       /* GPIO_PIN_7  */
+    { GPIOA, ADAR_1_CS_3V3_Pin },   /* GPIO_PIN_0  */
+    { GPIOA, ADAR_2_CS_3V3_Pin },   /* GPIO_PIN_1  */
+    { GPIOA, ADAR_3_CS_3V3_Pin },   /* GPIO_PIN_2  */
+    { GPIOA, ADAR_4_CS_3V3_Pin },   /* GPIO_PIN_3  */
+};
+#define SPI_CS_PEER_COUNT (sizeof(spi_cs_peers) / sizeof(spi_cs_peers[0]))
+
+/**
+ * @brief Deassert all peer CS pins (set HIGH) except the one we're about
+ *        to assert.  This prevents bus contention on shared MISO/SDO lines.
+ */
+static void deassert_peer_cs(GPIO_TypeDef *target_port, uint16_t target_pin)
+{
+    for (unsigned i = 0; i < SPI_CS_PEER_COUNT; i++) {
+        if (spi_cs_peers[i].port == target_port &&
+            spi_cs_peers[i].pin  == target_pin)
+            continue;  /* skip the one we're about to assert */
+        HAL_GPIO_WritePin(spi_cs_peers[i].port, spi_cs_peers[i].pin,
+                          GPIO_PIN_SET);
+    }
+}
+
 /**
  * @brief Detect whether 'extra' points to a stm32_spi_extra struct (with
  *        cs_port != NULL) or is a bare SPI_HandleTypeDef* (legacy path).
@@ -54,7 +93,7 @@ int32_t stm32_spi_init(struct no_os_spi_desc **desc,
 
 int32_t stm32_spi_write_and_read(struct no_os_spi_desc *desc,
                                  uint8_t *data,
-                                 uint32_t bytes_number)
+                                 uint16_t bytes_number)
 {
     if (!desc || !data || bytes_number == 0)
         return -EINVAL;
@@ -80,9 +119,12 @@ int32_t stm32_spi_write_and_read(struct no_os_spi_desc *desc,
     if (!hspi)
         return -EINVAL;
 
-    /* Assert CS (active low) */
-    if (cs_port)
+    /* Deassert all peer CS pins first to prevent SDO bus contention,
+     * then assert our target CS (active low). */
+    if (cs_port) {
+        deassert_peer_cs(cs_port, cs_pin);
         HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);
+    }
 
     HAL_StatusTypeDef hal_ret;
     hal_ret = HAL_SPI_TransmitReceive(hspi, data, data, bytes_number, 200);
