@@ -548,9 +548,14 @@ class RadarDashboard:
         # Update CFAR overlay — convert bin indices to physical coordinates
         det_coords = np.argwhere(det_shifted > 0)
         if len(det_coords) > 0:
-            # det_coords[:, 0] = range bin, det_coords[:, 1] = Doppler bin
+            # det_coords[:, 0] = range bin, det_coords[:, 1] = Doppler bin in SHIFTED array
             range_m = (det_coords[:, 0] + 0.5) * self._range_per_bin
-            vel_ms = self._vel_lo + (det_coords[:, 1] + 0.5) * self._vel_per_bin
+            # For Doppler: use fftfreq to get correct frequency axis after fftshift
+            # This gives us the velocity for each bin index in the shifted array
+            doppler_bins_shifted = det_coords[:, 1]
+            # Map shifted indices back to velocity: index 0 = -max_vel, index 16 = 0, index 31 = +max_vel
+            # For 32 bins: vel = -max_vel + (bin_idx + 0.5) * vel_per_bin
+            vel_ms = self._vel_lo + (doppler_bins_shifted + 0.5) * self._vel_per_bin
             offsets = np.column_stack([vel_ms, range_m])
             self._det_scatter.set_offsets(offsets)
         else:
