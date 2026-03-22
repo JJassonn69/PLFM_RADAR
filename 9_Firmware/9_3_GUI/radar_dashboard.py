@@ -116,6 +116,9 @@ class RadarDashboard:
         self._vmax_ema = 1000.0
         self._vmax_alpha = 0.15  # smoothing factor (lower = more stable)
 
+        # Status updates from acquisition thread (polled, never root.after)
+        self._pending_status: Optional[StatusResponse] = None
+
         self._build_ui()
         self._schedule_update()
 
@@ -355,8 +358,8 @@ class RadarDashboard:
                                  insertbackground=FG, wrap="word")
         self.log_text.pack(fill="both", expand=True, padx=8, pady=8)
 
-        # Redirect log handler to text widget
-        handler = _TextHandler(self.log_text)
+        # Redirect log handler to text widget (queue-based, never deadlocks)
+        handler = _TextHandler(self.log_text, self.root)
         handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s",
                                                 datefmt="%H:%M:%S"))
         logging.getLogger().addHandler(handler)
@@ -380,12 +383,24 @@ class RadarDashboard:
         self.btn_connect.config(state="disabled")
         self.root.update_idletasks()
 
+        self._connect_result: Optional[bool] = None
+
         def _do_connect():
             ok = self.conn.open()
-            # Schedule UI update back on the main thread
-            self.root.after(0, lambda: self._on_connect_done(ok))
+            # Never call root.after() from a background thread (deadlocks).
+            # Set a flag that _poll_connect_result picks up.
+            self._connect_result = ok
 
         threading.Thread(target=_do_connect, daemon=True).start()
+        self._poll_connect_result()
+
+    def _poll_connect_result(self):
+        """Poll for connection result on the main thread."""
+        if self._connect_result is not None:
+            self._on_connect_done(self._connect_result)
+            self._connect_result = None
+        else:
+            self.root.after(50, self._poll_connect_result)
 
     def _on_connect_done(self, success: bool):
         """Called on main thread after connection attempt completes."""
@@ -431,8 +446,11 @@ class RadarDashboard:
             log.error("Invalid custom command values")
 
     def _on_status_received(self, status: StatusResponse):
-        """Called from acquisition thread — schedule UI update on main thread."""
-        self.root.after(0, self._update_self_test_labels, status)
+        """Called from acquisition thread — store for main-thread pickup."""
+        # Never call root.after() from a background thread (deadlocks with
+        # the logging lock via Tkapp_ThreadSend).  Instead stash the status
+        # and let _update_display pick it up on the next tick.
+        self._pending_status = status
 
     def _update_self_test_labels(self, status: StatusResponse):
         """Update the self-test result labels from a StatusResponse."""
@@ -480,6 +498,12 @@ class RadarDashboard:
 
     def _update_display(self):
         """Pull latest frame from queue and update plots."""
+        # Check for pending status update from acquisition thread
+        status = self._pending_status
+        if status is not None:
+            self._pending_status = None
+            self._update_self_test_labels(status)
+
         frame = None
         # Drain queue, keep latest
         while True:
@@ -543,26 +567,44 @@ class RadarDashboard:
 
 
 class _TextHandler(logging.Handler):
-    """Logging handler that writes to a tkinter Text widget."""
+    """Logging handler that writes to a tkinter Text widget via a queue.
 
-    def __init__(self, text_widget: tk.Text):
+    emit() is called from ANY thread (including the acquisition thread).
+    To avoid deadlocking with Tkapp_ThreadSend, we never call widget.after()
+    inside emit().  Instead we drop formatted messages into a plain
+    queue.Queue and let the main thread drain it periodically.
+    """
+
+    def __init__(self, text_widget: tk.Text, root: tk.Tk):
         super().__init__()
         self._text = text_widget
+        self._root = root
+        self._queue: queue.Queue = queue.Queue(maxsize=500)
+        self._drain()  # start the drain loop
 
     def emit(self, record):
         msg = self.format(record)
         try:
-            self._text.after(0, self._append, msg)
+            self._queue.put_nowait(msg)
+        except queue.Full:
+            pass  # drop oldest-not-yet-displayed rather than block
+
+    # Called only on the main thread via root.after()
+    def _drain(self):
+        try:
+            for _ in range(50):  # batch up to 50 lines per tick
+                msg = self._queue.get_nowait()
+                self._text.insert("end", msg + "\n")
+            self._text.see("end")
+            # Keep last 500 lines
+            lines = int(self._text.index("end-1c").split(".")[0])
+            if lines > 500:
+                self._text.delete("1.0", f"{lines - 500}.0")
+        except queue.Empty:
+            pass
         except Exception:
             pass
-
-    def _append(self, msg: str):
-        self._text.insert("end", msg + "\n")
-        self._text.see("end")
-        # Keep last 500 lines
-        lines = int(self._text.index("end-1c").split(".")[0])
-        if lines > 500:
-            self._text.delete("1.0", f"{lines - 500}.0")
+        self._root.after(100, self._drain)
 
 
 # ============================================================================
