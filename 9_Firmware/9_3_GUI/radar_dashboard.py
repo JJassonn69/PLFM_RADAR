@@ -116,9 +116,6 @@ class RadarDashboard:
         self._vmax_ema = 1000.0
         self._vmax_alpha = 0.15  # smoothing factor (lower = more stable)
 
-        # Waterfall stable colorscale (prevents diagonal artifacts)
-        self._wf_vmax_ema = 5000.0
-
         # Status updates from acquisition thread (polled, never root.after)
         self._pending_status: Optional[StatusResponse] = None
 
@@ -564,15 +561,12 @@ class RadarDashboard:
         else:
             self._det_scatter.set_offsets(np.empty((0, 2)))
 
-        # Update waterfall - use stable colorscale (EMA) to avoid flicker/diagonal artifacts
+        # Update waterfall
         self._waterfall.append(frame.range_profile.copy())
         wf_arr = np.array(list(self._waterfall))
-        # Smooth vmax to avoid frame-to-frame scaling artifacts that create diagonal appearance
-        wf_frame_max = np.max(wf_arr) if wf_arr.size > 0 else 1.0
-        self._wf_vmax_ema = 0.1 * wf_frame_max + 0.9 * self._wf_vmax_ema
-        wf_vmax_stable = max(self._wf_vmax_ema, 100.0)
+        wf_max = max(np.max(wf_arr), 1.0)
         self._wf_img.set_data(wf_arr)
-        self._wf_img.set_clim(vmin=0, vmax=wf_vmax_stable)
+        self._wf_img.set_clim(vmin=0, vmax=wf_max)
 
         self._canvas.draw_idle()
 
@@ -635,6 +629,8 @@ def main():
                         help="Start HDF5 recording immediately")
     parser.add_argument("--device", type=int, default=0,
                         help="FT601 device index (default: 0)")
+    parser.add_argument("--moving-target", action="store_true",
+                        help="Mock mode: simulate approaching target (range closes over time)")
     args = parser.parse_args()
 
     if args.replay:
@@ -645,8 +641,11 @@ def main():
         conn = FT601Connection(mock=False)
         mode_str = "LIVE"
     else:
-        conn = FT601Connection(mock=True)
-        mode_str = "MOCK"
+        conn = FT601Connection(mock=True, moving_target=args.moving_target)
+        if args.moving_target:
+            mode_str = "MOCK (moving target)"
+        else:
+            mode_str = "MOCK"
 
     recorder = DataRecorder()
 

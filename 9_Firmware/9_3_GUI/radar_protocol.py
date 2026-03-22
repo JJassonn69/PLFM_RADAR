@@ -288,7 +288,7 @@ class FT601Connection:
     Supports ftd3xx (native D3XX) or mock mode.
     """
 
-    def __init__(self, mock: bool = True):
+    def __init__(self, mock: bool = True, moving_target: bool = False):
         self._mock = mock
         self._device = None
         self._lock = threading.Lock()
@@ -297,6 +297,10 @@ class FT601Connection:
         self._mock_frame_num = 0
         self._mock_sample_idx = 0
         self._mock_rng = np.random.RandomState(42)
+        # Moving target simulation
+        self._moving_target = moving_target
+        self._target_range_bin = 55  # Start far away
+        self._target_velocity = -0.3  # Moving toward radar (negative = decreasing range)
 
     def open(self, device_index: int = 0) -> bool:
         if self._mock:
@@ -373,8 +377,21 @@ class FT601Connection:
         Scene: two targets with noise floor
           Target A — stationary: range bin ~20, Doppler bin 0 (DC)
           Target B — moving:     range bin ~40, Doppler bin ~8
+          
+        With --moving-target: single target approaches from far range
         """
         time.sleep(0.01)  # Simulate USB latency
+
+        # Update target position for moving target simulation
+        if self._moving_target:
+            self._target_range_bin += self._target_velocity
+            # Wrap around: if target reaches 0, reset to far range
+            if self._target_range_bin < 5:
+                self._target_range_bin = 55
+                log.info(f"Target wrapped: resetting to far range (bin 55)")
+            elif int(self._target_range_bin) != int(self._target_range_bin - self._target_velocity):
+                # Log when target crosses into new integer bin
+                log.debug(f"Target at range bin {int(self._target_range_bin)}")
 
         num_packets = min(256, size // 35)
         buf = bytearray(num_packets * 35)
@@ -391,24 +408,39 @@ class FT601Connection:
             # Range profile (sum across Doppler — peaks at target range bins)
             range_i = noise_i
             range_q = noise_q
-            if abs(rbin - 20) <= 1:
-                range_i += 4000 + int(self._mock_rng.normal(0, 200))
-                range_q += 2000 + int(self._mock_rng.normal(0, 200))
-            if abs(rbin - 40) <= 1:
-                range_i += 3000 + int(self._mock_rng.normal(0, 150))
-                range_q += 1500 + int(self._mock_rng.normal(0, 150))
-
-            # Doppler response
-            dop_i = noise_i
-            dop_q = noise_q
-            # Target A: stationary at range ~20, Doppler bin 0 (DC)
-            if abs(rbin - 20) <= 1 and abs(dbin - 0) <= 1:
-                dop_i += 6000 + int(self._mock_rng.normal(0, 300))
-                dop_q += 3000 + int(self._mock_rng.normal(0, 300))
-            # Target B: moving at range ~40, Doppler bin ~8
-            if abs(rbin - 40) <= 1 and abs(dbin - 8) <= 1:
-                dop_i += 5000 + int(self._mock_rng.normal(0, 250))
-                dop_q += 2500 + int(self._mock_rng.normal(0, 250))
+            
+            if self._moving_target:
+                # Single approaching target
+                target_r = int(self._target_range_bin)
+                if abs(rbin - target_r) <= 1:
+                    range_i += 5000 + int(self._mock_rng.normal(0, 200))
+                    range_q += 3000 + int(self._mock_rng.normal(0, 200))
+                # Doppler: positive velocity = approaching (high Doppler bin)
+                dop_i = noise_i
+                dop_q = noise_q
+                if abs(rbin - target_r) <= 1 and abs(dbin - 25) <= 1:
+                    # High positive Doppler (approaching fast)
+                    dop_i += 7000 + int(self._mock_rng.normal(0, 300))
+                    dop_q += 4000 + int(self._mock_rng.normal(0, 300))
+            else:
+                # Static scene: two fixed targets
+                if abs(rbin - 20) <= 1:
+                    range_i += 4000 + int(self._mock_rng.normal(0, 200))
+                    range_q += 2000 + int(self._mock_rng.normal(0, 200))
+                if abs(rbin - 40) <= 1:
+                    range_i += 3000 + int(self._mock_rng.normal(0, 150))
+                    range_q += 1500 + int(self._mock_rng.normal(0, 150))
+                # Doppler response
+                dop_i = noise_i
+                dop_q = noise_q
+                # Target A: stationary at range ~20, Doppler bin 0 (DC)
+                if abs(rbin - 20) <= 1 and abs(dbin - 0) <= 1:
+                    dop_i += 6000 + int(self._mock_rng.normal(0, 300))
+                    dop_q += 3000 + int(self._mock_rng.normal(0, 300))
+                # Target B: moving at range ~40, Doppler bin ~8
+                if abs(rbin - 40) <= 1 and abs(dbin - 8) <= 1:
+                    dop_i += 5000 + int(self._mock_rng.normal(0, 250))
+                    dop_q += 2500 + int(self._mock_rng.normal(0, 250))
 
             # Detection flag (CFAR-like: flag cells with strong Doppler)
             mag = abs(dop_i) + abs(dop_q)
