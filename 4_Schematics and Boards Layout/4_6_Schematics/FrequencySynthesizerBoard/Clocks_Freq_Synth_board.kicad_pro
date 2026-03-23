@@ -528,7 +528,7 @@
     "last_paths": {
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "./",
       "specctra_dsn": "",
       "vrml": ""
     },
@@ -610,7 +610,15 @@
     "meta": {
       "version": 1
     },
-    "page_layout_descr_file": "",
+    "ngspice": {
+      "fix_include_paths": true,
+      "meta": {
+        "version": 0
+      },
+      "model_mode": 4,
+      "workbook_filename": ""
+    },
+    "page_layout_descr_file": "empty.kicad_wks",
     "plot_directory": "",
     "reuse_designators": true,
     "subpart_first_id": 65,
@@ -618,14 +626,28 @@
     "top_level_sheets": [
       {
         "filename": "Clocks_Freq_Synth_board.kicad_sch",
-        "name": "Clocks_Freq_Synth_board",
-        "uuid": "00000000-0000-0000-0000-000000000000"
+        "name": "",
+        "uuid": "b3c0bcb9-c057-4184-b6dd-f356a10d1804"
+      },
+      {
+        "filename": "Clocks_Freq_Synth_board_1.kicad_sch",
+        "name": "Clocks_Freq_Synth_board_1",
+        "uuid": "f26b4693-5ab7-4caa-b5a4-0f59105b2eca"
       }
     ],
     "used_designators": "",
     "variants": []
   },
-  "sheets": [],
+  "sheets": [
+    [
+      "b3c0bcb9-c057-4184-b6dd-f356a10d1804",
+      ""
+    ],
+    [
+      "f26b4693-5ab7-4caa-b5a4-0f59105b2eca",
+      "Clocks_Freq_Synth_board_1"
+    ]
+  ],
   "text_variables": {},
   "tuning_profiles": {
     "meta": {
