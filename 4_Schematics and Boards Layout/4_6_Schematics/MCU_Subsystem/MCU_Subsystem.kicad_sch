@@ -1,0 +1,263 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "a0000000-0000-0000-0000-000000000001")
+	(paper "A3")
+	(title_block
+		(title "AERIS-10 PLFM Radar - MCU Subsystem")
+		(date "2026-03-22")
+		(rev "0.1")
+		(company "PLFM_RADAR Project")
+		(comment 1 "STM32F746ZGT7 Microcontroller Subsystem")
+		(comment 2 "For custom radar main board")
+	)
+	(lib_symbols)
+	(text "AERIS-10 PLFM Phased Array Radar\nMCU Subsystem - Top Level\n\nSheet 1: MCU Core (power, clocks, reset, debug, decoupling)\nSheet 2: Communication Interfaces (SPI, I2C, UART, USB-FS)\nSheet 3: FPGA Interface (SPI bridge, handshake, level shifting)\nSheet 4: Sensors & Actuators (IMU, barometer, GPS, stepper, DAC/ADC bias)\nSheet 5: Power Sequencing & Indicators (enable network, LEDs)"
+		(exclude_from_sim no)
+		(at 25.4 38.1 0)
+		(effects
+			(font
+				(size 2.54 2.54)
+			)
+			(justify left)
+		)
+		(uuid "a0000000-0000-0000-0000-000000000010")
+	)
+	(sheet
+		(at 25.4 88.9)
+		(size 50.8 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 255 255 194 1)
+		)
+		(uuid "b1000000-0000-0000-0000-000000000001")
+		(property "Sheetname" "MCU_Core"
+			(at 25.4 87.6362 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "MCU_Core.kicad_sch"
+			(at 25.4 115.5638 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 101.6 88.9)
+		(size 50.8 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 194 255 194 1)
+		)
+		(uuid "b2000000-0000-0000-0000-000000000001")
+		(property "Sheetname" "Comm_Interfaces"
+			(at 101.6 87.6362 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Comm_Interfaces.kicad_sch"
+			(at 101.6 115.5638 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 177.8 88.9)
+		(size 50.8 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 194 224 255 1)
+		)
+		(uuid "b3000000-0000-0000-0000-000000000001")
+		(property "Sheetname" "FPGA_Interface"
+			(at 177.8 87.6362 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "FPGA_Interface.kicad_sch"
+			(at 177.8 115.5638 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 25.4 139.7)
+		(size 50.8 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 255 224 194 1)
+		)
+		(uuid "b4000000-0000-0000-0000-000000000001")
+		(property "Sheetname" "Sensors_Actuators"
+			(at 25.4 138.4362 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Sensors_Actuators.kicad_sch"
+			(at 25.4 166.3638 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 101.6 139.7)
+		(size 50.8 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 255 194 194 1)
+		)
+		(uuid "b5000000-0000-0000-0000-000000000001")
+		(property "Sheetname" "Power_Sequencing"
+			(at 101.6 138.4362 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Power_Sequencing.kicad_sch"
+			(at 101.6 166.3638 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001"
+					(page "6")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

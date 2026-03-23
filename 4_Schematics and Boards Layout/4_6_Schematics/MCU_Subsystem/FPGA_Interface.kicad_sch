@@ -1,0 +1,1786 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "c104b81f-24dc-4aa7-bfca-22ece2e419e8")
+	(paper "A3")
+	(title_block
+		(title "AERIS-10 FPGA-MCU Interface")
+		(date "2026-03-22")
+		(rev "0.1")
+		(company "PLFM_RADAR Project")
+		(comment 1 "SPI Bridge, Handshake Signals, Level Shifting 3.3V <-> 1.8V")
+	)
+	(lib_symbols
+		(symbol "Connector_Generic:Conn_01x06"
+			(pin_names
+				(offset 1.016)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "J"
+				(at 0 7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "Conn_01x06"
+				(at 0 -10.16 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "connector"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_fp_filters" "Connector*:*_1x??_*"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "Conn_01x06_1_1"
+				(rectangle
+					(start -1.27 6.35)
+					(end 1.27 -8.89)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(rectangle
+					(start -1.27 5.207)
+					(end 0 4.953)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -1.27 2.667)
+					(end 0 2.413)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -1.27 0.127)
+					(end 0 -0.127)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -1.27 -2.413)
+					(end 0 -2.667)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -1.27 -4.953)
+					(end 0 -5.207)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -1.27 -7.493)
+					(end 0 -7.747)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin passive line
+					(at -5.08 5.08 0)
+					(length 3.81)
+					(name "Pin_1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 2.54 0)
+					(length 3.81)
+					(name "Pin_2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 0 0)
+					(length 3.81)
+					(name "Pin_3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 -2.54 0)
+					(length 3.81)
+					(name "Pin_4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 -5.08 0)
+					(length 3.81)
+					(name "Pin_5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 -7.62 0)
+					(length 3.81)
+					(name "Pin_6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+	)
+	(text "Note: 33R series resistors recommended\non all MCU->FPGA digital lines\nfor signal integrity and ESD protection"
+		(exclude_from_sim no)
+		(at 25.4 230 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "0b779e7e-3ace-4b2d-8f4a-031628f477cb")
+	)
+	(text "FPGA JTAG (directly from debug header or\ndedicated JTAG connector, not through MCU)"
+		(exclude_from_sim no)
+		(at 150 165 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left)
+		)
+		(uuid "12f33b95-72a2-4d03-b14a-90e75fcfd8b7")
+	)
+	(text "Reserved (PD14)"
+		(exclude_from_sim no)
+		(at 60 215.48 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "140ea4b4-2d74-4ab7-b7b4-57d40d835143")
+	)
+	(text "-> FPGA pin (3.3V bank) -> "
+		(exclude_from_sim no)
+		(at 60 115.24 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "1abf17e1-d85d-4c1c-bd2b-0cb86197f97f")
+	)
+	(text "Reserved (PD15)"
+		(exclude_from_sim no)
+		(at 60 220.56 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "20eefcc1-9e5b-45f1-b10f-5c26b512c40f")
+	)
+	(text "-> FPGA pin (3.3V bank) -> "
+		(exclude_from_sim no)
+		(at 60 100 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "278a6b76-b9dd-4975-ab04-0645d2b4d193")
+	)
+	(text "FPGA -> ADAR1 CS"
+		(exclude_from_sim no)
+		(at 200 122.86 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "28084f84-ef92-4744-b983-5af4260e588d")
+	)
+	(text "Reserved (PD13)"
+		(exclude_from_sim no)
+		(at 60 210.4 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "2aceacbc-e822-4dbf-a319-4166f3283460")
+	)
+	(text "New Chirp Trigger (PD8)"
+		(exclude_from_sim no)
+		(at 60 185 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "3c9461f1-f27c-4bbc-90ea-dc38d72811d7")
+	)
+	(text "ADC Clock N (LVDS from AD9523)"
+		(exclude_from_sim no)
+		(at 200 245.24 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "510daa3d-c9d8-4d00-baf5-fe8977961951")
+	)
+	(text "New Azimuth (PD10)"
+		(exclude_from_sim no)
+		(at 60 195.16 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "612aa634-20b5-4ecc-9878-2cf26c667fb5")
+	)
+	(text "MCU -> FPGA Handshake Signals\nDirect 3.3V GPIO connections (FPGA 3.3V bank)\nActive-high pulses synchronized inside FPGA via CDC"
+		(exclude_from_sim no)
+		(at 25.4 165 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left)
+		)
+		(uuid "73bae6c3-0c0d-4129-8d2b-4b417a82a497")
+	)
+	(text "FPGA -> ADAR3 CS"
+		(exclude_from_sim no)
+		(at 200 138.1 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "790aabbd-e84a-479f-8ba4-fc6a538aca7b")
+	)
+	(text "-> FPGA pin (3.3V bank) -> "
+		(exclude_from_sim no)
+		(at 60 145.72 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "7e611866-8e59-43fc-beff-ced0ae47d2d4")
+	)
+	(text "-> FPGA pin (3.3V bank) -> "
+		(exclude_from_sim no)
+		(at 60 138.1 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "83198970-3098-4507-b81e-7a59f2da40c0")
+	)
+	(text "FPGA-MCU Interface\n\nThe STM32 operates at 3.3V I/O.\nThe Artix-7 FPGA has mixed I/O banks:\n  - Bank 34: 1.8V (ADAR1000 SPI, ADC/DAC data)\n  - Bank 14/16: 3.3V (MCU GPIO, FT601)\n\nSPI1 from MCU enters FPGA on 3.3V bank pins,\nFPGA internally routes to 1.8V bank for ADAR1000.\nNo external level shifter needed for SPI bridge -\nFPGA handles voltage translation between banks."
+		(exclude_from_sim no)
+		(at 25.146 31.75 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left)
+		)
+		(uuid "854c7b42-8426-442a-94f7-f14f870b4a4c")
+	)
+	(text "FPGA <- ADAR SPI MISO"
+		(exclude_from_sim no)
+		(at 200 115.24 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "894610db-680c-460d-8d32-429297e160fe")
+	)
+	(text "Mixers Enable (PD11)"
+		(exclude_from_sim no)
+		(at 60 200.24 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "895a2a24-8e95-493f-9fbf-3ab7122ab638")
+	)
+	(text "FPGA Reset (PD12)"
+		(exclude_from_sim no)
+		(at 60 205.32 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "8ad9e6e7-cb8b-4b3b-b473-744df5577f82")
+	)
+	(text "FPGA -> ADAR SPI CLK"
+		(exclude_from_sim no)
+		(at 200 100 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "8b252224-6095-4d67-997d-fc7762637053")
+	)
+	(text "DAC Clock (from AD9523)"
+		(exclude_from_sim no)
+		(at 200 235.08 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "902511ac-3be4-44c3-b598-e6104353577d")
+	)
+	(text "SPI1 Bridge Path: MCU (3.3V) -> FPGA -> ADAR1000 (1.8V)"
+		(exclude_from_sim no)
+		(at 25.4 85 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left)
+		)
+		(uuid "a4ebfaf2-91e8-49cb-b11c-9ed84c624701")
+	)
+	(text "JTAG Data Out"
+		(exclude_from_sim no)
+		(at 190 200.24 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "ac5f56b4-2be7-476c-9338-f5782e5b619e")
+	)
+	(text "FPGA -> ADAR SPI MOSI"
+		(exclude_from_sim no)
+		(at 200 107.62 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "ae958040-5cfd-46c1-8235-7b9b705ef65a")
+	)
+	(text "-> FPGA pin (3.3V bank) -> "
+		(exclude_from_sim no)
+		(at 60 122.86 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "b19bc631-eb36-47c9-baad-bbb94a8781ad")
+	)
+	(text "JTAG Mode Select"
+		(exclude_from_sim no)
+		(at 190 190.08 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "bb3a3390-b5c3-49f8-b617-75ff2a6959b9")
+	)
+	(text "JTAG Clock"
+		(exclude_from_sim no)
+		(at 190 185 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "bb9c4e4b-b9ea-484b-b478-982d33644717")
+	)
+	(text "FPGA -> ADAR4 CS"
+		(exclude_from_sim no)
+		(at 200 145.72 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "bd5f16aa-0eaf-4d83-8f70-530db25f0a96")
+	)
+	(text "System Clock (from AD9523)"
+		(exclude_from_sim no)
+		(at 200 230 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "bf888695-a065-43eb-809f-f860479b4bba")
+	)
+	(text "-> FPGA pin (3.3V bank) -> "
+		(exclude_from_sim no)
+		(at 60 107.62 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "c5f5f890-1262-438c-9984-065718c1febc")
+	)
+	(text "-> FPGA pin (3.3V bank) -> "
+		(exclude_from_sim no)
+		(at 60 130.48 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "cf188981-9067-4fea-a7d5-6dffd62b49ed")
+	)
+	(text "New Elevation (PD9)"
+		(exclude_from_sim no)
+		(at 60 190.08 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "cf65be60-a8c3-4b02-9a3e-486e77614883")
+	)
+	(text "FPGA -> ADAR2 CS"
+		(exclude_from_sim no)
+		(at 200 130.48 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "d2bd5d53-7b35-4912-b860-8e9babaa02ab")
+	)
+	(text "JTAG Data In"
+		(exclude_from_sim no)
+		(at 190 195.16 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "d505b270-0b4d-4078-a0d3-091603228c6c")
+	)
+	(text "ADC Clock P (LVDS from AD9523)"
+		(exclude_from_sim no)
+		(at 200 240.16 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "ddbc5a4a-813a-4923-9d95-8215e8d8dfcc")
+	)
+	(text "FPGA Clock Inputs\n(from AD9523 clock distribution)"
+		(exclude_from_sim no)
+		(at 150 215 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left)
+		)
+		(uuid "eef1aa39-7d13-4134-8807-5b95330ffce2")
+	)
+	(text "SMA test points for clock verification"
+		(exclude_from_sim no)
+		(at 150 255 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "fc49e570-ffcd-4718-a5c5-00098768ba8b")
+	)
+	(global_label "DIG_0"
+		(shape output)
+		(at 25.4 185 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "059934f6-c2ee-44a8-99e2-c5b3c1dc9dcd")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 185 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "STM32_SCLK1"
+		(shape bidirectional)
+		(at 25.4 100 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "1bb08573-441c-4456-b079-aba16f494e24")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 100 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "FPGA_DAC_CLOCK"
+		(shape input)
+		(at 150 235.08 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "1d739843-feb7-4ce1-9292-e64e17fde14d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 150 235.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "STM32_MOSI_1V8"
+		(shape bidirectional)
+		(at 160 107.62 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "20366bc0-b3aa-4e00-b412-64d82994a098")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 160 107.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "STM32_SCLK_1V8"
+		(shape bidirectional)
+		(at 160 100 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "2d1eaef4-7b7c-4d7e-be54-9180285e9ce8")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 160 100 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "DIG_4"
+		(shape output)
+		(at 25.4 205.32 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "320379f8-3236-46f2-a072-a5a52d869372")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 205.32 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "ADAR_1_CS_3V3"
+		(shape bidirectional)
+		(at 25.4 122.86 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "35d74c55-c120-4045-aa54-01744b7c7c60")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 122.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "ADAR_4_CS_1V8"
+		(shape bidirectional)
+		(at 160 145.72 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "42a0be81-e606-4c5b-ac24-489d9e18349b")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 160 145.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "DIG_3"
+		(shape output)
+		(at 25.4 200.24 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "47f60e4c-0ca1-445a-b381-834c82de4b26")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 200.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "DIG_2"
+		(shape output)
+		(at 25.4 195.16 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "6a13b635-3988-4c06-8340-3a2dd36b47c6")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 195.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "FPGA_TDI"
+		(shape bidirectional)
+		(at 150 195.16 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "7703dbb0-56db-4124-b161-5c52629fd325")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 150 195.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "ADAR_3_CS_1V8"
+		(shape bidirectional)
+		(at 160 138.1 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "7e840954-7390-4818-959f-62f23503c294")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 160 138.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "STM32_MOSI1"
+		(shape bidirectional)
+		(at 25.4 107.62 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "94b88438-a3b1-4092-8015-097dfbf13004")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 107.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "DIG_1"
+		(shape output)
+		(at 25.4 190.08 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "a478feb7-c302-4c1c-b368-f6156576cb62")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 190.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "FPGA_ADC_CLOCK_P"
+		(shape input)
+		(at 150 240.16 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "a623257f-e7b9-40f4-b3f6-3af4fb9062ff")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 150 240.16 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "ADAR_2_CS_1V8"
+		(shape bidirectional)
+		(at 160 130.48 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "a96546e7-2188-43c3-93d6-9af958b18e1f")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 160 130.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "ADAR_3_CS_3V3"
+		(shape bidirectional)
+		(at 25.4 138.1 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "ad7841a1-f0dc-4505-a18e-c9cc42b6067c")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 138.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "ADAR_1_CS_1V8"
+		(shape bidirectional)
+		(at 160 122.86 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "ae16f6e4-5181-4050-81bd-c5cdcddc6b1e")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 160 122.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "FPGA_ADC_CLOCK_N"
+		(shape input)
+		(at 150 245.24 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "ae581b8c-235c-4b06-8486-523eef72e48b")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 150 245.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "STM32_MISO1"
+		(shape bidirectional)
+		(at 25.4 115.24 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "b04d17fb-b9f5-44c8-981e-d7eab6868696")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 115.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "ADAR_4_CS_3V3"
+		(shape bidirectional)
+		(at 25.4 145.72 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "b2165c50-ec9e-4d83-8df5-9b033c508709")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 145.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "DIG_5"
+		(shape output)
+		(at 25.4 210.4 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "b4b6eadc-fce2-4af7-8c80-33afb390aabf")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 210.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "DIG_6"
+		(shape output)
+		(at 25.4 215.48 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "ba78615c-e6d8-4ebd-8260-27b68eddb93f")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 215.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "FPGA_TDO"
+		(shape bidirectional)
+		(at 150 200.24 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "bc4acb88-4f6f-4739-83cb-4fb9ca81c171")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 150 200.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "FPGA_SYS_CLOCK"
+		(shape input)
+		(at 150 230 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "be267bf6-23eb-460d-b9e9-82128bcd35de")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 150 230 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "STM32_MISO_1V8"
+		(shape bidirectional)
+		(at 160 115.24 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "c5d3a314-8d9c-4d5f-be00-d0450798a7c5")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 160 115.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "ADAR_2_CS_3V3"
+		(shape bidirectional)
+		(at 25.4 130.48 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "db126f09-cb96-4a95-bb15-bd28a73a8b2e")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 130.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "DIG_7"
+		(shape output)
+		(at 25.4 220.56 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "dff9bf34-ca62-4245-bed5-febf506be267")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 25.4 220.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "FPGA_TMS"
+		(shape bidirectional)
+		(at 150 190.08 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "e3b33a50-19f9-4667-a746-f753f086ba14")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 150 190.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "FPGA_TCK"
+		(shape bidirectional)
+		(at 150 185 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "e5320733-a9cf-4d5c-a0cb-a68d55b3007d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 150 185 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x06")
+		(at 220 185 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "6266a72f-063b-44b9-a42d-16c726af73dc")
+		(property "Reference" "JP_JTAG"
+			(at 225.08 185 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "FPGA_JTAG"
+			(at 225.08 187.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 220 185 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 220 185 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 220 185 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "3f561eda-402d-4eda-bd3f-c2b3e8564ac1")
+		)
+		(pin "2"
+			(uuid "b51793e8-9aee-428d-bf6b-4c01ce8dc872")
+		)
+		(pin "3"
+			(uuid "6dff049e-7167-4f8f-b9f1-9a14b77aaf4e")
+		)
+		(pin "4"
+			(uuid "15daf565-f2b5-465d-818a-ba7b773a9626")
+		)
+		(pin "5"
+			(uuid "1a118539-3f74-45ca-b61b-3cdb352c40c9")
+		)
+		(pin "6"
+			(uuid "8e9587e9-f8e0-421a-a469-0028657c0925")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b3000000-0000-0000-0000-000000000001"
+					(reference "JP_JTAG")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "4")
+		)
+	)
+	(embedded_fonts no)
+)

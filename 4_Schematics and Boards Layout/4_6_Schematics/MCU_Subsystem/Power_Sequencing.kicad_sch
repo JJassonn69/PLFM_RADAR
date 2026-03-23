@@ -1,0 +1,4573 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "6bd1e510-e5e2-49b7-80f8-9addaa1ab72e")
+	(paper "A3")
+	(title_block
+		(title "AERIS-10 Power Sequencing & Indicators")
+		(date "2026-03-22")
+		(rev "0.1")
+		(company "PLFM_RADAR Project")
+		(comment 1 "MCU-controlled power enables, LED status indicators, watchdog")
+	)
+	(lib_symbols)
+	(text "Yellow\nActivity"
+		(exclude_from_sim no)
+		(at 80.01 265.43 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "0c284fc3-43ec-49ca-8d4a-370d64171e07")
+	)
+	(text "Power Enable Sequencing Network\n\nThe STM32 controls all subsystem power rails via GPIO.\nPower-on sequence (from main.cpp):\n  1. +1V0_FPGA (PE7) - FPGA core\n  2. +1V8_FPGA (PE8) - FPGA aux/bank 34\n  3. +3V3_FPGA (PE9) - FPGA I/O banks\n  4. +1V8_CLOCK (PG4) - AD9523 clock synth\n  5. +3V3_CLOCK (PG5) - ADF4382 LO synth\n  6. +5V0_ADAR (PE10) - ADAR1000 beamformers\n  7. +3V3_ADAR12/34 (PE11/PE12) - ADAR regulators\n  8. +3V3_ADTR (PE13) - ADC/DAC transmitter\n  9. +3V3_SW (PE14) - RF switches\n  10. +5V0_PA1/2/3 (PG0/1/2) - PA stages\n  11. +5V5_PA (PG3) - PA final stage\n\nEach enable drives the EN pin of a regulator/LDO.\n100K pulldown on each EN pin ensures safe default off."
+		(exclude_from_sim no)
+		(at 25.4 49.53 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left)
+		)
+		(uuid "12339191-8ece-41fd-aa67-608e25a689b8")
+	)
+	(text "+3V3 FPGA I/O (PE9)"
+		(exclude_from_sim no)
+		(at 58.42 154.94 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "14c629c3-cf6a-44f8-a4db-7d463448191e")
+	)
+	(text "Internal Watchdog (IWDG)\nConfigured in firmware - no external components\nTimeout protects against MCU lockup during PA operation"
+		(exclude_from_sim no)
+		(at 24.13 280.67 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left)
+		)
+		(uuid "1f4356e8-6538-4548-8a94-b9bfd8599dd7")
+	)
+	(text "+5V0 PA Stage 2 (PG1)"
+		(exclude_from_sim no)
+		(at 189.23 234.95 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "260dd7b5-a972-4017-8374-5fa260292439")
+	)
+	(text "Red\nError"
+		(exclude_from_sim no)
+		(at 105.41 265.43 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "35b35871-7ee4-4f38-961d-deb52dc7ecdd")
+	)
+	(text "+1V8 FPGA Aux (PE8)"
+		(exclude_from_sim no)
+		(at 58.42 144.78 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "435a8aa5-7676-4bc9-9fda-abefb33af02b")
+	)
+	(text "+3V3 VDD Switches (PE15)"
+		(exclude_from_sim no)
+		(at 189.23 185.42 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "59865e67-b6a1-4c12-a2f5-dd92a30b2eb4")
+	)
+	(text "+1V0 FPGA Core (PE7)"
+		(exclude_from_sim no)
+		(at 58.42 134.62 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "613a04fe-16b1-4d95-a808-e89cc3a21439")
+	)
+	(text "+5V5 PA Final (PG3)"
+		(exclude_from_sim no)
+		(at 189.23 255.27 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "88ec98f2-11b5-4778-aa02-58f22f8fb108")
+	)
+	(text "Beamformer & RF Power Enables"
+		(exclude_from_sim no)
+		(at 148.59 119.38 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left)
+		)
+		(uuid "8f651e39-92a4-4e17-8251-998250dad63e")
+	)
+	(text "Blue\nHeartbeat"
+		(exclude_from_sim no)
+		(at 54.61 265.43 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "964614cc-2510-4519-81ee-b1bf84b6d832")
+	)
+	(text "Clock/LO Power Enables"
+		(exclude_from_sim no)
+		(at 24.13 170.18 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left)
+		)
+		(uuid "9bbdc9c9-8425-40a4-804d-6cf79c86a4bf")
+	)
+	(text "+5V0 PA Stage 1 (PG0)"
+		(exclude_from_sim no)
+		(at 189.23 224.79 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "9c252731-a6c8-4fce-9e54-4d2676ee53f2")
+	)
+	(text "+3V3 LO Synth (PG5)"
+		(exclude_from_sim no)
+		(at 58.42 195.58 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "ad7b20e1-30c8-4ac0-9ab1-9f8a58919363")
+	)
+	(text "+3V3 RF Switches (PE14)"
+		(exclude_from_sim no)
+		(at 189.23 175.26 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "bb625c6a-dccc-465c-9d6a-a9069a85846f")
+	)
+	(text "FPGA Power Enables"
+		(exclude_from_sim no)
+		(at 24.13 119.38 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left)
+		)
+		(uuid "c828f644-fe5b-4f70-ac3f-96e6cea0baaf")
+	)
+	(text "+1V8 Clock Synth (PG4)"
+		(exclude_from_sim no)
+		(at 58.42 185.42 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "c938f1a2-7579-464d-b015-8a55f6d3bff0")
+	)
+	(text "Status LEDs\nPF12=LED1 (power), PF13=LED2 (heartbeat),\nPF14=LED3 (activity), PF15=LED4 (error)\nActive-high, 1K series resistors"
+		(exclude_from_sim no)
+		(at 24.13 219.71 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left)
+		)
+		(uuid "cc21d4fe-d5e5-4c53-b837-814be326e3a3")
+	)
+	(text "+5V0 PA Stage 3 (PG2)"
+		(exclude_from_sim no)
+		(at 189.23 245.11 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "dc9129e3-43de-4965-9ff8-d3880b610978")
+	)
+	(text "+3V3 ADAR 1&2 (PE11)"
+		(exclude_from_sim no)
+		(at 189.23 144.78 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "e44f1fbc-c8b7-40a5-aaab-2d293ecf9935")
+	)
+	(text "+3V3 ADAR 3&4 (PE12)"
+		(exclude_from_sim no)
+		(at 189.23 154.94 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "ed682120-2377-4680-aad1-d40557a51b54")
+	)
+	(text "+3V3 ADC/DAC (PE13)"
+		(exclude_from_sim no)
+		(at 189.23 165.1 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "ef03c607-9f15-4788-8d04-b3c4a3ef9a73")
+	)
+	(text "Green\nPower OK"
+		(exclude_from_sim no)
+		(at 29.21 265.43 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "efc1f800-353d-47dd-b973-11428d0f4908")
+	)
+	(text "+5V0 ADAR1000 (PE10)"
+		(exclude_from_sim no)
+		(at 189.23 134.62 0)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "f551f5f6-d3a4-4f3c-9ed8-da5ab212b02e")
+	)
+	(text "Power Amplifier Enables"
+		(exclude_from_sim no)
+		(at 148.59 209.55 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left)
+		)
+		(uuid "fa909361-699e-474f-b781-25ec5a31fb94")
+	)
+	(wire
+		(pts
+			(xy 168.91 234.95) (xy 168.91 237.49)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "007dd5d0-b991-4321-a832-da81a0ec0b16")
+	)
+	(wire
+		(pts
+			(xy 39.37 163.83) (xy 43.18 163.83)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "04356368-d259-4f64-aaf2-18085888a422")
+	)
+	(wire
+		(pts
+			(xy 165.1 194.31) (xy 168.91 194.31)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0c2889bc-0c09-4775-bcf5-52d5f42bc590")
+	)
+	(wire
+		(pts
+			(xy 168.91 165.1) (xy 168.91 167.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0e9c801a-750c-4e9e-b022-d507c3ca430b")
+	)
+	(wire
+		(pts
+			(xy 30.48 260.35) (xy 34.29 260.35)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1354d0f4-af5a-48ee-9b55-a4e7c4c441c6")
+	)
+	(wire
+		(pts
+			(xy 165.1 163.83) (xy 168.91 163.83)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "15fc8a69-d340-4f7b-9569-6d4718d4c494")
+	)
+	(wire
+		(pts
+			(xy 80.01 250.19) (xy 85.09 247.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1eceefce-7c6d-4d28-9b3a-95ff2a21e6c5")
+	)
+	(wire
+		(pts
+			(xy 165.1 254) (xy 168.91 254)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "294b1e03-9079-4b24-80e2-6e5f5b78d205")
+	)
+	(wire
+		(pts
+			(xy 39.37 143.51) (xy 43.18 143.51)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2f549d49-d062-4338-b5e7-2f600f49d126")
+	)
+	(wire
+		(pts
+			(xy 165.1 243.84) (xy 168.91 243.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "35659451-3d96-41f4-a69a-af26e1fb9272")
+	)
+	(wire
+		(pts
+			(xy 168.91 185.42) (xy 168.91 187.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "38805080-05e3-438f-9eac-caec31b602bc")
+	)
+	(wire
+		(pts
+			(xy 39.37 153.67) (xy 43.18 153.67)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3d7dd490-7ac0-41bd-94f2-209fca0540ae")
+	)
+	(wire
+		(pts
+			(xy 168.91 245.11) (xy 168.91 247.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "47469d65-5d65-4ea7-ae83-b33528fc0dac")
+	)
+	(wire
+		(pts
+			(xy 173.99 227.33) (xy 168.91 227.33)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4940ab4b-e648-4c8d-8559-3bb7bce25b3e")
+	)
+	(wire
+		(pts
+			(xy 165.1 184.15) (xy 168.91 184.15)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4fbdc539-2f8b-4fb0-8846-44214442fcb8")
+	)
+	(wire
+		(pts
+			(xy 168.91 255.27) (xy 168.91 257.81)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "507c3dfe-9eb8-46b0-a5de-26182cb9cfc4")
+	)
+	(wire
+		(pts
+			(xy 81.28 260.35) (xy 85.09 260.35)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5e91a087-6ec2-4773-882b-88819d3bef0e")
+	)
+	(wire
+		(pts
+			(xy 106.68 260.35) (xy 110.49 260.35)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "60059067-c46d-4a53-b6d2-df2005de1ef6")
+	)
+	(wire
+		(pts
+			(xy 48.26 187.96) (xy 43.18 187.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "64388f55-6528-4d7c-990d-427e7645e84b")
+	)
+	(wire
+		(pts
+			(xy 106.68 254) (xy 110.49 254)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "64fcf7fc-7fd8-4109-9657-efc7e59c2c2b")
+	)
+	(wire
+		(pts
+			(xy 165.1 153.67) (xy 168.91 153.67)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "68d04d95-8839-4d87-9626-9eb100efbe17")
+	)
+	(wire
+		(pts
+			(xy 30.48 254) (xy 34.29 254)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "713c2db3-180d-447c-9e15-1711e26172a4")
+	)
+	(wire
+		(pts
+			(xy 55.88 254) (xy 59.69 254)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7be1fd29-1c59-453b-bfe6-190d0348dec2")
+	)
+	(wire
+		(pts
+			(xy 54.61 250.19) (xy 59.69 247.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "91c7af44-91fa-4db7-9fc4-ef9993c23e9f")
+	)
+	(wire
+		(pts
+			(xy 173.99 137.16) (xy 168.91 137.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "94fcf03d-11d5-4a82-a851-acdc88d8b3dd")
+	)
+	(wire
+		(pts
+			(xy 39.37 204.47) (xy 43.18 204.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "97fc803c-6de7-4cf2-b82e-2cb401be866f")
+	)
+	(wire
+		(pts
+			(xy 43.18 195.58) (xy 43.18 198.12)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9ae10f6c-c4ab-42b9-aea5-2f151728d612")
+	)
+	(wire
+		(pts
+			(xy 165.1 233.68) (xy 168.91 233.68)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "aaa295c1-c77f-4a3d-bc5d-d8468f1d5115")
+	)
+	(wire
+		(pts
+			(xy 165.1 264.16) (xy 168.91 264.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b2c35049-edb3-474c-aa83-bde61167067e")
+	)
+	(wire
+		(pts
+			(xy 43.18 144.78) (xy 43.18 147.32)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bcc377ee-e061-4468-b494-125cf07912f8")
+	)
+	(wire
+		(pts
+			(xy 29.21 250.19) (xy 34.29 247.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bea637fc-7d21-40f1-bb86-7bb38d55c218")
+	)
+	(wire
+		(pts
+			(xy 168.91 154.94) (xy 168.91 157.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c182ef7d-cfb6-4912-a469-178f333ad220")
+	)
+	(wire
+		(pts
+			(xy 168.91 144.78) (xy 168.91 147.32)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c8a155e9-3135-4eab-bf47-e0a104e396a6")
+	)
+	(wire
+		(pts
+			(xy 55.88 260.35) (xy 59.69 260.35)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c94e9d9b-54b8-4ed8-845d-5f21653089c9")
+	)
+	(wire
+		(pts
+			(xy 105.41 250.19) (xy 110.49 247.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c9f8fd9f-7cb8-4b1c-b1fa-6926e0cb654f")
+	)
+	(wire
+		(pts
+			(xy 81.28 254) (xy 85.09 254)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d88629de-dc87-426f-b7ea-350c1bde03df")
+	)
+	(wire
+		(pts
+			(xy 168.91 175.26) (xy 168.91 177.8)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e3b1d9c9-cfc4-4424-a05f-03453cac5fe0")
+	)
+	(wire
+		(pts
+			(xy 43.18 154.94) (xy 43.18 157.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f0acbfcb-da2a-4e1e-921d-f6aef151d0be")
+	)
+	(wire
+		(pts
+			(xy 48.26 137.16) (xy 43.18 137.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f1e8ead1-2b68-4427-ab3d-3ec2d3aaf923")
+	)
+	(wire
+		(pts
+			(xy 165.1 173.99) (xy 168.91 173.99)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f222877c-c819-45ea-886e-a2e955d429fb")
+	)
+	(wire
+		(pts
+			(xy 165.1 143.51) (xy 168.91 143.51)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fe2268b9-ae38-48b8-b4fb-83de939cf5cc")
+	)
+	(wire
+		(pts
+			(xy 39.37 194.31) (xy 43.18 194.31)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ff87a8c0-02e6-458c-aaa3-5e911f520e78")
+	)
+	(global_label "LED_1_Pin"
+		(shape output)
+		(at 24.13 250.19 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "00420a89-7508-48e3-8102-568ff710cc1e")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 24.13 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.27 0.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_3V3_FPGA"
+		(shape output)
+		(at 24.13 154.94 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "0a99982f-f39d-45a5-94ee-b585092cbb00")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 24.13 154.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.27 -0.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_1V8_CLOCK"
+		(shape output)
+		(at 24.13 185.42 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "0fe93066-3772-402f-8a4f-c79c07e375c6")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 24.13 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.27 0.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_3V3_CLOCK"
+		(shape output)
+		(at 24.13 195.58 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "24110931-1e59-4fa7-8fbf-a4228a830cb7")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 24.13 195.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.27 0.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "LED_2_Pin"
+		(shape output)
+		(at 49.53 250.19 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "26ff03bb-855f-4797-961e-f8188a2ca442")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 49.53 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.27 0.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_3V3_ADAR34"
+		(shape output)
+		(at 148.59 154.94 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "2eed064b-fe8c-4115-98ed-7c301eceb6c0")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 148.59 154.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.41 -0.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_3V3_ADAR12"
+		(shape output)
+		(at 148.59 144.78 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "37ee8abc-ad77-4630-b8a1-3147cd07d739")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 148.59 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.41 -0.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_3V3_SW"
+		(shape output)
+		(at 148.59 175.26 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "45ec2761-40e2-456c-8718-7790b7889bb0")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 148.59 175.26 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.41 -0.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_3V3_VDD_SW"
+		(shape output)
+		(at 148.59 185.42 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "5e0d1f34-f69a-4772-a89f-fffe7cb211a0")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 148.59 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.41 -0.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "LED_3_Pin"
+		(shape output)
+		(at 74.93 250.19 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "60eb9d94-2d30-4f1b-aeef-dff718651fe5")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 74.93 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.27 0.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_5V0_ADAR"
+		(shape output)
+		(at 148.59 134.62 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "63932f01-d4ef-4824-903a-ac0c69180a6e")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 148.59 134.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.41 -0.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_1V0_FPGA"
+		(shape output)
+		(at 24.13 134.62 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "6965ae63-ecb6-4f71-9dce-8b4d06bf6ae3")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 24.13 134.62 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.27 -0.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_5V0_PA1"
+		(shape output)
+		(at 148.59 224.79 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "75139c6f-b15e-48d5-8c0d-9e53398fd311")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 148.59 224.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.41 -0.21 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "LED_4_Pin"
+		(shape output)
+		(at 100.33 250.19 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "7602ca7e-6c6a-42ef-905e-7b3d69c4e438")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 100.33 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.27 0.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_5V0_PA3"
+		(shape output)
+		(at 148.59 245.11 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "77ed92b4-cc90-46e3-aaae-3ff44331e6ba")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 148.59 245.11 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.41 -0.21 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_1V8_FPGA"
+		(shape output)
+		(at 24.13 144.78 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "a37e08d5-03a5-475d-b12f-d638be8df8c6")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 24.13 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.27 -0.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_5V5_PA"
+		(shape output)
+		(at 148.59 255.27 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "aaf4b764-a359-4629-b1aa-934c47b39ecf")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 148.59 255.27 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.41 -0.21 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_5V0_PA2"
+		(shape output)
+		(at 148.59 234.95 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "aed2ce72-8b05-4769-b328-1bca2b4dc584")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 148.59 234.95 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.41 -0.21 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "EN_P_3V3_ADTR"
+		(shape output)
+		(at 148.59 165.1 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "b417c230-f417-4e47-ad19-54ce29d1f9ea")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 148.59 165.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Intersheets" ""
+			(at -1.41 -0.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 168.91 260.35 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "0541f3ea-d172-4a2c-991a-62c633e9cfed")
+		(property "Reference" "R24"
+			(at 171.45 260.35 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 171.45 262.89 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 168.91 260.35 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 260.35 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 260.35 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "7ee5517c-5463-472e-8b43-024abef31c99")
+		)
+		(pin "2"
+			(uuid "73e783bd-05f5-4b8d-aa10-17f120630116")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R24")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 43.18 190.5 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "0a772ee3-6d31-4f6a-bed7-1c980e3b559d")
+		(property "Reference" "R13"
+			(at 45.72 190.5 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 45.72 193.04 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 43.18 190.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 43.18 190.5 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 43.18 190.5 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "100d10ea-8402-4690-ae7d-bb21bc85fcfd")
+		)
+		(pin "2"
+			(uuid "762a6176-19d5-4b3e-885a-6a87fceb038c")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R13")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 59.69 250.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "0c4112e8-cf6c-4c83-9033-1167e780c70c")
+		(property "Reference" "R26"
+			(at 62.23 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1k"
+			(at 62.23 252.73 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 59.69 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 59.69 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 59.69 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8a5ad581-2481-4317-a6cd-ea849ca358b9")
+		)
+		(pin "2"
+			(uuid "dd03440c-1275-4764-b65e-d1a35ea8c61f")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R26")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:LED")
+		(at 34.29 256.54 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "210816b3-c1f4-4c83-8c6a-78ef49ce8168")
+		(property "Reference" "D1"
+			(at 36.83 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Green"
+			(at 36.83 259.08 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 34.29 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 34.29 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 34.29 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "K"
+			(uuid "2ef5f87d-a6c7-4de6-8938-97291c35dde2")
+		)
+		(pin "A"
+			(uuid "b4e72e7e-3d78-4343-8e72-0d548bcd41c1")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "D1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 168.91 149.86 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "2214e1df-e76b-4dda-bdfb-a39f4f2dd7b8")
+		(property "Reference" "R16"
+			(at 171.45 149.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 171.45 152.4 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 168.91 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 149.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 149.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "cb933691-87cf-4ac7-8e39-2851d51cdfce")
+		)
+		(pin "2"
+			(uuid "6d026c6a-66c4-4e7d-b942-772e7859834e")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R16")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 85.09 261.62 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "2307899b-0514-41d5-a6f7-7dea4bbc363d")
+		(property "Reference" "#pwr_gnd_led_2"
+			(at 85.09 259.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 85.09 264.16 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 85.09 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 85.09 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 85.09 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "1f4a09ef-5bf9-4bc2-8bc5-0d0e70842b48")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_led_2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 168.91 234.95 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "272c5e9c-f462-4d8c-9fca-d50a393f9175")
+		(property "Reference" "#pwr_gnd_EN_P_5V0_PA1"
+			(at 168.91 232.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 168.91 237.49 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 168.91 234.95 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 234.95 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 234.95 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "ca139138-740d-44af-ad5c-1eb8baef3315")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_5V0_PA1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 168.91 240.03 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "272ceda3-7963-4d60-90fb-7b4c53d16db4")
+		(property "Reference" "R22"
+			(at 171.45 240.03 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 171.45 242.57 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 168.91 240.03 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 240.03 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 240.03 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "1f0cb79d-31ef-4e77-b08e-19641a499ff1")
+		)
+		(pin "2"
+			(uuid "620700e7-4119-46e4-98ce-e5e44f95180f")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R22")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 168.91 229.87 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "2ce78223-af6e-40b5-ba5e-2ef7b6364880")
+		(property "Reference" "R21"
+			(at 171.45 229.87 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 171.45 232.41 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 168.91 229.87 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 229.87 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 229.87 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "1f9615cb-fe7e-4111-9495-abb3d733bae7")
+		)
+		(pin "2"
+			(uuid "5229148d-683b-44e9-a409-458730f4de51")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R21")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 34.29 250.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "3af6e027-36f1-4a03-b325-dfc65d83ae05")
+		(property "Reference" "R25"
+			(at 36.83 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1k"
+			(at 36.83 252.73 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 34.29 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 34.29 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 34.29 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "4f76eb07-3cd1-41e6-acd6-557abd8537f8")
+		)
+		(pin "2"
+			(uuid "e7df29d7-5759-46a7-9f7f-d7dec2b41189")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R25")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 43.18 139.7 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "3eb2dde6-524a-4fe8-af3f-a82764a5203f")
+		(property "Reference" "R10"
+			(at 45.72 139.7 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 45.72 142.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 43.18 139.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 43.18 139.7 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 43.18 139.7 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e21ba8db-71fa-43a0-a2f2-9ea739895c95")
+		)
+		(pin "2"
+			(uuid "3e7cabc1-4f46-423a-bea3-b37b3d8577fd")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R10")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:LED")
+		(at 110.49 256.54 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "3f83f6d4-fe9e-49a1-8e03-f1b9f7023efc")
+		(property "Reference" "D4"
+			(at 113.03 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Red"
+			(at 113.03 259.08 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 110.49 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 110.49 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 110.49 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "K"
+			(uuid "8807cabc-8b7a-4475-af65-0628a9efdf7b")
+		)
+		(pin "A"
+			(uuid "ef8b614d-0803-48b3-943c-5a9fde37ad39")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "D4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 168.91 250.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "3fe14e2e-f19d-4c40-930f-3c1f9c121f6b")
+		(property "Reference" "R23"
+			(at 171.45 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 171.45 252.73 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 168.91 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "83c8f04e-16a9-4869-90a2-8193316b53d2")
+		)
+		(pin "2"
+			(uuid "df6f7391-606f-4008-961d-e511b5eb2d06")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R23")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 43.18 200.66 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "4a46b7d6-66f3-4926-b28c-fa05d16a9019")
+		(property "Reference" "R14"
+			(at 45.72 200.66 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 45.72 203.2 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 43.18 200.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 43.18 200.66 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 43.18 200.66 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "6cd6868f-ce34-4a54-a8cb-c42ae793afc6")
+		)
+		(pin "2"
+			(uuid "b3b0c190-5e1d-4e2b-8572-52bb67020489")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R14")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 168.91 139.7 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "535ff5da-4908-49d2-a731-4afaae99633b")
+		(property "Reference" "R15"
+			(at 171.45 139.7 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 171.45 142.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 168.91 139.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 139.7 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 139.7 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0b27a602-044e-4075-a9e7-819358e5c746")
+		)
+		(pin "2"
+			(uuid "9755e94c-a824-4663-9702-022d95b0637d")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R15")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 43.18 144.78 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "56649c8f-d1a2-48aa-8dbc-0787b405a390")
+		(property "Reference" "#pwr_gnd_EN_P_1V0_FPGA"
+			(at 43.18 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 43.18 147.32 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 43.18 144.78 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 43.18 144.78 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 43.18 144.78 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "be5c57e4-2724-42f5-80f9-e6f0acde363c")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_1V0_FPGA")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 168.91 265.43 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "5eef618f-932b-43e2-b46f-4ae977fdc363")
+		(property "Reference" "#pwr_gnd_EN_P_5V5_PA"
+			(at 168.91 262.89 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 168.91 267.97 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 168.91 265.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 265.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 265.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "985f3b20-0a96-44d3-a561-3e21ed6765c5")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_5V5_PA")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 168.91 170.18 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "602bfb26-6013-44db-a47a-a5ad04234674")
+		(property "Reference" "R18"
+			(at 171.45 170.18 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 171.45 172.72 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 168.91 170.18 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 170.18 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 170.18 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "a5abd3a4-c2be-46b8-9b4c-4e8afb7f600a")
+		)
+		(pin "2"
+			(uuid "b95486a5-88dd-428c-919c-9017900b02bf")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R18")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 168.91 190.5 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "6bc4d73e-a1c4-4fe4-8b80-9dfef6b14b71")
+		(property "Reference" "R20"
+			(at 171.45 190.5 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 171.45 193.04 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 168.91 190.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 190.5 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 190.5 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "a85a04e9-d8d4-48cf-9f77-c80396a99c22")
+		)
+		(pin "2"
+			(uuid "e259e965-5041-483f-8dea-e146928a28ab")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R20")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 43.18 195.58 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "71ad3a4e-2347-40d3-903c-73d3a03926b2")
+		(property "Reference" "#pwr_gnd_EN_P_1V8_CLOCK"
+			(at 43.18 193.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 43.18 198.12 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 43.18 195.58 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 43.18 195.58 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 43.18 195.58 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "077e70ad-8a48-47ff-bbd0-4e3a2da629b5")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_1V8_CLOCK")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 168.91 160.02 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "76d72aff-0c27-41ce-969d-1f8d238812b7")
+		(property "Reference" "R17"
+			(at 171.45 160.02 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 171.45 162.56 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 168.91 160.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 160.02 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 160.02 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "c1fa74ef-bf89-4c49-b6aa-22841b542449")
+		)
+		(pin "2"
+			(uuid "ccdf0c38-facf-4a35-9a2e-9b9e1745b58e")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R17")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 168.91 195.58 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "772a8677-fd9a-43dc-979a-b4df34ed7620")
+		(property "Reference" "#pwr_gnd_EN_P_3V3_VDD_SW"
+			(at 168.91 193.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 168.91 198.12 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 168.91 195.58 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 195.58 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 195.58 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "d422d92a-896e-4de7-8a56-6c42a337653b")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_3V3_VDD_SW")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 43.18 165.1 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "79bb653c-f8fa-4e0d-9e86-c5ff896a20dd")
+		(property "Reference" "#pwr_gnd_EN_P_3V3_FPGA"
+			(at 43.18 162.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 43.18 167.64 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 43.18 165.1 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 43.18 165.1 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 43.18 165.1 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "0d970b37-3c1a-4047-bd1a-f47ce84f005d")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_3V3_FPGA")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 168.91 180.34 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "834bb9f9-66ef-4894-9344-c8d349380535")
+		(property "Reference" "R19"
+			(at 171.45 180.34 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 171.45 182.88 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 168.91 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 180.34 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 180.34 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "73d1cb98-2622-4c85-8cf1-d46ed9785f05")
+		)
+		(pin "2"
+			(uuid "bb0525bc-51b7-492e-967e-9fcfb643e9d5")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R19")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 168.91 185.42 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "8510fe65-c4d0-4b5f-b8f9-1928adee84df")
+		(property "Reference" "#pwr_gnd_EN_P_3V3_SW"
+			(at 168.91 182.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 168.91 187.96 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 168.91 185.42 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 185.42 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 185.42 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "4973f0ae-5e9e-47ea-b399-13944c10eb57")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_3V3_SW")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 110.49 261.62 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "855183bd-860d-488e-96b3-4aa8e45869c3")
+		(property "Reference" "#pwr_gnd_led_3"
+			(at 110.49 259.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 110.49 264.16 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 110.49 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 110.49 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 110.49 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "93da23b8-3e06-473f-bfde-e90073459e91")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_led_3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 110.49 250.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "8dc287e1-5732-4e10-be76-361514aba9d6")
+		(property "Reference" "R28"
+			(at 113.03 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1k"
+			(at 113.03 252.73 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 110.49 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 110.49 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 110.49 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "09996346-d426-48f3-b40c-137fe7dec622")
+		)
+		(pin "2"
+			(uuid "fb07d244-fe15-438e-a309-c26bc98a74f8")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R28")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 59.69 261.62 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "8f2beff2-5d82-4eeb-8ebf-cb9610edfaa7")
+		(property "Reference" "#pwr_gnd_led_1"
+			(at 59.69 259.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 59.69 264.16 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 59.69 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 59.69 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 59.69 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "4cc49a70-93b0-4039-8c58-c0fb43921afa")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_led_1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 168.91 175.26 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "99372fb3-8fa4-464c-9699-b8a20d8a1472")
+		(property "Reference" "#pwr_gnd_EN_P_3V3_ADTR"
+			(at 168.91 172.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 168.91 177.8 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 168.91 175.26 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 175.26 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 175.26 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "b28465f2-827b-45dd-ab6a-bf22e01f77eb")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_3V3_ADTR")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 168.91 154.94 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "9d6c98d3-94d3-4b82-9957-aea70a2e8e3c")
+		(property "Reference" "#pwr_gnd_EN_P_3V3_ADAR12"
+			(at 168.91 152.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 168.91 157.48 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 168.91 154.94 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 154.94 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 154.94 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "a688690e-31e5-4a38-a4c1-f46cadabff53")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_3V3_ADAR12")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 85.09 250.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "9ecd9453-5584-48cb-b283-02bf3f5fbf9e")
+		(property "Reference" "R27"
+			(at 87.63 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1k"
+			(at 87.63 252.73 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 85.09 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 85.09 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 85.09 250.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0170313b-4845-463f-8458-68e7f0211c0a")
+		)
+		(pin "2"
+			(uuid "b5865bc8-977c-4257-aee3-8b78ec0f8ba8")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R27")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:LED")
+		(at 85.09 256.54 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "a01c2730-a5a6-49eb-84c5-ceca69e22739")
+		(property "Reference" "D3"
+			(at 87.63 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Yellow"
+			(at 87.63 259.08 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 85.09 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 85.09 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 85.09 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "K"
+			(uuid "2fea80aa-2335-448b-8c72-528cdf8d039d")
+		)
+		(pin "A"
+			(uuid "b3528bc4-dcb4-4599-9661-fc9b394611e5")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "D3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 43.18 149.86 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "a1bed6ec-d27f-4339-9804-3eead428fab1")
+		(property "Reference" "R11"
+			(at 45.72 149.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 45.72 152.4 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 43.18 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 43.18 149.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 43.18 149.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "bef88720-e41e-49a7-8e16-6b597afa5f70")
+		)
+		(pin "2"
+			(uuid "e67f5b8e-0a94-4217-975d-d19ce37d084d")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R11")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 168.91 165.1 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "a21ba552-8eb9-47ac-9861-700f73996ef7")
+		(property "Reference" "#pwr_gnd_EN_P_3V3_ADAR34"
+			(at 168.91 162.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 168.91 167.64 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 168.91 165.1 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 165.1 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 165.1 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "72315a2e-4939-4d98-a241-62e21d9e3bed")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_3V3_ADAR34")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 168.91 255.27 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "aeade2f2-5555-411a-8eaf-4147a54f1532")
+		(property "Reference" "#pwr_gnd_EN_P_5V0_PA3"
+			(at 168.91 252.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 168.91 257.81 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 168.91 255.27 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 255.27 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 255.27 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "8eb2310e-17a3-4d75-9d14-4b443b43968f")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_5V0_PA3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 168.91 144.78 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "c490a5ae-a6bd-4c0c-a4bc-c64c0142d28a")
+		(property "Reference" "#pwr_gnd_EN_P_5V0_ADAR"
+			(at 168.91 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 168.91 147.32 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 168.91 144.78 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 144.78 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 144.78 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "d5e25a6b-ff52-4339-a225-89f45d8d2f54")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_5V0_ADAR")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 168.91 245.11 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "c4e71dad-07ae-41eb-9e05-35e78880fc8e")
+		(property "Reference" "#pwr_gnd_EN_P_5V0_PA2"
+			(at 168.91 242.57 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 168.91 247.65 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 168.91 245.11 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 245.11 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 168.91 245.11 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "ab93ea8b-53b1-4989-a7cc-bc8b4b92c8ac")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_5V0_PA2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 43.18 160.02 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "cc591af5-3666-4e9a-92af-e3866a1360b0")
+		(property "Reference" "R12"
+			(at 45.72 160.02 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100k"
+			(at 45.72 162.56 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 43.18 160.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 43.18 160.02 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 43.18 160.02 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "2b4e41d7-75ed-48ec-9175-e58c3efe87eb")
+		)
+		(pin "2"
+			(uuid "817a0551-65e2-4a66-9ba7-0fc5b3621d5e")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "R12")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 34.29 261.62 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e43789c9-f429-4354-8f54-f30192327f6f")
+		(property "Reference" "#pwr_gnd_led_0"
+			(at 34.29 259.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 34.29 264.16 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 34.29 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 34.29 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 34.29 261.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "b25abfa4-114f-4578-bb03-ba41f36e6de6")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_led_0")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:LED")
+		(at 59.69 256.54 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e7b73622-c5c0-4087-b606-97da91ea8819")
+		(property "Reference" "D2"
+			(at 62.23 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Blue"
+			(at 62.23 259.08 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 59.69 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 59.69 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 59.69 256.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "K"
+			(uuid "d1ddfdca-0716-4553-977e-276303d1da84")
+		)
+		(pin "A"
+			(uuid "51d14523-31c0-4744-95ad-faa138506758")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "D2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 43.18 154.94 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "f71d4a21-4e7a-43ea-9e1c-c82d07b63fe9")
+		(property "Reference" "#pwr_gnd_EN_P_1V8_FPGA"
+			(at 43.18 152.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 43.18 157.48 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 43.18 154.94 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 43.18 154.94 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 43.18 154.94 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "f4f8f197-3e13-4a9a-9c0b-9ca3a01b44c7")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_1V8_FPGA")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 43.18 205.74 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "fb5930ac-4221-4071-a106-9ecbcf13ea09")
+		(property "Reference" "#pwr_gnd_EN_P_3V3_CLOCK"
+			(at 43.18 203.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 43.18 208.28 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 43.18 205.74 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 43.18 205.74 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 43.18 205.74 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "U"
+			(uuid "c337f336-65a5-49b5-9fb9-9714ff599fe1")
+		)
+		(instances
+			(project "MCU_Subsystem"
+				(path "/a0000000-0000-0000-0000-000000000001/b5000000-0000-0000-0000-000000000001"
+					(reference "#pwr_gnd_EN_P_3V3_CLOCK")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "6")
+		)
+	)
+	(embedded_fonts no)
+)
