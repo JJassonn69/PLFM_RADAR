@@ -11,3 +11,15 @@ GUI_V6 ==> Added USB3 FT601 support
 radar_dashboard ==> Board bring-up dashboard (FT601 reader, real-time R-D heatmap, CFAR overlay, waterfall, host commands, HDF5 recording)
 radar_protocol ==> Protocol layer (packet parsing, command building, FT601 connection, data recorder, acquisition thread)
 smoke_test ==> Board bring-up smoke test host script (triggers FPGA self-test via opcode 0x30)
+
+GUI_radar_dashboard_v2 ==> Unified V2 dashboard merging best features from all legacy GUIs:
+  - From V2-V6: Kalman filter tracking (DBSCAN clustering + 4-state KF, numpy-only)
+  - From V3-V6: GPS/IMU pitch correction on elevation angles
+  - From V4-V6: Google Maps HTML overlay with target plotting
+  - From V2-V6: Multi-PRF velocity unwrapping (Chinese Remainder Theorem)
+  - From V5: Settings validation (firmware-mirrored range checks)
+  - From V4_2_CSV: CSV offline analysis (host-side range FFT, Doppler FFT, MTI, CFAR)
+  - From radar_dashboard: FT601 pipeline, R-D heatmap, CFAR overlay, waterfall, host commands, HDF5 recording
+  - New: Targets tab with track list, tracked target overlay on R-D map (orange circles)
+  - 6 tabs: Display, Targets, Map, Control, CSV Analysis, Log
+test_radar_dashboard_v2 ==> 47 unit tests for V2 new features (settings validation, multi-PRF, pitch correction, tracker, maps, CSV processor)
