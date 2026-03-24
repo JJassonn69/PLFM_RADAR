@@ -232,41 +232,70 @@ class TargetTracker:
         return associated
 
     def _cluster_detections(self, detections: List[RadarTarget],
-                            eps: float = 50.0) -> List[RadarTarget]:
-        """Simple proximity clustering (replaces DBSCAN to avoid sklearn dep)."""
+                            range_eps: float = 20.0,
+                            vel_eps: float = 5.0) -> List[RadarTarget]:
+        """
+        Proximity clustering with per-dimension box thresholds.
+        Detections merge only if within range_eps AND vel_eps.
+        This prevents merging targets at same range but opposite velocities.
+        """
         if len(detections) <= 1:
             return detections
 
-        # Greedy nearest-neighbor merge
+        # Sort by SNR descending so strongest peaks seed clusters
+        order = sorted(range(len(detections)),
+                       key=lambda k: detections[k].snr, reverse=True)
+
         used = [False] * len(detections)
         merged = []
-        for i, d in enumerate(detections):
+        cluster_id = 0
+        for i in order:
             if used[i]:
                 continue
+            d = detections[i]
             cluster_range = [d.range_m]
             cluster_vel = [d.velocity]
             cluster_snr = [d.snr]
             used[i] = True
-            for j in range(i + 1, len(detections)):
+            merged_indices = [i]
+            for j in order:
                 if used[j]:
                     continue
-                dist = math.sqrt((d.range_m - detections[j].range_m) ** 2 +
-                                 (d.velocity - detections[j].velocity) ** 2)
-                if dist < eps:
-                    cluster_range.append(detections[j].range_m)
-                    cluster_vel.append(detections[j].velocity)
-                    cluster_snr.append(detections[j].snr)
+                dj = detections[j]
+                # Per-dimension box threshold (BOTH must be satisfied)
+                if (abs(d.range_m - dj.range_m) < range_eps and
+                        abs(d.velocity - dj.velocity) < vel_eps):
+                    cluster_range.append(dj.range_m)
+                    cluster_vel.append(dj.velocity)
+                    cluster_snr.append(dj.snr)
                     used[j] = True
+                    merged_indices.append(j)
+            # SNR-weighted centroid so strongest peak dominates
+            weights = np.array(cluster_snr, dtype=np.float64)
+            w_sum = weights.sum()
+            if w_sum > 0:
+                w_range = float(np.dot(weights, cluster_range) / w_sum)
+                w_vel = float(np.dot(weights, cluster_vel) / w_sum)
+            else:
+                w_range = float(np.mean(cluster_range))
+                w_vel = float(np.mean(cluster_vel))
             centroid = RadarTarget(
-                range_m=float(np.mean(cluster_range)),
-                velocity=float(np.mean(cluster_vel)),
+                range_m=w_range,
+                velocity=w_vel,
                 snr=float(np.max(cluster_snr)),
                 azimuth=d.azimuth,
                 elevation=d.elevation,
                 corrected_elevation=d.corrected_elevation,
                 timestamp=d.timestamp,
             )
+            # DIAG: Log cluster formation
+            vel_spread = max(cluster_vel) - min(cluster_vel) if len(cluster_vel) > 1 else 0
+            print(f"    CLUSTER {cluster_id}: {len(merged_indices)} detections merged")
+            print(f"      indices: {merged_indices}")
+            print(f"      vel_range: [{min(cluster_vel):+.2f}, {max(cluster_vel):+.2f}] spread={vel_spread:.2f}")
+            print(f"      -> centroid: range={centroid.range_m:.1f}m vel={centroid.velocity:+.2f}m/s")
             merged.append(centroid)
+            cluster_id += 1
         return merged
 
     def _associate(self, detections: List[RadarTarget]) -> List[RadarTarget]:
@@ -1199,10 +1228,14 @@ class RadarDashboardV2:
         det_coords = np.argwhere(frame.detections > 0)
         raw_targets = []
         for rbin, dbin in det_coords:
+            # BUG: Using shifted formula on unshifted bin!
+            velocity = self._vel_lo + float(dbin) * self._vel_per_bin
+            range_m = float(rbin) * self._range_per_bin
+            snr = float(frame.magnitude[rbin, dbin])
             t = RadarTarget(
-                range_m=float(rbin) * self._range_per_bin,
-                velocity=self._vel_lo + float(dbin) * self._vel_per_bin,
-                snr=float(frame.magnitude[rbin, dbin]),
+                range_m=range_m,
+                velocity=velocity,
+                snr=snr,
                 elevation=0, azimuth=0,
                 timestamp=frame.timestamp)
             raw_targets.append(t)
