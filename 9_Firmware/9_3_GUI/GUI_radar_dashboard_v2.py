@@ -288,12 +288,6 @@ class TargetTracker:
                 corrected_elevation=d.corrected_elevation,
                 timestamp=d.timestamp,
             )
-            # DIAG: Log cluster formation
-            vel_spread = max(cluster_vel) - min(cluster_vel) if len(cluster_vel) > 1 else 0
-            print(f"    CLUSTER {cluster_id}: {len(merged_indices)} detections merged")
-            print(f"      indices: {merged_indices}")
-            print(f"      vel_range: [{min(cluster_vel):+.2f}, {max(cluster_vel):+.2f}] spread={vel_spread:.2f}")
-            print(f"      -> centroid: range={centroid.range_m:.1f}m vel={centroid.velocity:+.2f}m/s")
             merged.append(centroid)
             cluster_id += 1
         return merged
