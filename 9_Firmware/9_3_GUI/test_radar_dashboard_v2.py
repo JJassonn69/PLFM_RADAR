@@ -214,9 +214,40 @@ class TestTargetTracker(unittest.TestCase):
                         timestamp=time.time()),
         ]
         result = self.tracker.update(targets)
-        # Clustering with eps=50 should merge these
+        # Per-dimension clustering (range_eps=20, vel_eps=5) should merge these
         self.assertEqual(len(result), 1)
-        self.assertAlmostEqual(result[0].range_m, 100.5, places=0)
+        # SNR-weighted centroid should be closer to the higher-SNR detection
+        self.assertAlmostEqual(result[0].range_m, 100.5, delta=1.0)
+
+    def test_clustering_separates_opposite_velocities(self):
+        # Two detections at same range but very different velocities
+        # should NOT merge (vel_eps=5.0)
+        targets = [
+            RadarTarget(range_m=10.0, velocity=-20.0, snr=30000.0,
+                        timestamp=time.time()),
+            RadarTarget(range_m=10.0, velocity=+20.0, snr=25000.0,
+                        timestamp=time.time()),
+        ]
+        result = self.tracker.update(targets)
+        self.assertEqual(len(result), 2)
+        vels = sorted([r.velocity for r in result])
+        self.assertLess(vels[0], -10.0)
+        self.assertGreater(vels[1], +10.0)
+
+    def test_clustering_snr_weighted_centroid(self):
+        # Strong peak should dominate cluster velocity
+        targets = [
+            RadarTarget(range_m=50.0, velocity=10.0, snr=50000.0,
+                        timestamp=time.time()),
+            RadarTarget(range_m=50.0, velocity=12.0, snr=5000.0,
+                        timestamp=time.time()),
+            RadarTarget(range_m=50.0, velocity=11.0, snr=1000.0,
+                        timestamp=time.time()),
+        ]
+        result = self.tracker.update(targets)
+        self.assertEqual(len(result), 1)
+        # Velocity should be close to 10.0 (the 50k SNR peak), not 11.0 (mean)
+        self.assertAlmostEqual(result[0].velocity, 10.0, delta=0.5)
 
     def test_pitch_correction_applied(self):
         gps = GPSData(latitude=41.0, longitude=12.0, pitch=10.0)

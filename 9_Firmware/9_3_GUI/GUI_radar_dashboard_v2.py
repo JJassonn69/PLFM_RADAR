@@ -232,35 +232,53 @@ class TargetTracker:
         return associated
 
     def _cluster_detections(self, detections: List[RadarTarget],
-                            eps: float = 50.0) -> List[RadarTarget]:
-        """Simple proximity clustering (replaces DBSCAN to avoid sklearn dep)."""
+                            range_eps: float = 20.0,
+                            vel_eps: float = 5.0) -> List[RadarTarget]:
+        """
+        Proximity clustering with per-dimension box thresholds.
+        Uses SNR-weighted centroid so strongest peaks dominate the
+        cluster velocity (avoids averaging opposite-sign velocities).
+        """
         if len(detections) <= 1:
             return detections
 
-        # Greedy nearest-neighbor merge
+        # Sort by SNR descending so strongest peaks seed clusters
+        order = sorted(range(len(detections)),
+                       key=lambda k: detections[k].snr, reverse=True)
+
         used = [False] * len(detections)
         merged = []
-        for i, d in enumerate(detections):
+        for i in order:
             if used[i]:
                 continue
-            cluster_range = [d.range_m]
-            cluster_vel = [d.velocity]
-            cluster_snr = [d.snr]
+            d = detections[i]
+            c_range = [d.range_m]
+            c_vel = [d.velocity]
+            c_snr = [d.snr]
             used[i] = True
-            for j in range(i + 1, len(detections)):
+            for j in order:
                 if used[j]:
                     continue
-                dist = math.sqrt((d.range_m - detections[j].range_m) ** 2 +
-                                 (d.velocity - detections[j].velocity) ** 2)
-                if dist < eps:
-                    cluster_range.append(detections[j].range_m)
-                    cluster_vel.append(detections[j].velocity)
-                    cluster_snr.append(detections[j].snr)
+                dj = detections[j]
+                if (abs(d.range_m - dj.range_m) < range_eps and
+                        abs(d.velocity - dj.velocity) < vel_eps):
+                    c_range.append(dj.range_m)
+                    c_vel.append(dj.velocity)
+                    c_snr.append(dj.snr)
                     used[j] = True
+            # SNR-weighted centroid for velocity (strong peaks dominate)
+            weights = np.array(c_snr, dtype=np.float64)
+            w_sum = weights.sum()
+            if w_sum > 0:
+                w_vel = float(np.dot(weights, c_vel) / w_sum)
+                w_rng = float(np.dot(weights, c_range) / w_sum)
+            else:
+                w_vel = float(np.mean(c_vel))
+                w_rng = float(np.mean(c_range))
             centroid = RadarTarget(
-                range_m=float(np.mean(cluster_range)),
-                velocity=float(np.mean(cluster_vel)),
-                snr=float(np.max(cluster_snr)),
+                range_m=w_rng,
+                velocity=w_vel,
+                snr=float(np.max(c_snr)),
                 azimuth=d.azimuth,
                 elevation=d.elevation,
                 corrected_elevation=d.corrected_elevation,
