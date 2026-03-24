@@ -19,6 +19,7 @@ set xdc_file [file join $project_root "constraints" "te0713_vio.xdc"]
 
 file mkdir $build_dir
 file mkdir $reports_dir
+file mkdir [file join $build_dir "ip"]
 
 # Create project
 create_project -force $project_name $build_dir -part xc7a200tfbg484-2
