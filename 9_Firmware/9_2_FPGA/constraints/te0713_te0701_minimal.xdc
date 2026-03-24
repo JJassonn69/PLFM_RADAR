@@ -55,15 +55,18 @@ set_property PACKAGE_PIN B22 [get_ports {system_status[3]}]
 
 # --------------------------------------------------------------------------
 # UART via FT2232HQ Channel B (Bank 14, LVCMOS33)
-# Signal path (verified from 4x5_series_pinout_tracelength.xlsx):
-#   RXD: FPGA P19 (B14_L24_P) ← JM1-92 ← JB1-91 (MIO14) ← TE0701 CPLD ← FTDI BDBUS0
-#   TXD: FPGA U18 (B14_L18_N) → JM1-85 → JB1-86 (MIO15) → TE0701 CPLD → FTDI BDBUS1
+# Signal path (from 4x5_series_pinout_tracelength.xlsx):
+#   P19 (B14_L24_P) ↔ JM1-92 ↔ JB1-91 (MIO14) ↔ TE0701 CPLD ↔ FTDI BDBUS0
+#   U18 (B14_L18_N) ↔ JM1-85 ↔ JB1-86 (MIO15) ↔ TE0701 CPLD ↔ FTDI BDBUS1
 # These nets go DIRECTLY from B2B connector to FPGA (NOT through TE0713 CPLD U3).
 # Bank 14 VCCIO is fixed at 3.3V on TE0713.
+#
+# SWAPPED vs. original mapping — testing if MIO14(P19) is actually the TX
+# direction from FPGA's perspective (CPLD may invert the naming convention).
 # --------------------------------------------------------------------------
-set_property PACKAGE_PIN P19 [get_ports {uart_rxd}]
+set_property PACKAGE_PIN U18 [get_ports {uart_rxd}]
 set_property IOSTANDARD LVCMOS33 [get_ports {uart_rxd}]
-set_property PACKAGE_PIN U18 [get_ports {uart_txd}]
+set_property PACKAGE_PIN P19 [get_ports {uart_txd}]
 set_property IOSTANDARD LVCMOS33 [get_ports {uart_txd}]
 
 # UART is asynchronous — no timing constraints needed, but mark as false path
