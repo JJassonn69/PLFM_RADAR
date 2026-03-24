@@ -7,8 +7,8 @@
 //   - FPGA Self-Test controller (5 subsystems)
 //   - Self-Test Reporter (sends results as 20-byte packet over UART)
 //
-// Uses TE0713 FIFO0CLK (50 MHz, Bank 14, LVCMOS15) at pin U20.
-// UART pins on Bank 14: P16 (RXD from host), U18 (TXD to host), LVCMOS33.
+// Uses TE0713 FIFO0CLK (50 MHz, Bank 14, LVCMOS33) at pin U20.
+// UART pins on Bank 14: P19 (RXD from host), U18 (TXD to host), LVCMOS33.
 // LEDs and status outputs on Bank 16 FMC LA pins (LVCMOS33).
 //
 // Operation:
@@ -23,7 +23,7 @@
 
 module radar_system_top_te0713_dev (
     input  wire       clk_100m,        // TE0713 FIFO0CLK (actually 50 MHz)
-    input  wire       uart_rxd,        // UART receive from host (Bank 14, P16)
+    input  wire       uart_rxd,        // UART receive from host (Bank 14, P19)
     output wire       uart_txd,        // UART transmit to host (Bank 14, U18)
     output wire [3:0] user_led,
     output wire [3:0] system_status
