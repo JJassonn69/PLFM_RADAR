@@ -76,6 +76,9 @@ PROD_RTL=(
     cfar_ca.v
     mti_canceller.v
     fpga_self_test.v
+    uart_tx.v
+    uart_rx.v
+    uart_self_test_reporter.v
 )
 
 # Source-only RTL (not instantiated at top level, but should still be lint-clean)
@@ -390,6 +393,15 @@ run_test "CFAR CA Detector" \
 run_test "FPGA Self-Test" \
     tb/tb_fpga_self_test.vvp \
     tb/tb_fpga_self_test.v fpga_self_test.v
+
+run_test "UART TX/RX Loopback" \
+    tb/tb_uart_txrx.vvp \
+    tb/tb_uart_txrx.v uart_tx.v uart_rx.v
+
+run_test "UART Self-Test Reporter" \
+    tb/tb_uart_reporter.vvp \
+    tb/tb_uart_self_test_reporter.v uart_self_test_reporter.v \
+    uart_tx.v uart_rx.v
 
 echo ""
 

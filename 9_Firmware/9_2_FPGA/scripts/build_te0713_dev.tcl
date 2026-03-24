@@ -13,6 +13,10 @@ set build_dir [file join $project_root "vivado_te0713_dev"]
 set reports_dir [file join $build_dir "reports"]
 
 set top_file [file join $project_root "radar_system_top_te0713_dev.v"]
+set uart_tx_file [file join $project_root "uart_tx.v"]
+set uart_rx_file [file join $project_root "uart_rx.v"]
+set uart_reporter_file [file join $project_root "uart_self_test_reporter.v"]
+set self_test_file [file join $project_root "fpga_self_test.v"]
 set xdc_file [file join $project_root "constraints" "te0713_te0701_minimal.xdc"]
 
 file mkdir $build_dir
@@ -22,6 +26,10 @@ create_project -force $project_name $build_dir -part xc7a200tfbg484-2
 set_property target_language Verilog [current_project]
 
 add_files -norecurse $top_file
+add_files -norecurse $uart_tx_file
+add_files -norecurse $uart_rx_file
+add_files -norecurse $uart_reporter_file
+add_files -norecurse $self_test_file
 add_files -fileset constrs_1 -norecurse $xdc_file
 
 set_property top radar_system_top_te0713_dev [current_fileset]

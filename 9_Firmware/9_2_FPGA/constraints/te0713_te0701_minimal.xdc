@@ -52,6 +52,23 @@ set_property PACKAGE_PIN C22 [get_ports {system_status[2]}]
 set_property PACKAGE_PIN B22 [get_ports {system_status[3]}]
 
 # --------------------------------------------------------------------------
+# UART via FT2232HQ Channel B (Bank 14, LVCMOS33)
+# Signal path: Host USB → FT2232HQ ChB → MachXO2 CPLD → B2B JM1 → FPGA
+#   TX: FPGA P16 ← JM1-92 ← JB1-91 ← CPLD ← FTDI BDBUS0  (FPGA receives)
+#   RX: FPGA U18 → JM1-85 → JB1-86 → CPLD → FTDI BDBUS1  (FPGA transmits)
+# Bank 14 VCCIO is fixed at 3.3V on TE0713.
+# --------------------------------------------------------------------------
+set_property PACKAGE_PIN P16 [get_ports {uart_rxd}]
+set_property IOSTANDARD LVCMOS33 [get_ports {uart_rxd}]
+set_property PACKAGE_PIN U18 [get_ports {uart_txd}]
+set_property IOSTANDARD LVCMOS33 [get_ports {uart_txd}]
+
+# UART is asynchronous — no timing constraints needed, but mark as false path
+# to prevent Vivado from flagging unconstrained paths.
+set_false_path -from [get_ports {uart_rxd}]
+set_false_path -to [get_ports {uart_txd}]
+
+# --------------------------------------------------------------------------
 # Keep implementation checks strict.
 # report_timing_summary -report_unconstrained
 # report_drc
