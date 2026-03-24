@@ -67,8 +67,31 @@ set_property top radar_system_top_te0713_vio [current_fileset]
 update_compile_order -fileset sources_1
 
 # ==========================================================================
-# Build: synthesis → implementation → bitstream
+# Build: synthesis → place → route → bitstream (with debug hub clock fix)
 # ==========================================================================
+# Run synthesis first so we can configure the debug hub
+puts "INFO: Running synthesis..."
+launch_runs synth_1 -jobs 8
+wait_on_run synth_1
+
+set synth_status [get_property STATUS [get_runs synth_1]]
+puts "INFO: synth_1 status: $synth_status"
+if {![string match "*Complete*" $synth_status]} {
+    error "Synthesis did not complete successfully. Status: $synth_status"
+}
+
+# Open synthesized design to configure debug hub clock frequency
+# The debug hub defaults to 300 MHz but our FIFO0CLK is 50 MHz
+open_run synth_1
+puts "INFO: Configuring debug hub for 50 MHz clock..."
+set_property C_CLK_INPUT_FREQ_HZ 50000000 [get_debug_cores dbg_hub]
+set_property C_ENABLE_CLK_DIVIDER false [get_debug_cores dbg_hub]
+# Explicitly connect debug hub clock to our buffered clock net
+connect_debug_port dbg_hub/clk [get_nets bufg_clk/O]
+implement_debug_core
+close_design
+
+# Now run implementation to bitstream
 puts "INFO: Launching implementation to bitstream..."
 launch_runs impl_1 -to_step write_bitstream -jobs 8
 wait_on_run impl_1
