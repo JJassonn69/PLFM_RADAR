@@ -1195,14 +1195,18 @@ class RadarDashboardV2:
             self._frame_count = 0
             self._fps_ts = now
 
-        # Extract detections for tracking
-        det_coords = np.argwhere(frame.detections > 0)
+        # fftshift Doppler axis FIRST so all downstream code uses shifted indices
+        mag = np.fft.fftshift(frame.magnitude, axes=1)
+        det_shifted = np.fft.fftshift(frame.detections, axes=1)
+
+        # Extract detections for tracking from SHIFTED arrays
+        det_coords = np.argwhere(det_shifted > 0)
         raw_targets = []
         for rbin, dbin in det_coords:
             t = RadarTarget(
-                range_m=float(rbin) * self._range_per_bin,
-                velocity=self._vel_lo + float(dbin) * self._vel_per_bin,
-                snr=float(frame.magnitude[rbin, dbin]),
+                range_m=(float(rbin) + 0.5) * self._range_per_bin,
+                velocity=self._vel_lo + (float(dbin) + 0.5) * self._vel_per_bin,
+                snr=float(mag[rbin, dbin]),
                 elevation=0, azimuth=0,
                 timestamp=frame.timestamp)
             raw_targets.append(t)
@@ -1216,10 +1220,6 @@ class RadarDashboardV2:
         self.lbl_detections.config(text=f"Det: {frame.detection_count}")
         self.lbl_frame.config(text=f"Frame: {frame.frame_number}")
         self.lbl_tracks.config(text=f"Tracks: {len(self._tracker.tracks)}")
-
-        # Update R-D heatmap
-        mag = np.fft.fftshift(frame.magnitude, axes=1)
-        det_shifted = np.fft.fftshift(frame.detections, axes=1)
 
         frame_vmax = float(np.max(mag)) if np.max(mag) > 0 else 1.0
         self._vmax_ema = (self._vmax_alpha * frame_vmax +
