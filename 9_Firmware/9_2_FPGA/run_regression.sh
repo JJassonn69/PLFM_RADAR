@@ -79,6 +79,7 @@ PROD_RTL=(
     uart_tx.v
     uart_rx.v
     uart_self_test_reporter.v
+    uart_tx_blaster.v
 )
 
 # Source-only RTL (not instantiated at top level, but should still be lint-clean)
@@ -402,6 +403,10 @@ run_test "UART Self-Test Reporter" \
     tb/tb_uart_reporter.vvp \
     tb/tb_uart_self_test_reporter.v uart_self_test_reporter.v \
     uart_tx.v uart_rx.v
+
+run_test "UART TX Blaster (diagnostic)" \
+    tb/tb_uart_tx_blaster.vvp \
+    tb/tb_uart_tx_blaster.v uart_tx_blaster.v uart_tx.v
 
 echo ""
 
