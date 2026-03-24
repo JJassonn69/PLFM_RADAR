@@ -19,7 +19,9 @@ set_property CONFIG_VOLTAGE 3.3 [current_design]
 set_property BITSTREAM.CONFIG.UNUSEDPIN Pullup [current_design]
 
 # Clock IOSTANDARD
-set_property IOSTANDARD LVCMOS15 [get_ports {clk_100m}]
+# U20 is in Bank 14 — VCCIO fixed at 3.3V on TE0713, so must be LVCMOS33.
+# (Was LVCMOS15 from TE0712 constraints where clock bank had 1.5V VCCO.)
+set_property IOSTANDARD LVCMOS33 [get_ports {clk_100m}]
 
 # Status/output IO standards
 # These outputs are exported to TE0701 FMC LA lines (not onboard LEDs).
