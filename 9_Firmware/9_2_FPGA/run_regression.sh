@@ -80,6 +80,7 @@ PROD_RTL=(
     uart_rx.v
     uart_self_test_reporter.v
     uart_tx_blaster.v
+    radar_system_top_te0713_vio.v
 )
 
 # Source-only RTL (not instantiated at top level, but should still be lint-clean)
@@ -407,6 +408,10 @@ run_test "UART Self-Test Reporter" \
 run_test "UART TX Blaster (diagnostic)" \
     tb/tb_uart_tx_blaster.vvp \
     tb/tb_uart_tx_blaster.v uart_tx_blaster.v uart_tx.v
+
+run_test "VIO Self-Test Wrapper" \
+    tb/tb_vio_selftest.vvp \
+    tb/tb_radar_system_top_te0713_vio.v radar_system_top_te0713_vio.v fpga_self_test.v
 
 echo ""
 
