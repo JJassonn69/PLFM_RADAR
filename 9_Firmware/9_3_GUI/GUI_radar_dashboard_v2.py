@@ -60,6 +60,7 @@ from radar_protocol import (
     DataRecorder, RadarAcquisition,
     RadarFrame, StatusResponse, Opcode,
     NUM_RANGE_BINS, NUM_DOPPLER_BINS, WATERFALL_DEPTH,
+    CFAR_MODE_NAMES, CFAR_MODE_VALUES, PARAM_VALIDATION, AERIS10_CONFIG,
 )
 
 logging.basicConfig(
@@ -517,16 +518,8 @@ class RadarDashboardV2:
 
     UPDATE_INTERVAL_MS = 100  # 10 Hz display refresh
 
-    AERIS10_CONFIG = {
-        "sample_rate": 400e6,
-        "bandwidth": 500e6,
-        "ramp_time": 300e-6,
-        "center_freq": 10.5e9,
-        "fft_size": 1024,
-        "decimation": 16,
-        "num_chirps": 32,
-        "range_formula": "if",
-    }
+    # AERIS10_CONFIG imported from radar_protocol — shared single source of truth
+    AERIS10_CONFIG = AERIS10_CONFIG  # re-export as class attribute for backward compat
 
     C = 3e8
 
@@ -613,6 +606,11 @@ class RadarDashboardV2:
 
         self.lbl_pitch = ttk.Label(top, text="Pitch: --", font=("Menlo", 9))
         self.lbl_pitch.pack(side="left", padx=8)
+
+        self.lbl_cfar_mode = ttk.Label(top, text="CFAR: CA",
+                                        font=("Menlo", 9, "bold"),
+                                        foreground=ACCENT)
+        self.lbl_cfar_mode.pack(side="left", padx=8)
 
         self.btn_connect = ttk.Button(top, text="Connect",
                                        command=self._on_connect,
@@ -833,18 +831,23 @@ class RadarDashboardV2:
         right.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
 
         self._param_vars: Dict[str, tk.StringVar] = {}
+        # Validation feedback label (shared, shown below params)
+        self._param_feedback = tk.StringVar(value="")
+
+        # Standard numeric parameters (label, opcode, default)
         params = [
             ("CFAR Guard (0x21)", 0x21, "2"),
             ("CFAR Train (0x22)", 0x22, "8"),
             ("CFAR Alpha Q4.4 (0x23)", 0x23, "48"),
-            ("CFAR Mode (0x24)", 0x24, "0"),
+            # CFAR Mode is handled separately as a dropdown below
             ("Threshold (0x03)", 0x03, "500"),
             ("Gain Shift (0x16)", 0x16, "0"),
             ("DC Notch Width (0x27)", 0x27, "0"),
             ("Range Mode (0x20)", 0x20, "0"),
             ("Stream Control (0x04)", 0x04, "7"),
         ]
-        for row_idx, (label, opcode, default) in enumerate(params):
+        row_idx = 0
+        for label, opcode, default in params:
             ttk.Label(right, text=label).grid(row=row_idx, column=0,
                                                sticky="w", pady=2)
             var = tk.StringVar(value=default)
@@ -852,26 +855,49 @@ class RadarDashboardV2:
             ttk.Entry(right, textvariable=var, width=10).grid(
                 row=row_idx, column=1, padx=8, pady=2)
             ttk.Button(right, text="Set",
-                       command=lambda op=opcode, v=var: self._send_cmd(
-                           op, int(v.get()))
+                       command=lambda op=opcode, v=var: self._send_validated_param(
+                           op, v)
                        ).grid(row=row_idx, column=2, pady=2)
+            row_idx += 1
+
+        # CFAR Mode dropdown (CA-CFAR / GO-CFAR / SO-CFAR)
+        ttk.Label(right, text="CFAR Mode (0x24)").grid(
+            row=row_idx, column=0, sticky="w", pady=2)
+        self._cfar_mode_var = tk.StringVar(value=CFAR_MODE_NAMES[0])
+        self._param_vars[str(0x24)] = self._cfar_mode_var
+        cfar_combo = ttk.Combobox(
+            right, textvariable=self._cfar_mode_var,
+            values=CFAR_MODE_NAMES, state="readonly", width=10)
+        cfar_combo.grid(row=row_idx, column=1, padx=8, pady=2)
+        ttk.Button(right, text="Set",
+                   command=self._send_cfar_mode).grid(
+            row=row_idx, column=2, pady=2)
+        row_idx += 1
+
+        # Validation feedback
+        self._feedback_lbl = ttk.Label(
+            right, textvariable=self._param_feedback,
+            font=("Menlo", 8), foreground=YELLOW, wraplength=300)
+        self._feedback_lbl.grid(row=row_idx, column=0, columnspan=3,
+                                 sticky="w", pady=(4, 0))
+        total_param_rows = row_idx + 1
 
         # Custom command
         ttk.Separator(right, orient="horizontal").grid(
-            row=len(params), column=0, columnspan=3, sticky="ew", pady=8)
+            row=total_param_rows, column=0, columnspan=3, sticky="ew", pady=8)
         ttk.Label(right, text="Custom Opcode (hex)").grid(
-            row=len(params) + 1, column=0, sticky="w")
+            row=total_param_rows + 1, column=0, sticky="w")
         self._custom_op = tk.StringVar(value="01")
         ttk.Entry(right, textvariable=self._custom_op, width=10).grid(
-            row=len(params) + 1, column=1, padx=8)
+            row=total_param_rows + 1, column=1, padx=8)
         ttk.Label(right, text="Value (dec)").grid(
-            row=len(params) + 2, column=0, sticky="w")
+            row=total_param_rows + 2, column=0, sticky="w")
         self._custom_val = tk.StringVar(value="0")
         ttk.Entry(right, textvariable=self._custom_val, width=10).grid(
-            row=len(params) + 2, column=1, padx=8)
+            row=total_param_rows + 2, column=1, padx=8)
         ttk.Button(right, text="Send Custom",
                    command=self._send_custom).grid(
-            row=len(params) + 2, column=2, pady=2)
+            row=total_param_rows + 2, column=2, pady=2)
 
         outer.columnconfigure(0, weight=1)
         outer.columnconfigure(1, weight=2)
@@ -991,6 +1017,41 @@ class RadarDashboardV2:
         cmd = RadarProtocol.build_command(opcode, value)
         ok = self.conn.write(cmd)
         log.info(f"CMD 0x{opcode:02X} val={value} ({'OK' if ok else 'FAIL'})")
+
+    def _send_validated_param(self, opcode: int, var: tk.StringVar):
+        """Validate a numeric parameter entry, clamp to RTL range, and send."""
+        raw = var.get().strip()
+        try:
+            value = int(raw)
+        except ValueError:
+            self._param_feedback.set(f"Invalid: '{raw}' is not an integer")
+            log.error(f"Param 0x{opcode:02X}: non-integer '{raw}'")
+            return
+        spec = PARAM_VALIDATION.get(opcode)
+        if spec:
+            lo, hi, desc = spec
+            if value < lo or value > hi:
+                clamped = max(lo, min(hi, value))
+                self._param_feedback.set(
+                    f"Clamped {value} -> {clamped} ({desc})")
+                log.warning(f"Param 0x{opcode:02X}: {value} out of "
+                            f"[{lo},{hi}], clamped to {clamped}")
+                value = clamped
+                var.set(str(value))
+            else:
+                self._param_feedback.set("")
+        else:
+            self._param_feedback.set("")
+        self._send_cmd(opcode, value)
+
+    def _send_cfar_mode(self):
+        """Send CFAR mode from the dropdown selector."""
+        name = self._cfar_mode_var.get()
+        value = CFAR_MODE_VALUES.get(name, 0)
+        self._send_cmd(0x24, value)
+        # Update status bar indicator
+        short = name.replace("-CFAR", "")
+        self.lbl_cfar_mode.config(text=f"CFAR: {short}")
 
     def _send_custom(self):
         try:

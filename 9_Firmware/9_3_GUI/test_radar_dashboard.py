@@ -22,6 +22,7 @@ from radar_protocol import (
     HEADER_BYTE, FOOTER_BYTE, STATUS_HEADER_BYTE,
     NUM_RANGE_BINS, NUM_DOPPLER_BINS, NUM_CELLS,
     _HARDWARE_ONLY_OPCODES, _REPLAY_ADJUSTABLE_OPCODES,
+    CFAR_MODE_NAMES, CFAR_MODE_VALUES, PARAM_VALIDATION,
 )
 
 
@@ -857,23 +858,23 @@ class TestAxisCalculations(unittest.TestCase):
 
     def test_aeris10_range_per_bin(self):
         """AERIS-10 IF mode: range_per_bin = c/(2*BW)*16 = 4.8 m."""
-        from radar_dashboard import RadarDashboard
-        cfg = dict(RadarDashboard.AERIS10_CONFIG)
+        from radar_protocol import AERIS10_CONFIG
+        cfg = dict(AERIS10_CONFIG)
         rpb = self._calc_range_per_bin(cfg)
         self.assertAlmostEqual(rpb, 4.8, places=3)
 
     def test_aeris10_max_range(self):
         """AERIS-10: max_range = 307.2 m (64 * 4.8)."""
-        from radar_dashboard import RadarDashboard
-        cfg = dict(RadarDashboard.AERIS10_CONFIG)
+        from radar_protocol import AERIS10_CONFIG
+        cfg = dict(AERIS10_CONFIG)
         rpb = self._calc_range_per_bin(cfg)
         max_range = rpb * NUM_RANGE_BINS
         self.assertAlmostEqual(max_range, 307.2, places=1)
 
     def test_aeris10_max_velocity(self):
         """AERIS-10: max_vel = lambda/(4*T) ≈ 23.8 m/s."""
-        from radar_dashboard import RadarDashboard
-        cfg = dict(RadarDashboard.AERIS10_CONFIG)
+        from radar_protocol import AERIS10_CONFIG
+        cfg = dict(AERIS10_CONFIG)
         max_vel = self._calc_max_vel(cfg)
         self.assertAlmostEqual(max_vel, 23.8, places=0)
 
@@ -890,6 +891,200 @@ class TestAxisCalculations(unittest.TestCase):
         """FT601Connection does not have radar_config attr."""
         conn = FT601Connection(mock=True)
         self.assertFalse(hasattr(conn, 'radar_config'))
+
+
+class TestCfarGoSoModes(unittest.TestCase):
+    """Test GO-CFAR and SO-CFAR modes in the replay pipeline.
+
+    RTL (cfar_ca.v) implements three modes:
+      0 = CA (Cell-Averaging): noise = leading_sum + lagging_sum
+      1 = GO (Greatest-Of):    noise = max(leading_avg, lagging_avg)
+      2 = SO (Smallest-Of):    noise = min(leading_avg, lagging_avg)
+
+    GO uses only one window → lower noise estimate → more detections.
+    SO uses only one window → smallest noise → most detections.
+    Expected counts with default params (guard=2, train=8, alpha=0x30,
+    MTI=ON, DC_notch=2): CA=5, GO=13, SO=44.
+    """
+
+    NPY_DIR = os.path.join(os.path.dirname(__file__),
+                           "..", "9_2_FPGA", "tb", "cosim", "real_data", "hex")
+
+    def _npy_available(self):
+        return os.path.isdir(self.NPY_DIR) and os.path.isfile(
+            os.path.join(self.NPY_DIR, "fullchain_mti_doppler_i.npy"))
+
+    def _count_detections(self, conn):
+        """Count detection-flagged packets in a ReplayConnection."""
+        raw = conn._packets
+        boundaries = RadarProtocol.find_packet_boundaries(raw)
+        det_count = 0
+        for start, end, ptype in boundaries:
+            result = RadarProtocol.parse_data_packet(raw[start:end])
+            if result and result["detection"]:
+                det_count += 1
+        return det_count
+
+    def test_go_cfar_detection_count(self):
+        """GO-CFAR (mode=1) produces 13 detections with default params."""
+        if not self._npy_available():
+            self.skipTest("npy data files not found")
+        conn = ReplayConnection(self.NPY_DIR, use_mti=True)
+        conn.open()
+        # Switch to GO-CFAR
+        cmd = RadarProtocol.build_command(0x24, 1)
+        conn.write(cmd)
+        # Force rebuild
+        conn.read(4096)
+        det_count = self._count_detections(conn)
+        self.assertEqual(det_count, 13)
+        conn.close()
+
+    def test_so_cfar_detection_count(self):
+        """SO-CFAR (mode=2) produces 44 detections with default params."""
+        if not self._npy_available():
+            self.skipTest("npy data files not found")
+        conn = ReplayConnection(self.NPY_DIR, use_mti=True)
+        conn.open()
+        # Switch to SO-CFAR
+        cmd = RadarProtocol.build_command(0x24, 2)
+        conn.write(cmd)
+        conn.read(4096)
+        det_count = self._count_detections(conn)
+        self.assertEqual(det_count, 44)
+        conn.close()
+
+    def test_go_more_detections_than_ca(self):
+        """GO-CFAR uses single-window noise → lower threshold → more detections than CA."""
+        if not self._npy_available():
+            self.skipTest("npy data files not found")
+        conn = ReplayConnection(self.NPY_DIR, use_mti=True)
+        conn.open()
+        ca_count = self._count_detections(conn)
+
+        cmd = RadarProtocol.build_command(0x24, 1)
+        conn.write(cmd)
+        conn.read(4096)
+        go_count = self._count_detections(conn)
+
+        self.assertGreater(go_count, ca_count)
+        conn.close()
+
+    def test_so_more_detections_than_go(self):
+        """SO-CFAR picks smaller noise → lowest threshold → most detections."""
+        if not self._npy_available():
+            self.skipTest("npy data files not found")
+        conn = ReplayConnection(self.NPY_DIR, use_mti=True)
+        conn.open()
+
+        cmd = RadarProtocol.build_command(0x24, 1)
+        conn.write(cmd)
+        conn.read(4096)
+        go_count = self._count_detections(conn)
+
+        cmd = RadarProtocol.build_command(0x24, 2)
+        conn.write(cmd)
+        conn.read(4096)
+        so_count = self._count_detections(conn)
+
+        self.assertGreater(so_count, go_count)
+        conn.close()
+
+    def test_mode_switch_back_to_ca(self):
+        """Switching GO → CA restores original detection count."""
+        if not self._npy_available():
+            self.skipTest("npy data files not found")
+        conn = ReplayConnection(self.NPY_DIR, use_mti=True)
+        conn.open()
+        ca_original = self._count_detections(conn)
+
+        # Switch to GO
+        cmd = RadarProtocol.build_command(0x24, 1)
+        conn.write(cmd)
+        conn.read(4096)
+        go_count = self._count_detections(conn)
+        self.assertNotEqual(go_count, ca_original)
+
+        # Switch back to CA
+        cmd = RadarProtocol.build_command(0x24, 0)
+        conn.write(cmd)
+        conn.read(4096)
+        ca_restored = self._count_detections(conn)
+        self.assertEqual(ca_restored, ca_original)
+        conn.close()
+
+    def test_invalid_mode_falls_back_to_ca(self):
+        """Mode value 3 (reserved) should fall back to CA behavior."""
+        if not self._npy_available():
+            self.skipTest("npy data files not found")
+        conn = ReplayConnection(self.NPY_DIR, use_mti=True)
+        conn.open()
+        ca_count = self._count_detections(conn)
+
+        # Set invalid mode 3
+        cmd = RadarProtocol.build_command(0x24, 3)
+        conn.write(cmd)
+        conn.read(4096)
+        fallback_count = self._count_detections(conn)
+        self.assertEqual(fallback_count, ca_count)
+        conn.close()
+
+
+class TestParamValidation(unittest.TestCase):
+    """Test parameter validation constants and CFAR mode mappings."""
+
+    def test_param_validation_keys_are_valid_opcodes(self):
+        """Every key in PARAM_VALIDATION is a valid Opcode value."""
+        enum_values = set(int(m) for m in Opcode)
+        for op in PARAM_VALIDATION:
+            self.assertIn(op, enum_values,
+                          f"0x{op:02X} in PARAM_VALIDATION but not in Opcode enum")
+
+    def test_param_validation_ranges_not_empty(self):
+        """Every validation spec has min < max or min == max."""
+        for op, (lo, hi, desc) in PARAM_VALIDATION.items():
+            self.assertLessEqual(lo, hi,
+                                 f"0x{op:02X}: min={lo} > max={hi}")
+            self.assertIsInstance(desc, str)
+
+    def test_cfar_mode_names_count(self):
+        """Exactly 3 CFAR modes: CA, GO, SO."""
+        self.assertEqual(len(CFAR_MODE_NAMES), 3)
+
+    def test_cfar_mode_values_mapping(self):
+        """CFAR_MODE_VALUES maps names to 0, 1, 2."""
+        for idx, name in enumerate(CFAR_MODE_NAMES):
+            self.assertEqual(CFAR_MODE_VALUES[name], idx)
+
+    def test_cfar_mode_names_match_rtl(self):
+        """Mode names correspond to cfar_ca.v modes (CA=0, GO=1, SO=2)."""
+        self.assertEqual(CFAR_MODE_VALUES["CA-CFAR"], 0)
+        self.assertEqual(CFAR_MODE_VALUES["GO-CFAR"], 1)
+        self.assertEqual(CFAR_MODE_VALUES["SO-CFAR"], 2)
+
+    def test_threshold_validation_range(self):
+        """Threshold 0x03 range is 0-65535 (16-bit)."""
+        lo, hi, _ = PARAM_VALIDATION[0x03]
+        self.assertEqual(lo, 0)
+        self.assertEqual(hi, 65535)
+
+    def test_cfar_guard_validation_range(self):
+        """CFAR guard 0x21 range is 0-15 (4-bit)."""
+        lo, hi, _ = PARAM_VALIDATION[0x21]
+        self.assertEqual(lo, 0)
+        self.assertEqual(hi, 15)
+
+    def test_dc_notch_validation_range(self):
+        """DC notch 0x27 range is 0-7 (3-bit)."""
+        lo, hi, _ = PARAM_VALIDATION[0x27]
+        self.assertEqual(lo, 0)
+        self.assertEqual(hi, 7)
+
+    def test_cfar_alpha_validation_range(self):
+        """CFAR alpha 0x23 range is 0-255 (8-bit Q4.4)."""
+        lo, hi, _ = PARAM_VALIDATION[0x23]
+        self.assertEqual(lo, 0)
+        self.assertEqual(hi, 255)
 
 
 if __name__ == "__main__":

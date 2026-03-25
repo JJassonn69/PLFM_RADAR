@@ -47,6 +47,7 @@ from radar_protocol import (
     DataRecorder, RadarAcquisition,
     RadarFrame, StatusResponse, Opcode,
     NUM_RANGE_BINS, NUM_DOPPLER_BINS, WATERFALL_DEPTH,
+    AERIS10_CONFIG,
 )
 
 logging.basicConfig(
@@ -78,18 +79,8 @@ class RadarDashboard:
 
     UPDATE_INTERVAL_MS = 100  # 10 Hz display refresh
 
-    # Default radar parameters for physical axis labels (AERIS-10)
-    # Overridden by ReplayConnection.radar_config when in replay mode.
-    AERIS10_CONFIG = {
-        "sample_rate": 400e6,        # Hz — AERIS-10 ADC sample rate
-        "bandwidth": 500e6,          # Hz — chirp bandwidth
-        "ramp_time": 300e-6,         # s  — chirp ramp time
-        "center_freq": 10.5e9,       # Hz — X-band center frequency
-        "fft_size": 1024,            # FFT length (range)
-        "decimation": 16,            # peak decimation ratio
-        "num_chirps": 32,            # chirps per Doppler frame
-        "range_formula": "if",       # AERIS-10: range = c/(2*BW) * decimation per bin
-    }
+    # Reference to shared AERIS-10 config (defined in radar_protocol.py)
+    AERIS10_CONFIG = AERIS10_CONFIG
 
     C = 3e8  # m/s — speed of light
 

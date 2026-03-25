@@ -83,6 +83,38 @@ class Opcode(IntEnum):
     STATUS_REQUEST      = 0xFF  # host_status_request (triggers status packet)
 
 
+# CFAR mode display names (index = mode value, matches cfar_ca.v)
+CFAR_MODE_NAMES = ["CA-CFAR", "GO-CFAR", "SO-CFAR"]
+CFAR_MODE_VALUES = {name: idx for idx, name in enumerate(CFAR_MODE_NAMES)}
+
+# Parameter validation rules: opcode → (min, max, description)
+# Matches RTL register widths in radar_system_top.v
+PARAM_VALIDATION = {
+    0x03: (0, 65535, "Threshold [16-bit]"),
+    0x04: (0, 7, "Stream control [3-bit bitmask]"),
+    0x16: (0, 15, "Gain shift [4-bit: bit3=dir, 2:0=shift]"),
+    0x20: (0, 2, "Range mode [0=auto, 1=short, 2=long]"),
+    0x21: (0, 15, "CFAR guard cells [4-bit]"),
+    0x22: (0, 31, "CFAR training cells [5-bit]"),
+    0x23: (0, 255, "CFAR alpha Q4.4 [8-bit]"),
+    0x24: (0, 2, "CFAR mode [0=CA, 1=GO, 2=SO]"),
+    0x27: (0, 7, "DC notch +/-width [3-bit]"),
+}
+
+# AERIS-10 radar configuration for physical axis labels.
+# Used by dashboards when not in replay mode (which provides CN0566 config).
+AERIS10_CONFIG = {
+    "sample_rate": 400e6,        # Hz — AERIS-10 ADC sample rate
+    "bandwidth": 500e6,          # Hz — chirp bandwidth
+    "ramp_time": 300e-6,         # s  — chirp ramp time
+    "center_freq": 10.5e9,       # Hz — X-band center frequency
+    "fft_size": 1024,            # FFT length (range)
+    "decimation": 16,            # peak decimation ratio
+    "num_chirps": 32,            # chirps per Doppler frame
+    "range_formula": "if",       # AERIS-10: range = c/(2*BW) * decimation per bin
+}
+
+
 # ============================================================================
 # Data Structures
 # ============================================================================
