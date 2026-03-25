@@ -47,31 +47,40 @@ WATERFALL_DEPTH = 64
 
 
 class Opcode(IntEnum):
-    """Host register opcodes (matches radar_system_top.v command decode)."""
-    TRIGGER             = 0x01
-    PRF_DIV             = 0x02
-    NUM_CHIRPS          = 0x03
-    CHIRP_TIMER         = 0x04
-    STREAM_ENABLE       = 0x05
-    GAIN_SHIFT          = 0x06
-    THRESHOLD           = 0x10
-    LONG_CHIRP          = 0x10
-    LONG_LISTEN         = 0x11
-    GUARD               = 0x12
-    SHORT_CHIRP         = 0x13
-    SHORT_LISTEN        = 0x14
-    CHIRPS_PER_ELEV     = 0x15
-    RANGE_MODE          = 0x20
-    CFAR_GUARD          = 0x21
-    CFAR_TRAIN          = 0x22
-    CFAR_ALPHA          = 0x23
-    CFAR_MODE           = 0x24
-    CFAR_ENABLE         = 0x25
-    MTI_ENABLE          = 0x26
-    DC_NOTCH_WIDTH      = 0x27
-    SELF_TEST_TRIGGER   = 0x30
-    SELF_TEST_STATUS    = 0x31
-    STATUS_REQUEST      = 0xFF
+    """Host register opcodes — matches radar_system_top.v command decode exactly.
+
+    RTL decode is at radar_system_top.v lines 811-853.  Keep this enum
+    in sync whenever the Verilog case statement changes.
+
+    Command word format: {opcode[31:24], addr[23:16], value[15:0]}
+    """
+    # Core control
+    RADAR_MODE          = 0x01  # host_radar_mode [1:0]
+    TRIGGER             = 0x02  # host_trigger_pulse (self-clearing)
+    THRESHOLD           = 0x03  # host_detect_threshold [15:0]
+    STREAM_CONTROL      = 0x04  # host_stream_control [2:0] (bit0=range, bit1=doppler, bit2=cfar)
+    # Chirp timing configuration
+    LONG_CHIRP          = 0x10  # host_long_chirp_cycles [15:0] (default 3000)
+    LONG_LISTEN         = 0x11  # host_long_listen_cycles [15:0] (default 13700)
+    GUARD               = 0x12  # host_guard_cycles [15:0] (default 17540)
+    SHORT_CHIRP         = 0x13  # host_short_chirp_cycles [15:0] (default 50)
+    SHORT_LISTEN        = 0x14  # host_short_listen_cycles [15:0] (default 17450)
+    CHIRPS_PER_ELEV     = 0x15  # host_chirps_per_elev [5:0] (default 32)
+    GAIN_SHIFT          = 0x16  # host_gain_shift [3:0] (bit3=dir, bit2:0=shift)
+    # Range and detection configuration
+    RANGE_MODE          = 0x20  # host_range_mode [1:0] (00=auto, 01=short, 10=long)
+    CFAR_GUARD          = 0x21  # host_cfar_guard [3:0] (guard cells per side)
+    CFAR_TRAIN          = 0x22  # host_cfar_train [4:0] (training cells per side)
+    CFAR_ALPHA          = 0x23  # host_cfar_alpha [7:0] (Q4.4 threshold multiplier)
+    CFAR_MODE           = 0x24  # host_cfar_mode [1:0] (00=CA, 01=GO, 10=SO)
+    CFAR_ENABLE         = 0x25  # host_cfar_enable (1=CFAR, 0=simple threshold)
+    MTI_ENABLE          = 0x26  # host_mti_enable (1=active, 0=pass-through)
+    DC_NOTCH_WIDTH      = 0x27  # host_dc_notch_width [2:0] (0=off, 1..7 bins)
+    # Board self-test
+    SELF_TEST_TRIGGER   = 0x30  # host_self_test_trigger (self-clearing)
+    SELF_TEST_STATUS    = 0x31  # host_status_request alias (triggers readback)
+    # Status readback
+    STATUS_REQUEST      = 0xFF  # host_status_request (triggers status packet)
 
 
 # ============================================================================
@@ -480,18 +489,17 @@ class FT601Connection:
 
 # Hardware-only opcodes that cannot be adjusted in replay mode
 _HARDWARE_ONLY_OPCODES = {
-    0x01,  # TRIGGER
-    0x02,  # PRF_DIV
-    0x03,  # NUM_CHIRPS
-    0x04,  # CHIRP_TIMER
-    0x05,  # STREAM_ENABLE
-    0x06,  # GAIN_SHIFT
-    0x10,  # THRESHOLD / LONG_CHIRP
+    0x01,  # RADAR_MODE
+    0x02,  # TRIGGER (self-clearing pulse)
+    0x03,  # THRESHOLD (detect_threshold)
+    0x04,  # STREAM_CONTROL
+    0x10,  # LONG_CHIRP
     0x11,  # LONG_LISTEN
     0x12,  # GUARD
     0x13,  # SHORT_CHIRP
     0x14,  # SHORT_LISTEN
     0x15,  # CHIRPS_PER_ELEV
+    0x16,  # GAIN_SHIFT
     0x20,  # RANGE_MODE
     0x30,  # SELF_TEST_TRIGGER
     0x31,  # SELF_TEST_STATUS

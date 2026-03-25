@@ -795,7 +795,7 @@ class RadarDashboardV2:
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
         buttons = [
-            ("Trigger Chirp (0x01)", 0x01, 1),
+            ("Trigger Chirp (0x02)", 0x02, 1),
             ("Enable MTI (0x26)", 0x26, 1),
             ("Disable MTI (0x26)", 0x26, 0),
             ("Enable CFAR (0x25)", 0x25, 1),
@@ -838,11 +838,11 @@ class RadarDashboardV2:
             ("CFAR Train (0x22)", 0x22, "8"),
             ("CFAR Alpha Q4.4 (0x23)", 0x23, "48"),
             ("CFAR Mode (0x24)", 0x24, "0"),
-            ("Threshold (0x10)", 0x10, "500"),
-            ("Gain Shift (0x06)", 0x06, "0"),
+            ("Threshold (0x03)", 0x03, "500"),
+            ("Gain Shift (0x16)", 0x16, "0"),
             ("DC Notch Width (0x27)", 0x27, "0"),
             ("Range Mode (0x20)", 0x20, "0"),
-            ("Stream Enable (0x05)", 0x05, "7"),
+            ("Stream Control (0x04)", 0x04, "7"),
         ]
         for row_idx, (label, opcode, default) in enumerate(params):
             ttk.Label(right, text=label).grid(row=row_idx, column=0,

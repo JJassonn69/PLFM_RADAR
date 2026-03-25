@@ -297,8 +297,8 @@ class RadarDashboard:
         left = ttk.LabelFrame(outer, text="Quick Actions", padding=12)
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
-        ttk.Button(left, text="Trigger Chirp (0x01)",
-                   command=lambda: self._send_cmd(0x01, 1)).pack(fill="x", pady=3)
+        ttk.Button(left, text="Trigger Chirp (0x02)",
+                   command=lambda: self._send_cmd(0x02, 1)).pack(fill="x", pady=3)
         ttk.Button(left, text="Enable MTI (0x26)",
                    command=lambda: self._send_cmd(0x26, 1)).pack(fill="x", pady=3)
         ttk.Button(left, text="Disable MTI (0x26)",
@@ -347,11 +347,11 @@ class RadarDashboard:
             ("CFAR Train (0x22)", 0x22, "8"),
             ("CFAR Alpha Q4.4 (0x23)", 0x23, "48"),
             ("CFAR Mode (0x24)", 0x24, "0"),
-            ("Threshold (0x10)", 0x10, "500"),
-            ("Gain Shift (0x06)", 0x06, "0"),
+            ("Threshold (0x03)", 0x03, "500"),
+            ("Gain Shift (0x16)", 0x16, "0"),
             ("DC Notch Width (0x27)", 0x27, "0"),
             ("Range Mode (0x20)", 0x20, "0"),
-            ("Stream Enable (0x05)", 0x05, "7"),
+            ("Stream Control (0x04)", 0x04, "7"),
         ]
 
         for row_idx, (label, opcode, default) in enumerate(params):
