@@ -132,6 +132,7 @@ doppler_processor_optimized doppler_proc (
     .doppler_valid(doppler_valid),
     .doppler_bin(doppler_bin),
     .range_bin(range_bin),
+    .sub_frame(),                   // Not used in this testbench
     .processing_active(processing_active),
     .frame_complete(frame_complete),
     .status(dut_status)
@@ -200,15 +201,18 @@ endtask
 // ============================================================================
 // COUNT DECIMATOR OUTPUTS (always block)
 // ============================================================================
+
 always @(posedge clk or negedge reset_n) begin
     if (!reset_n) begin
         decim_out_count <= 0;
-    end else if (decim_valid_out) begin
-        if (decim_out_count < CHIRPS * RANGE_BINS) begin
-            decim_cap_i[decim_out_count] <= decim_i_out;
-            decim_cap_q[decim_out_count] <= decim_q_out;
+    end else begin
+        if (decim_valid_out) begin
+            if (decim_out_count < CHIRPS * RANGE_BINS) begin
+                decim_cap_i[decim_out_count] <= decim_i_out;
+                decim_cap_q[decim_out_count] <= decim_q_out;
+            end
+            decim_out_count <= decim_out_count + 1;
         end
-        decim_out_count <= decim_out_count + 1;
     end
 end
 

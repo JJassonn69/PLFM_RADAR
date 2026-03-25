@@ -240,47 +240,47 @@ puts "================================================================"
 open_run impl_1 -name impl_1
 
 # --- Checklist Item 2: Timing Summary ---
-puts "  [2/15] Timing Summary..."
+puts {  [2/15] Timing Summary...}
 report_timing_summary -delay_type min_max -max_paths 100 \
     -report_unconstrained \
     -file "${report_dir}/02_timing_summary.rpt"
 
 # --- Checklist Item 3: Clock Analysis ---
-puts "  [3/15] Clock Analysis..."
+puts {  [3/15] Clock Analysis...}
 report_clocks -file "${report_dir}/03_clocks.rpt"
 report_clock_interaction -delay_type min_max \
     -file "${report_dir}/03_clock_interaction.rpt"
 report_clock_networks -file "${report_dir}/03_clock_networks.rpt"
 
 # --- Checklist Item 4: Utilization ---
-puts "  [4/15] Utilization..."
+puts {  [4/15] Utilization...}
 report_utilization -file "${report_dir}/04_utilization.rpt"
 report_utilization -hierarchical -file "${report_dir}/04_utilization_hierarchical.rpt"
 
 # --- Checklist Item 5: Power ---
-puts "  [5/15] Power Report..."
+puts {  [5/15] Power Report...}
 report_power -file "${report_dir}/05_power.rpt"
 
 # --- Checklist Item 6: DRC ---
-puts "  [6/15] DRC..."
+puts {  [6/15] DRC...}
 report_drc -file "${report_dir}/06_drc.rpt"
 
 # --- Checklist Item 7: IO and Constraints ---
-puts "  [7/15] IO Report..."
+puts {  [7/15] IO Report...}
 report_io -file "${report_dir}/07_io.rpt"
 report_timing -from [all_inputs] -to [all_outputs] -max_paths 20 \
     -file "${report_dir}/07_io_timing.rpt"
 
 # --- Checklist Item 8: Congestion Analysis ---
-puts "  [8/15] Congestion Analysis..."
+puts {  [8/15] Congestion Analysis...}
 report_design_analysis -congestion -file "${report_dir}/08_congestion.rpt"
 
 # --- Checklist Item 9: Route Status ---
-puts "  [9/15] Route Status..."
+puts {  [9/15] Route Status...}
 report_route_status -file "${report_dir}/09_route_status.rpt"
 
 # --- Checklist Item 10: Critical Paths ---
-puts "  [10/15] Critical Paths..."
+puts {  [10/15] Critical Paths...}
 report_timing -max_paths 20 -sort_by slack -nworst 5 \
     -file "${report_dir}/10_critical_paths_setup.rpt"
 report_timing -delay_type min -max_paths 20 -sort_by slack -nworst 5 \
@@ -289,20 +289,20 @@ report_high_fanout_nets -timing -load_type -max_nets 20 \
     -file "${report_dir}/10_high_fanout_nets.rpt"
 
 # --- Checklist Item 11: QoR Summary ---
-puts "  [11/15] QoR Summary..."
+puts {  [11/15] QoR Summary...}
 report_design_analysis -timing -file "${report_dir}/11_design_analysis_timing.rpt"
 report_design_analysis -logic_level_distribution -file "${report_dir}/11_logic_level_dist.rpt"
 report_methodology -file "${report_dir}/11_methodology.rpt"
 
 # --- Checklist Item 12: CDC Analysis ---
-puts "  [12/15] CDC Analysis..."
+puts {  [12/15] CDC Analysis...}
 report_cdc -details -file "${report_dir}/12_cdc.rpt"
 
 # --- Checklist Item 13: Log Scan (captured separately in build log) ---
-puts "  [13/15] Log scan - see build23.log"
+puts {  [13/15] Log scan - see build23.log}
 
 # --- Additional reports ---
-puts "  [extra] Generating additional diagnostic reports..."
+puts {  [extra] Generating additional diagnostic reports...}
 
 if {[catch {report_exceptions -file "${report_dir}/13_exceptions.rpt"} err]} {
     puts "  WARNING: report_exceptions failed: $err"
@@ -332,12 +332,33 @@ puts $summary_fh "Bitstream Time:  ${bit_elapsed}s"
 puts $summary_fh ""
 
 # Extract key timing numbers
+proc stat_or_default {prop default_value} {
+    if {[catch {set value [get_property $prop [current_design]]}]} {
+        return $default_value
+    }
+    if {$value eq ""} {
+        return $default_value
+    }
+    return $value
+}
+
+proc first_path_slack_or_default {delay_type default_value} {
+    set paths [get_timing_paths -quiet -delay_type $delay_type -max_paths 1 -nworst 1]
+    if {[llength $paths] > 0} {
+        set slack [get_property SLACK [lindex $paths 0]]
+        if {$slack ne ""} {
+            return $slack
+        }
+    }
+    return $default_value
+}
+
 puts $summary_fh "--- Timing ---"
-set wns [get_property STATS.WNS [current_design]]
-set tns [get_property STATS.TNS [current_design]]
-set whs [get_property STATS.WHS [current_design]]
-set ths [get_property STATS.THS [current_design]]
-set fail_ep [get_property STATS.TPWS [current_design]]
+set wns [stat_or_default STATS.WNS [first_path_slack_or_default max 0.0]]
+set tns [stat_or_default STATS.TNS 0.0]
+set whs [stat_or_default STATS.WHS [first_path_slack_or_default min 0.0]]
+set ths [stat_or_default STATS.THS 0.0]
+set fail_ep [stat_or_default STATS.TPWS 0]
 puts $summary_fh "  WNS:  $wns ns"
 puts $summary_fh "  TNS:  $tns ns"
 puts $summary_fh "  WHS:  $whs ns"

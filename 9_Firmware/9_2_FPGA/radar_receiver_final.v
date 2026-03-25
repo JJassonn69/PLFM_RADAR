@@ -18,6 +18,7 @@ module radar_receiver_final (
     output wire doppler_valid,
     output wire [4:0] doppler_bin,
     output wire [5:0] range_bin,
+    output wire sub_frame,              // 0=long PRI sub-frame, 1=short PRI sub-frame
     
     // Matched filter range profile output (for USB)
     output wire signed [15:0] range_profile_i_out,
@@ -404,9 +405,10 @@ assign range_data_valid = mti_range_valid;
 
 // ========== DOPPLER PROCESSOR ==========
 doppler_processor_optimized #(
-    .DOPPLER_FFT_SIZE(32),
+    .DOPPLER_FFT_SIZE(16),
     .RANGE_BINS(64),
-    .CHIRPS_PER_FRAME(32)  // MUST MATCH YOUR ACTUAL FRAME SIZE!
+    .CHIRPS_PER_FRAME(32),
+    .CHIRPS_PER_SUBFRAME(16)
 ) doppler_proc (
     .clk(clk),
     .reset_n(reset_n),
@@ -419,6 +421,7 @@ doppler_processor_optimized #(
     .doppler_valid(doppler_valid),
     .doppler_bin(doppler_bin),
     .range_bin(range_bin),
+    .sub_frame(sub_frame),
     
     // Status
     .processing_active(doppler_processing),

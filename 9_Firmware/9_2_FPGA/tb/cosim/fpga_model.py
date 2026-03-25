@@ -1075,44 +1075,43 @@ class RangeBinDecimator:
 
 
 # =============================================================================
-# Doppler Processor (Hamming window + 32-point FFT)
+# Doppler Processor (Hamming window + dual 16-point FFT)
 # =============================================================================
 
-# Hamming window LUT (32 entries, 16-bit unsigned Q15)
+# Hamming window LUT (16 entries, 16-bit unsigned Q15)
+# Matches doppler_processor.v window_coeff[0:15]
+# w[n] = 0.54 - 0.46 * cos(2*pi*n/15), n=0..15, symmetric
 HAMMING_WINDOW = [
-    0x0800, 0x0862, 0x09CB, 0x0C3B, 0x0FB2, 0x142F, 0x19B2, 0x2039,
-    0x27C4, 0x3050, 0x39DB, 0x4462, 0x4FE3, 0x5C5A, 0x69C4, 0x781D,
-    0x7FFF, 0x781D, 0x69C4, 0x5C5A, 0x4FE3, 0x4462, 0x39DB, 0x3050,
-    0x27C4, 0x2039, 0x19B2, 0x142F, 0x0FB2, 0x0C3B, 0x09CB, 0x0862,
+    0x0A3D, 0x0E5C, 0x1B6D, 0x3088, 0x4B33, 0x6573, 0x7642, 0x7F62,
+    0x7F62, 0x7642, 0x6573, 0x4B33, 0x3088, 0x1B6D, 0x0E5C, 0x0A3D,
 ]
 
 
 class DopplerProcessor:
     """
-    Bit-accurate model of doppler_processor_optimized.v
+    Bit-accurate model of doppler_processor_optimized.v (dual 16-pt FFT architecture).
 
-    For each range bin (0-63):
-      1. Read 32 chirps of data from accumulation buffer
-      2. Apply Hamming window (Q15 multiply, round, >>>15)
-      3. 32-point FFT
+    The staggered-PRF frame has 32 chirps total:
+      - Sub-frame 0 (long PRI):  chirps 0-15  -> 16-pt Hamming -> 16-pt FFT -> bins 0-15
+      - Sub-frame 1 (short PRI): chirps 16-31 -> 16-pt Hamming -> 16-pt FFT -> bins 16-31
 
-    The 32-point FFT uses xfft_32.v (Xilinx IP wrapper around fft_engine).
-    For the Python model, we use FFTEngine with N=32.
+    Output: doppler_bin[4:0] = {sub_frame_id, bin_in_subframe[3:0]}
+    Total output per range bin: 32 bins (16 + 16), same interface as before.
     """
 
-    DOPPLER_FFT_SIZE = 32
+    DOPPLER_FFT_SIZE = 16     # Per sub-frame
     RANGE_BINS = 64
     CHIRPS_PER_FRAME = 32
+    CHIRPS_PER_SUBFRAME = 16
 
-    def __init__(self, twiddle_file_32=None):
+    def __init__(self, twiddle_file_16=None):
         """
-        For 32-point FFT, we need the 32-point twiddle file.
+        For 16-point FFT, we need the 16-point twiddle file.
         If not provided, we generate twiddle factors mathematically
-        (since the 32-pt twiddle ROM is cos(2*pi*k/32) for k=0..7).
+        (cos(2*pi*k/16) for k=0..3, quarter-wave ROM with 4 entries).
         """
-        self.fft32 = None
-        self._twiddle_file_32 = twiddle_file_32
-        # We'll use a simple 32-pt FFT with computed twiddles
+        self.fft16 = None
+        self._twiddle_file_16 = twiddle_file_16
 
     @staticmethod
     def window_multiply(data_16, window_16):
@@ -1134,7 +1133,7 @@ class DopplerProcessor:
 
     def process_frame(self, chirp_data_i, chirp_data_q):
         """
-        Process one complete Doppler frame.
+        Process one complete Doppler frame using dual 16-pt FFTs.
 
         Args:
             chirp_data_i: 2D array [32 chirps][64 range bins] of signed 16-bit I
@@ -1143,46 +1142,63 @@ class DopplerProcessor:
         Returns:
             (doppler_map_i, doppler_map_q): 2D arrays [64 range bins][32 doppler bins]
                                             of signed 16-bit
+                                            Bins 0-15 = sub-frame 0 (long PRI)
+                                            Bins 16-31 = sub-frame 1 (short PRI)
         """
         doppler_map_i = []
         doppler_map_q = []
 
-        # Generate 32-pt twiddle factors (quarter-wave cos, 8 entries)
-        # cos(2*pi*k/32) for k=0..7
+        # Generate 16-pt twiddle factors (quarter-wave cos, 4 entries)
+        # cos(2*pi*k/16) for k=0..3
+        # Matches fft_twiddle_16.mem: 7FFF, 7641, 5A82, 30FB
         import math
-        cos_rom_32 = []
-        for k in range(8):
-            val = round(32767.0 * math.cos(2.0 * math.pi * k / 32.0))
-            cos_rom_32.append(sign_extend(val & 0xFFFF, 16))
+        cos_rom_16 = []
+        for k in range(4):
+            val = round(32767.0 * math.cos(2.0 * math.pi * k / 16.0))
+            cos_rom_16.append(sign_extend(val & 0xFFFF, 16))
 
-        fft32 = FFTEngine.__new__(FFTEngine)
-        fft32.N = 32
-        fft32.LOG2N = 5
-        fft32.cos_rom = cos_rom_32
-        fft32.mem_re = [0] * 32
-        fft32.mem_im = [0] * 32
+        fft16 = FFTEngine.__new__(FFTEngine)
+        fft16.N = 16
+        fft16.LOG2N = 4
+        fft16.cos_rom = cos_rom_16
+        fft16.mem_re = [0] * 16
+        fft16.mem_im = [0] * 16
 
         for rbin in range(self.RANGE_BINS):
-            # Gather 32 chirps for this range bin
-            fft_in_re = []
-            fft_in_im = []
+            # Output bins for this range bin: 32 total (16 from each sub-frame)
+            out_re = [0] * 32
+            out_im = [0] * 32
 
-            for chirp in range(self.CHIRPS_PER_FRAME):
-                re_val = sign_extend(chirp_data_i[chirp][rbin] & 0xFFFF, 16)
-                im_val = sign_extend(chirp_data_q[chirp][rbin] & 0xFFFF, 16)
+            # Process each sub-frame independently
+            for sf in range(2):
+                chirp_start = sf * self.CHIRPS_PER_SUBFRAME
+                bin_offset = sf * self.DOPPLER_FFT_SIZE
 
-                # Apply Hamming window
-                win_re = self.window_multiply(re_val, HAMMING_WINDOW[chirp])
-                win_im = self.window_multiply(im_val, HAMMING_WINDOW[chirp])
+                fft_in_re = []
+                fft_in_im = []
 
-                fft_in_re.append(win_re)
-                fft_in_im.append(win_im)
+                for c in range(self.CHIRPS_PER_SUBFRAME):
+                    chirp = chirp_start + c
+                    re_val = sign_extend(chirp_data_i[chirp][rbin] & 0xFFFF, 16)
+                    im_val = sign_extend(chirp_data_q[chirp][rbin] & 0xFFFF, 16)
 
-            # 32-point forward FFT
-            fft_out_re, fft_out_im = fft32.compute(fft_in_re, fft_in_im, inverse=False)
+                    # Apply 16-pt Hamming window (index = c within sub-frame)
+                    win_re = self.window_multiply(re_val, HAMMING_WINDOW[c])
+                    win_im = self.window_multiply(im_val, HAMMING_WINDOW[c])
 
-            doppler_map_i.append(fft_out_re)
-            doppler_map_q.append(fft_out_im)
+                    fft_in_re.append(win_re)
+                    fft_in_im.append(win_im)
+
+                # 16-point forward FFT
+                fft_out_re, fft_out_im = fft16.compute(fft_in_re, fft_in_im, inverse=False)
+
+                # Pack into output: sub-frame 0 -> bins 0-15, sub-frame 1 -> bins 16-31
+                for b in range(self.DOPPLER_FFT_SIZE):
+                    out_re[bin_offset + b] = fft_out_re[b]
+                    out_im[bin_offset + b] = fft_out_im[b]
+
+            doppler_map_i.append(out_re)
+            doppler_map_q.append(out_im)
 
         return doppler_map_i, doppler_map_q
 
@@ -1207,7 +1223,7 @@ class SignalChain:
     IF_FREQ = 120_000_000    # IF frequency
     FTW_120MHZ = 0x4CCCCCCD  # Phase increment for 120 MHz at 400 MSPS
 
-    def __init__(self, twiddle_file_1024=None, twiddle_file_32=None):
+    def __init__(self, twiddle_file_1024=None, twiddle_file_16=None):
         self.nco = NCO()
         self.mixer = Mixer()
         self.cic_i = CICDecimator()
@@ -1217,7 +1233,7 @@ class SignalChain:
         self.ddc_interface = DDCInputInterface()
         self.matched_filter = MatchedFilterChain(fft_size=1024, twiddle_file=twiddle_file_1024)
         self.range_decimator = RangeBinDecimator()
-        self.doppler = DopplerProcessor(twiddle_file_32=twiddle_file_32)
+        self.doppler = DopplerProcessor(twiddle_file_16=twiddle_file_16)
 
     def ddc_step(self, adc_data_8bit, ftw=None):
         """

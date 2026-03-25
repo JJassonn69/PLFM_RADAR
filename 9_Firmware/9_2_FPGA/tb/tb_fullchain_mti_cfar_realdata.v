@@ -131,9 +131,12 @@ wire [4:0]  notched_doppler_bin;
 wire [5:0]  notched_range_bin;
 
 assign dop_bin_unsigned = doppler_bin;
+// DC notch: with dual 16-pt FFTs, DC is at bin 0 (sub-frame 0) and bin 16
+// (sub-frame 1). Notch within ±width of DC in each 16-bin sub-frame.
+wire [3:0] bin_in_subframe = dop_bin_unsigned[3:0];
 assign dc_notch_active = (DC_NOTCH_WIDTH != 3'd0) &&
-                          (dop_bin_unsigned < {2'b0, DC_NOTCH_WIDTH} ||
-                           dop_bin_unsigned > (5'd31 - {2'b0, DC_NOTCH_WIDTH} + 5'd1));
+                          (bin_in_subframe < {1'b0, DC_NOTCH_WIDTH} ||
+                           bin_in_subframe > (4'd15 - {1'b0, DC_NOTCH_WIDTH} + 4'd1));
 
 assign notched_doppler_data  = dc_notch_active ? 32'd0 : doppler_output;
 assign notched_doppler_valid = doppler_valid;
@@ -209,6 +212,7 @@ doppler_processor_optimized doppler_proc (
     .doppler_valid(doppler_valid),
     .doppler_bin(doppler_bin),
     .range_bin(range_bin),
+    .sub_frame(),                   // Not used in this testbench
     .processing_active(processing_active),
     .frame_complete(frame_complete),
     .status(dut_status)

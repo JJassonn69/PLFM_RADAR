@@ -23,7 +23,6 @@
 //
 
 module radar_system_top_te0713_vio (
-    input  wire       clk_100m,        // TE0713 FIFO0CLK (actually 50 MHz)
     output wire [3:0] user_led,
     output wire [3:0] system_status
 );
@@ -32,21 +31,44 @@ module radar_system_top_te0713_vio (
 // Parameters
 // =========================================================================
 localparam [7:0] VERSION_MAJOR = 8'd0;
-localparam [7:0] VERSION_MINOR = 8'd3;   // v0.3 = VIO build
+localparam [7:0] VERSION_MINOR = 8'd5;   // v0.5 = VIO build with INTERNAL FPGA CLOCK
 
 // =========================================================================
-// Clock buffer
+// Internal FPGA Configuration Oscillator (~65 MHz)
+// Guaranteed to run, bypassing all external dead clock generators.
 // =========================================================================
+wire clk_internal;
 wire clk_buf;
 
 `ifdef SIMULATION
-    assign clk_buf = clk_100m;
+    reg sim_clk = 0;
+    always #7.5 sim_clk = ~sim_clk; // ~66 MHz
+    assign clk_internal = sim_clk;
 `else
-    BUFG bufg_clk (
-        .I(clk_100m),
-        .O(clk_buf)
+    STARTUPE2 #(
+        .PROG_USR("FALSE"),  
+        .SIM_CCLK_FREQ(0.0)
+    ) startup_inst (
+        .CFGCLK(),       
+        .CFGMCLK(clk_internal), // ~65 MHz internal oscillator output
+        .EOS(),          
+        .PREQ(),         
+        .CLK(1'b0),      
+        .GSR(1'b0),      
+        .GTS(1'b0),      
+        .KEYCLEARB(1'b1),
+        .PACK(1'b0),     
+        .USRCCLKO(1'b0), 
+        .USRCCLKTS(1'b0),
+        .USRDONEO(1'b1), 
+        .USRDONETS(1'b1) 
     );
 `endif
+
+BUFG bufg_clk (
+    .I(clk_internal),
+    .O(clk_buf)
+);
 
 // =========================================================================
 // Power-on reset generator (~500ms at 50 MHz = 25M cycles)

@@ -48,19 +48,24 @@ ADC_BITS = 8              # ADC resolution
 T_LONG_CHIRP = 30e-6      # 30 us long chirp duration
 T_SHORT_CHIRP = 0.5e-6    # 0.5 us short chirp
 T_LISTEN_LONG = 137e-6    # 137 us listening window
+T_PRI_LONG = 167e-6       # 30 us chirp + 137 us listen
+T_PRI_SHORT = 175e-6      # staggered short-PRI sub-frame
 N_SAMPLES_LISTEN = int(T_LISTEN_LONG * FS_ADC)  # 54800 samples
 
 # Processing chain
 CIC_DECIMATION = 4
 FFT_SIZE = 1024
 RANGE_BINS = 64
-DOPPLER_FFT_SIZE = 32
+DOPPLER_FFT_SIZE = 16      # Per sub-frame
+DOPPLER_TOTAL_BINS = 32    # Total output bins (2 sub-frames x 16)
+CHIRPS_PER_SUBFRAME = 16
 CHIRPS_PER_FRAME = 32
 
 # Derived
 RANGE_RESOLUTION = C_LIGHT / (2 * CHIRP_BW)  # 7.5 m
 MAX_UNAMBIGUOUS_RANGE = C_LIGHT * T_LISTEN_LONG / 2  # ~20.55 km
-VELOCITY_RESOLUTION = WAVELENGTH / (2 * CHIRPS_PER_FRAME * T_LONG_CHIRP)
+VELOCITY_RESOLUTION_LONG = WAVELENGTH / (2 * CHIRPS_PER_SUBFRAME * T_PRI_LONG)
+VELOCITY_RESOLUTION_SHORT = WAVELENGTH / (2 * CHIRPS_PER_SUBFRAME * T_PRI_SHORT)
 
 # Short chirp LUT (60 entries, 8-bit unsigned)
 SHORT_CHIRP_LUT = [
@@ -384,9 +389,6 @@ def generate_doppler_frame(targets, n_chirps=CHIRPS_PER_FRAME,
                 break
         return math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
 
-    # Chirp repetition interval (PRI)
-    t_pri = T_LONG_CHIRP + T_LISTEN_LONG  # ~167 us
-
     frame_i = []
     frame_q = []
 
@@ -408,8 +410,16 @@ def generate_doppler_frame(targets, n_chirps=CHIRPS_PER_FRAME,
             # Amplitude (simplified)
             amp = target.amplitude / 4.0
 
-            # Doppler phase for this chirp
-            doppler_phase = 2 * math.pi * target.doppler_hz * chirp_idx * t_pri
+            # Doppler phase for this chirp.
+            # The frame uses staggered PRF: chirps 0-15 use the long PRI,
+            # chirps 16-31 use the short PRI.
+            if chirp_idx < CHIRPS_PER_SUBFRAME:
+                slow_time_s = chirp_idx * T_PRI_LONG
+            else:
+                slow_time_s = (CHIRPS_PER_SUBFRAME * T_PRI_LONG) + \
+                              ((chirp_idx - CHIRPS_PER_SUBFRAME) * T_PRI_SHORT)
+
+            doppler_phase = 2 * math.pi * target.doppler_hz * slow_time_s
             total_phase = doppler_phase + target.phase_deg * math.pi / 180.0
 
             # Spread across a few bins (sinc-like response from matched filter)

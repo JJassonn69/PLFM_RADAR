@@ -65,10 +65,65 @@ current_hw_device $fpga
 # ==========================================================================
 puts "INFO: Programming $fpga with VIO bitstream..."
 set_property PROGRAM.FILE $bit_file $fpga
-set_property PROBES.FILE {} $fpga
-set_property FULL_PROBES.FILE {} $fpga
+# Find the probes (.ltx) file next to the bitstream
+set ltx_file [file join [file dirname $bit_file] [file rootname [file tail $bit_file]].ltx]
+if {![file exists $ltx_file]} {
+    # Try debug_nets.ltx
+    set ltx_file [file join [file dirname $bit_file] "debug_nets.ltx"]
+}
+if {![file exists $ltx_file]} {
+    # Search build dir
+    set ltx_candidates [glob -nocomplain [file join $build_dir "aeris10_te0713_vio.runs" "impl_1" "*.ltx"]]
+    if {[llength $ltx_candidates] > 0} {
+        set ltx_file [lindex $ltx_candidates 0]
+    }
+}
+if {[file exists $ltx_file]} {
+    puts "INFO: Using probes file: $ltx_file"
+    set_property PROBES.FILE $ltx_file $fpga
+    set_property FULL_PROBES.FILE $ltx_file $fpga
+} else {
+    puts "WARNING: No .ltx probes file found — VIO detection may fail"
+    set_property PROBES.FILE {} $fpga
+    set_property FULL_PROBES.FILE {} $fpga
+}
 program_hw_devices $fpga
-refresh_hw_device $fpga
+
+# CRITICAL: Tell Vivado to scan USER2 BSCAN chain because the bitstream
+# was rebuilt with C_USER_SCAN_CHAIN=2 to avoid collision with the TE0713
+# onboard CPLD which occupies USER1.
+# Note: Use BSCAN_SWITCH_USER_MASK (not PARAM.BSCAN_SWITCH_USER_MASK which is read-only)
+# Bitmask: USER1=0x1, USER2=0x2, USER3=0x4, USER4=0x8
+puts "INFO: Setting BSCAN_SWITCH_USER_MASK for USER2..."
+
+# Debug: check current value and property info
+set current_mask [get_property BSCAN_SWITCH_USER_MASK $fpga]
+puts "INFO: Current BSCAN_SWITCH_USER_MASK = '$current_mask'"
+
+# Report XSDB_USER_BSCAN and related properties
+puts "INFO: REGISTER.USERCODE = [get_property REGISTER.USERCODE $fpga]"
+
+# Try each USER chain to see which one works
+foreach mask {0001 0010 0100 1000 0011 0101 0110 1111} {
+    puts ""
+    puts "INFO: ===== Trying BSCAN_SWITCH_USER_MASK = $mask ====="
+    set_property BSCAN_SWITCH_USER_MASK $mask $fpga
+    set result [catch {refresh_hw_device -update_hw_probes true $fpga} errmsg]
+    if {$result == 0} {
+        puts "INFO: refresh_hw_device succeeded with mask=$mask"
+        set vio_test [get_hw_vios -of_objects $fpga]
+        puts "INFO: VIO cores: $vio_test"
+        if {[llength $vio_test] > 0} {
+            puts "INFO: >>> FOUND VIO with mask=$mask <<<"
+            break
+        }
+    } else {
+        puts "INFO: refresh_hw_device failed with mask=$mask: $errmsg"
+    }
+}
+
+puts ""
+puts "INFO: Final BSCAN_SWITCH_USER_MASK = [get_property BSCAN_SWITCH_USER_MASK $fpga]"
 
 puts "INFO: Programming complete. Waiting for self-test to run..."
 after 2000   ;# Wait 2 seconds for POR + self-test to complete

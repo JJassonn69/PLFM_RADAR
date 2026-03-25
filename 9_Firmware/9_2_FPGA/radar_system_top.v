@@ -156,6 +156,7 @@ wire [31:0] rx_doppler_output;
 wire rx_doppler_valid;
 wire [4:0] rx_doppler_bin;
 wire [5:0] rx_range_bin;
+wire rx_sub_frame;                 // 0=long PRI sub-frame, 1=short PRI sub-frame
 wire [31:0] rx_range_profile;
 wire rx_range_valid;
 wire [15:0] rx_doppler_real;
@@ -217,10 +218,11 @@ reg [5:0]  host_chirps_per_elev;      // Opcode 0x15 (default 32)
 reg        host_status_request;       // Opcode 0xFF (self-clearing pulse)
 
 // Fix 4: Doppler/chirps mismatch protection
-// DOPPLER_FFT_SIZE is compile-time (32). If host sets chirps_per_elev to a
-// different value, Doppler accumulation is corrupted. Clamp at command decode
-// and flag the mismatch so the host knows.
-localparam DOPPLER_FFT_SIZE = 32;     // Must match doppler_processor parameter
+// DOPPLER_FFT_SIZE is compile-time (16, dual sub-frame). If host sets
+// chirps_per_elev to a different value, Doppler accumulation is corrupted.
+// Clamp at command decode and flag the mismatch so the host knows.
+localparam DOPPLER_FFT_SIZE = 16;     // Must match doppler_processor parameter (per sub-frame)
+localparam CHIRPS_PER_FRAME = 32;     // Total chirps per frame (2 × DOPPLER_FFT_SIZE for staggered PRF)
 reg        chirps_mismatch_error;     // Set if host tried to set chirps != FFT size
 
 // Fix 7: Range-mode register (opcode 0x20)
@@ -484,6 +486,7 @@ radar_receiver_final rx_inst (
     .doppler_valid(rx_doppler_valid),
     .doppler_bin(rx_doppler_bin),
     .range_bin(rx_range_bin),
+    .sub_frame(rx_sub_frame),
     
     // Matched filter range profile (for USB)
     .range_profile_i_out(rx_range_profile[15:0]),
@@ -532,16 +535,19 @@ assign rx_doppler_data_valid = rx_doppler_valid;
 // ============================================================================
 // DC NOTCH FILTER (post-Doppler-FFT, pre-CFAR)
 // ============================================================================
-// Zeros out Doppler bins within ±host_dc_notch_width of DC (bin 0).
-// In a 32-point FFT, DC is bin 0; negative Doppler wraps to bins 31,30,...
-// notch_width=1 → zero bins {0}. notch_width=2 → zero bins {0,1,31}. etc.
+// Zeros out Doppler bins within ±host_dc_notch_width of DC in BOTH sub-frames.
+// With dual 16-pt FFTs, DC lives at bin 0 (sub-frame 0) and bin 16 (sub-frame 1).
+// Within each 16-bin sub-frame, negative Doppler wraps to bins 15,14,...
+//   Sub-frame 0 DC notch: bins 0..width-1 and bins 16-width+1..15
+//   Sub-frame 1 DC notch: bins 16..16+width-1 and bins 32-width+1..31
 // When host_dc_notch_width=0: pass-through (no zeroing).
 
 wire dc_notch_active;
 wire [4:0] dop_bin_unsigned = rx_doppler_bin;
+wire [3:0] bin_in_subframe = dop_bin_unsigned[3:0]; // 4-bit bin within sub-frame (0..15)
 assign dc_notch_active = (host_dc_notch_width != 3'd0) &&
-                          (dop_bin_unsigned < {2'b0, host_dc_notch_width} ||
-                           dop_bin_unsigned > (5'd31 - {2'b0, host_dc_notch_width} + 5'd1));
+                          (bin_in_subframe < {1'b0, host_dc_notch_width} ||
+                           bin_in_subframe > (4'd15 - {1'b0, host_dc_notch_width} + 4'd1));
 
 // Notched Doppler data: zero I/Q when in notch zone, pass through otherwise
 wire [31:0] notched_doppler_data  = dc_notch_active ? 32'd0 : rx_doppler_output;
@@ -814,18 +820,19 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
                 8'h13: host_short_chirp_cycles <= usb_cmd_value;
                 8'h14: host_short_listen_cycles <= usb_cmd_value;
                 8'h15: begin
-                    // Fix 4: Clamp chirps_per_elev to DOPPLER_FFT_SIZE.
+                    // Fix 4: Clamp chirps_per_elev to CHIRPS_PER_FRAME (32 total
+                    // for staggered PRF: 16 long PRI + 16 short PRI).
                     // If host requests a different value, clamp and set error flag.
-                    if (usb_cmd_value[5:0] > DOPPLER_FFT_SIZE[5:0]) begin
-                        host_chirps_per_elev  <= DOPPLER_FFT_SIZE[5:0];
+                    if (usb_cmd_value[5:0] > CHIRPS_PER_FRAME[5:0]) begin
+                        host_chirps_per_elev  <= CHIRPS_PER_FRAME[5:0];
                         chirps_mismatch_error <= 1'b1;
                     end else if (usb_cmd_value[5:0] == 6'd0) begin
-                        host_chirps_per_elev  <= DOPPLER_FFT_SIZE[5:0];
+                        host_chirps_per_elev  <= CHIRPS_PER_FRAME[5:0];
                         chirps_mismatch_error <= 1'b1;
                     end else begin
                         host_chirps_per_elev  <= usb_cmd_value[5:0];
-                        // Clear error only if value matches FFT size exactly
-                        chirps_mismatch_error <= (usb_cmd_value[5:0] != DOPPLER_FFT_SIZE[5:0]);
+                        // Clear error only if value matches frame size exactly
+                        chirps_mismatch_error <= (usb_cmd_value[5:0] != CHIRPS_PER_FRAME[5:0]);
                     end
                 end
                 8'h16: host_gain_shift         <= usb_cmd_value[3:0];  // Fix 3: digital gain

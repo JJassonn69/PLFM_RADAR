@@ -316,6 +316,10 @@ always @(posedge clk or negedge reset_n) begin
                 r_enable     <= cfg_cfar_enable;
                 r_simple_thr <= cfg_simple_threshold;
 
+                // Reset detect_count for the new frame so counts
+                // don't accumulate across multiple playback runs.
+                detect_count <= 16'd0;
+
                 // Buffer first sample
                 mag_we    <= 1'b1;
                 mag_waddr <= {range_bin_in, doppler_bin_in};
@@ -330,7 +334,7 @@ always @(posedge clk or negedge reset_n) begin
                     detect_magnitude <= cur_mag;
                     detect_threshold <= {1'b0, cfg_simple_threshold};
                     if (cur_mag > {1'b0, cfg_simple_threshold})
-                        detect_count <= detect_count + 1;
+                        detect_count <= 16'd1;
                 end
 
                 state <= ST_BUFFER;

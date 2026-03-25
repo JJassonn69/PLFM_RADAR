@@ -77,22 +77,20 @@ FFT_INTERNAL_W = 32
 FFT_TWIDDLE_W = 16
 
 # Doppler
-DOPPLER_FFT_SIZE = 32
+DOPPLER_FFT_SIZE = 16            # Per sub-frame (dual 16-pt FFT architecture)
+DOPPLER_TOTAL_BINS = 32          # Total output bins (2 sub-frames x 16)
 DOPPLER_RANGE_BINS = 64
 DOPPLER_CHIRPS = 32
+DOPPLER_CHIRPS_PER_SUBFRAME = 16
 DOPPLER_WINDOW_TYPE = 0          # Hamming
 
-# Hamming window coefficients from doppler_processor.v (Q15)
+# Hamming window coefficients from doppler_processor.v (Q15, 16 entries)
+# w[n] = 0.54 - 0.46 * cos(2*pi*n/15), n=0..15, symmetric
 HAMMING_Q15 = [
-    0x0800, 0x0862, 0x09CB, 0x0C3B,
-    0x0FB2, 0x142F, 0x19B2, 0x2039,
-    0x27C4, 0x3050, 0x39DB, 0x4462,
-    0x4FE3, 0x5C5A, 0x69C4, 0x781D,
-    0x7FFF,  # Peak
-    0x781D, 0x69C4, 0x5C5A, 0x4FE3,
-    0x4462, 0x39DB, 0x3050, 0x27C4,
-    0x2039, 0x19B2, 0x142F, 0x0FB2,
-    0x0C3B, 0x09CB, 0x0862,
+    0x0A3D, 0x0E5C, 0x1B6D, 0x3088,
+    0x4B33, 0x6573, 0x7642, 0x7F62,
+    0x7F62, 0x7642, 0x6573, 0x4B33,
+    0x3088, 0x1B6D, 0x0E5C, 0x0A3D,
 ]
 
 # ADI dataset parameters
@@ -652,108 +650,117 @@ def run_range_bin_decimator(range_fft_i, range_fft_q,
 
 
 # ===========================================================================
-# Stage 3: Doppler FFT (32-point with Hamming window, bit-accurate)
+# Stage 3: Doppler FFT (dual 16-point with Hamming window, bit-accurate)
 # ===========================================================================
-def run_doppler_fft(range_data_i, range_data_q, twiddle_file_32=None):
+def run_doppler_fft(range_data_i, range_data_q, twiddle_file_16=None):
     """
-    Bit-accurate Doppler processor matching doppler_processor.v.
+    Bit-accurate Doppler processor matching doppler_processor.v (dual 16-pt FFT).
+    
+    Architecture: Staggered-PRF frame with 32 total chirps, processed as:
+      Sub-frame 0 (long PRI):  chirps 0-15  -> 16-pt Hamming -> 16-pt FFT -> bins 0-15
+      Sub-frame 1 (short PRI): chirps 16-31 -> 16-pt Hamming -> 16-pt FFT -> bins 16-31
     
     Input: range_data_i/q shape (DOPPLER_CHIRPS, FFT_SIZE) — 16-bit signed
            Only first DOPPLER_RANGE_BINS columns are processed.
-    Output: doppler_map_i/q shape (DOPPLER_RANGE_BINS, DOPPLER_FFT_SIZE) — 16-bit signed
-    
-    Pipeline per range bin:
-    1. Read 32 chirps for this range bin
-    2. Apply Hamming window (Q15 multiply + round >>> 15)
-    3. 32-point FFT
+    Output: doppler_map_i/q shape (DOPPLER_RANGE_BINS, DOPPLER_TOTAL_BINS) — 16-bit signed
+            Bins 0-15 from sub-frame 0, bins 16-31 from sub-frame 1.
     """
     n_chirps = DOPPLER_CHIRPS
     n_range = DOPPLER_RANGE_BINS
-    n_fft = DOPPLER_FFT_SIZE
+    n_fft = DOPPLER_FFT_SIZE           # 16 (per sub-frame)
+    n_total = DOPPLER_TOTAL_BINS       # 32 (total output)
+    n_sf_chirps = DOPPLER_CHIRPS_PER_SUBFRAME  # 16
     
-    print(f"[DOPPLER] Processing {n_range} range bins x {n_chirps} chirps → {n_fft}-point FFT")
+    print(f"[DOPPLER] Processing {n_range} range bins x {n_chirps} chirps → "
+          f"dual {n_fft}-point FFT ({n_total} total bins)")
     
-    # Build Hamming window as signed 16-bit
+    # Build 16-entry Hamming window as signed 16-bit
     hamming = np.array([int(v) for v in HAMMING_Q15], dtype=np.int64)
     assert len(hamming) == n_fft, f"Hamming length {len(hamming)} != {n_fft}"
     
-    # Build 32-point twiddle factors
-    if twiddle_file_32 and os.path.exists(twiddle_file_32):
-        cos_rom_32 = load_twiddle_rom(twiddle_file_32)
+    # Build 16-point twiddle factors (quarter-wave cos, 4 entries)
+    # cos(2*pi*k/16) for k=0..3
+    if twiddle_file_16 and os.path.exists(twiddle_file_16):
+        cos_rom_16 = load_twiddle_rom(twiddle_file_16)
     else:
-        cos_rom_32 = np.round(32767 * np.cos(2 * np.pi * np.arange(n_fft // 4) / n_fft)).astype(np.int64)
+        cos_rom_16 = np.round(32767 * np.cos(2 * np.pi * np.arange(n_fft // 4) / n_fft)).astype(np.int64)
     
-    doppler_map_i = np.zeros((n_range, n_fft), dtype=np.int64)
-    doppler_map_q = np.zeros((n_range, n_fft), dtype=np.int64)
+    LOG2N_16 = 4
+    
+    doppler_map_i = np.zeros((n_range, n_total), dtype=np.int64)
+    doppler_map_q = np.zeros((n_range, n_total), dtype=np.int64)
     
     for rbin in range(n_range):
-        # Extract chirp stack for this range bin
-        chirp_i = np.zeros(n_chirps, dtype=np.int64)
-        chirp_q = np.zeros(n_chirps, dtype=np.int64)
-        for c in range(n_chirps):
-            chirp_i[c] = int(range_data_i[c, rbin])
-            chirp_q[c] = int(range_data_q[c, rbin])
-        
-        # Apply Hamming window (Q15 multiply with rounding)
-        windowed_i = np.zeros(n_fft, dtype=np.int64)
-        windowed_q = np.zeros(n_fft, dtype=np.int64)
-        for k in range(n_fft):
-            # 16-bit x 16-bit = 32-bit, then round and shift >>> 15
-            mult_i = chirp_i[k] * hamming[k]
-            mult_q = chirp_q[k] * hamming[k]
-            windowed_i[k] = saturate((mult_i + (1 << 14)) >> 15, 16)
-            windowed_q[k] = saturate((mult_q + (1 << 14)) >> 15, 16)
-        
-        # 32-point FFT (same algorithm as range FFT, different N)
-        LOG2N_32 = 5
-        mem_re = np.zeros(n_fft, dtype=np.int64)
-        mem_im = np.zeros(n_fft, dtype=np.int64)
-        
-        # Bit-reversed loading, sign-extend to 32-bit
-        for n in range(n_fft):
-            br = 0
-            for b in range(LOG2N_32):
-                if n & (1 << b):
-                    br |= (1 << (LOG2N_32 - 1 - b))
-            mem_re[br] = windowed_i[n]
-            mem_im[br] = windowed_q[n]
-        
-        # Butterfly stages
-        half = 1
-        for stg in range(LOG2N_32):
-            for bfly in range(n_fft // 2):
-                idx = bfly & (half - 1)
-                grp = bfly - idx
-                addr_even = (grp << 1) | idx
-                addr_odd = addr_even + half
-                
-                tw_idx = (idx << (LOG2N_32 - 1 - stg)) % (n_fft // 2)
-                tw_cos, tw_sin = fft_twiddle_lookup(tw_idx, n_fft, cos_rom_32)
-                
-                a_re = mem_re[addr_even]
-                a_im = mem_im[addr_even]
-                b_re = mem_re[addr_odd]
-                b_im = mem_im[addr_odd]
-                
-                prod_re = b_re * tw_cos + b_im * tw_sin
-                prod_im = b_im * tw_cos - b_re * tw_sin
-                
-                prod_re_shifted = prod_re >> 15
-                prod_im_shifted = prod_im >> 15
-                
-                mem_re[addr_even] = a_re + prod_re_shifted
-                mem_im[addr_even] = a_im + prod_im_shifted
-                mem_re[addr_odd] = a_re - prod_re_shifted
-                mem_im[addr_odd] = a_im - prod_im_shifted
+        # Process each sub-frame independently
+        for sf in range(2):
+            chirp_start = sf * n_sf_chirps
+            bin_offset = sf * n_fft
             
-            half <<= 1
-        
-        # Saturate 32-bit → 16-bit
-        for n in range(n_fft):
-            doppler_map_i[rbin, n] = saturate(mem_re[n], 16)
-            doppler_map_q[rbin, n] = saturate(mem_im[n], 16)
+            # Extract chirps for this sub-frame and range bin
+            chirp_i = np.zeros(n_fft, dtype=np.int64)
+            chirp_q = np.zeros(n_fft, dtype=np.int64)
+            for c in range(n_fft):
+                chirp_i[c] = int(range_data_i[chirp_start + c, rbin])
+                chirp_q[c] = int(range_data_q[chirp_start + c, rbin])
+            
+            # Apply 16-pt Hamming window (Q15 multiply with rounding)
+            windowed_i = np.zeros(n_fft, dtype=np.int64)
+            windowed_q = np.zeros(n_fft, dtype=np.int64)
+            for k in range(n_fft):
+                mult_i = chirp_i[k] * hamming[k]
+                mult_q = chirp_q[k] * hamming[k]
+                windowed_i[k] = saturate((mult_i + (1 << 14)) >> 15, 16)
+                windowed_q[k] = saturate((mult_q + (1 << 14)) >> 15, 16)
+            
+            # 16-point FFT (radix-2 DIT, bit-accurate)
+            mem_re = np.zeros(n_fft, dtype=np.int64)
+            mem_im = np.zeros(n_fft, dtype=np.int64)
+            
+            # Bit-reversed loading, sign-extend to 32-bit
+            for n in range(n_fft):
+                br = 0
+                for b in range(LOG2N_16):
+                    if n & (1 << b):
+                        br |= (1 << (LOG2N_16 - 1 - b))
+                mem_re[br] = windowed_i[n]
+                mem_im[br] = windowed_q[n]
+            
+            # Butterfly stages
+            half = 1
+            for stg in range(LOG2N_16):
+                for bfly in range(n_fft // 2):
+                    idx = bfly & (half - 1)
+                    grp = bfly - idx
+                    addr_even = (grp << 1) | idx
+                    addr_odd = addr_even + half
+                    
+                    tw_idx = (idx << (LOG2N_16 - 1 - stg)) % (n_fft // 2)
+                    tw_cos, tw_sin = fft_twiddle_lookup(tw_idx, n_fft, cos_rom_16)
+                    
+                    a_re = mem_re[addr_even]
+                    a_im = mem_im[addr_even]
+                    b_re = mem_re[addr_odd]
+                    b_im = mem_im[addr_odd]
+                    
+                    prod_re = b_re * tw_cos + b_im * tw_sin
+                    prod_im = b_im * tw_cos - b_re * tw_sin
+                    
+                    prod_re_shifted = prod_re >> 15
+                    prod_im_shifted = prod_im >> 15
+                    
+                    mem_re[addr_even] = a_re + prod_re_shifted
+                    mem_im[addr_even] = a_im + prod_im_shifted
+                    mem_re[addr_odd] = a_re - prod_re_shifted
+                    mem_im[addr_odd] = a_im - prod_im_shifted
+                
+                half <<= 1
+            
+            # Saturate 32-bit → 16-bit and pack into output bins
+            for n in range(n_fft):
+                doppler_map_i[rbin, bin_offset + n] = saturate(mem_re[n], 16)
+                doppler_map_q[rbin, bin_offset + n] = saturate(mem_im[n], 16)
     
-    print(f"  Doppler map: shape ({n_range}, {n_fft}), "
+    print(f"  Doppler map: shape ({n_range}, {n_total}), "
           f"I range [{doppler_map_i.min()}, {doppler_map_i.max()}]")
     
     return doppler_map_i, doppler_map_q
@@ -812,32 +819,34 @@ def run_mti_canceller(decim_i, decim_q, enable=True):
 
 
 # ===========================================================================
-# Stage 3d: DC Notch Filter (post-Doppler, bit-accurate)
+# Stage 3d: DC Notch Filter (post-Doppler, bit-accurate, per sub-frame)
 # ===========================================================================
 def run_dc_notch(doppler_i, doppler_q, width=2):
     """
     Bit-accurate model of the inline DC notch filter in radar_system_top.v.
 
-    Input:  doppler_i/q — shape (NUM_RANGE_BINS, NUM_DOPPLER_BINS), 16-bit signed
-    Output: notched_i/q — shape (NUM_RANGE_BINS, NUM_DOPPLER_BINS), 16-bit signed
+    Input:  doppler_i/q — shape (NUM_RANGE_BINS, 32), 16-bit signed
+    Output: notched_i/q — shape (NUM_RANGE_BINS, 32), 16-bit signed
 
-    Zeros Doppler bins within ±width of DC (bin 0).
-    In a 32-point FFT, DC is bin 0; negative Doppler wraps to bins 31,30,...
-      width=0: pass-through
-      width=1: zero bins {0}
-      width=2: zero bins {0, 1, 31}
-      width=3: zero bins {0, 1, 2, 30, 31}  etc.
+    With dual 16-pt FFT architecture, DC is at bin 0 in each sub-frame:
+      Sub-frame 0: bins 0-15, DC at bin 0
+      Sub-frame 1: bins 16-31, DC at bin 16
 
-    RTL logic (from radar_system_top.v lines 517-524):
+    The RTL operates on bin_in_subframe = doppler_bin[3:0]:
       dc_notch_active = (width != 0) &&
-                        (dop_bin < width || dop_bin > (31 - width + 1))
+                        (bin_in_subframe < width || bin_in_subframe > (15 - width + 1))
       notched_data = dc_notch_active ? 0 : doppler_data
+
+    width=0: pass-through
+    width=1: zero bins {0, 16}                 (DC in both sub-frames)
+    width=2: zero bins {0, 1, 15, 16, 17, 31}  (DC ±1 in both sub-frames)
+    width=3: zero bins {0, 1, 2, 14, 15, 16, 17, 18, 30, 31}  etc.
     """
     n_range, n_doppler = doppler_i.shape
     notched_i = doppler_i.copy()
     notched_q = doppler_q.copy()
 
-    print(f"[DC NOTCH] width={width}, {n_range} range bins x {n_doppler} Doppler bins")
+    print(f"[DC NOTCH] width={width}, {n_range} range bins x {n_doppler} Doppler bins (per-sub-frame)")
 
     if width == 0:
         print(f"  Pass-through (width=0)")
@@ -845,9 +854,9 @@ def run_dc_notch(doppler_i, doppler_q, width=2):
 
     zeroed_count = 0
     for dbin in range(n_doppler):
-        # Replicate RTL comparison (unsigned 5-bit):
-        #   dop_bin < width  OR  dop_bin > (31 - width + 1)
-        active = (dbin < width) or (dbin > (31 - width + 1))
+        # Replicate RTL: bin_in_subframe = dbin[3:0]
+        bin_in_subframe = dbin & 0xF
+        active = (bin_in_subframe < width) or (bin_in_subframe > (15 - width + 1))
         if active:
             notched_i[:, dbin] = 0
             notched_q[:, dbin] = 0
@@ -1046,14 +1055,20 @@ def run_float_reference(iq_i, iq_q):
         range_fft[c, :] = np.fft.fft(iq_i[c, :] + 1j * iq_q[c, :])
     
     # Doppler FFT with RTL-identical Hamming window (Q15 coefficients as float)
+    # Dual 16-pt FFT: sub-frame 0 (chirps 0-15) -> bins 0-15,
+    #                 sub-frame 1 (chirps 16-31) -> bins 16-31
     n_range = min(DOPPLER_RANGE_BINS, n_samples)
     hamming_float = np.array(HAMMING_Q15, dtype=np.float64) / 32768.0
+    n_sf = DOPPLER_CHIRPS_PER_SUBFRAME
     
-    doppler_map = np.zeros((n_range, DOPPLER_FFT_SIZE), dtype=np.complex128)
+    doppler_map = np.zeros((n_range, DOPPLER_TOTAL_BINS), dtype=np.complex128)
     for rbin in range(n_range):
-        chirp_stack = range_fft[:DOPPLER_CHIRPS, rbin]
-        windowed = chirp_stack * hamming_float
-        doppler_map[rbin, :] = np.fft.fft(windowed)
+        for sf in range(2):
+            chirp_start = sf * n_sf
+            bin_offset = sf * DOPPLER_FFT_SIZE
+            chirp_stack = range_fft[chirp_start:chirp_start + n_sf, rbin]
+            windowed = chirp_stack * hamming_float
+            doppler_map[rbin, bin_offset:bin_offset + DOPPLER_FFT_SIZE] = np.fft.fft(windowed)
     
     return range_fft, doppler_map
 
@@ -1235,11 +1250,23 @@ def main():
     # Run Doppler FFT (bit-accurate) — "direct" path (first 64 bins)
     # -----------------------------------------------------------------------
     print(f"\n{'=' * 72}")
-    print("Stage 3: Doppler FFT (32-point with Hamming window)")
+    print("Stage 3: Doppler FFT (dual 16-point with Hamming window)")
     print("  [direct path: first 64 range bins, no decimation]")
-    twiddle_32 = os.path.join(fpga_dir, "fft_twiddle_32.mem")
-    doppler_i, doppler_q = run_doppler_fft(all_range_i, all_range_q, twiddle_file_32=twiddle_32)
+    twiddle_16 = os.path.join(fpga_dir, "fft_twiddle_16.mem")
+    # Backward-compatible direct Doppler stimulus: first 64 range bins from
+    # the post-range-FFT data, packed chirp-major as {Q[31:16], I[15:0]}.
+    direct_input_file = os.path.join(output_dir, "doppler_input_realdata.hex")
+    with open(direct_input_file, 'w') as f:
+        for chirp in range(DOPPLER_CHIRPS):
+            for rbin in range(DOPPLER_RANGE_BINS):
+                i_val = int(all_range_i[chirp, rbin]) & 0xFFFF
+                q_val = int(all_range_q[chirp, rbin]) & 0xFFFF
+                f.write(f"{((q_val << 16) | i_val):08X}\n")
+    print(f"  Wrote {direct_input_file} ({DOPPLER_CHIRPS * DOPPLER_RANGE_BINS} packed IQ words)")
+
+    doppler_i, doppler_q = run_doppler_fft(all_range_i, all_range_q, twiddle_file_16=twiddle_16)
     write_hex_files(output_dir, doppler_i, doppler_q, "doppler_map")
+    write_hex_files(output_dir, doppler_i, doppler_q, "doppler_ref")
     
     # -----------------------------------------------------------------------
     # Run Range Bin Decimator + Doppler FFT — "full-chain" path
@@ -1276,7 +1303,7 @@ def main():
     print(f"\n{'=' * 72}")
     print("Stage 3b: Doppler FFT on decimated data (full-chain path)")
     fc_doppler_i, fc_doppler_q = run_doppler_fft(
-        decim_i, decim_q, twiddle_file_32=twiddle_32
+        decim_i, decim_q, twiddle_file_16=twiddle_16
     )
     write_hex_files(output_dir, fc_doppler_i, fc_doppler_q, "fullchain_doppler_ref")
     
@@ -1284,12 +1311,12 @@ def main():
     fc_doppler_packed_file = os.path.join(output_dir, "fullchain_doppler_ref_packed.hex")
     with open(fc_doppler_packed_file, 'w') as f:
         for rbin in range(DOPPLER_RANGE_BINS):
-            for dbin in range(DOPPLER_FFT_SIZE):
+            for dbin in range(DOPPLER_TOTAL_BINS):
                 i_val = int(fc_doppler_i[rbin, dbin]) & 0xFFFF
                 q_val = int(fc_doppler_q[rbin, dbin]) & 0xFFFF
                 packed = (q_val << 16) | i_val
                 f.write(f"{packed:08X}\n")
-    print(f"  Wrote {fc_doppler_packed_file} ({DOPPLER_RANGE_BINS * DOPPLER_FFT_SIZE} packed IQ words)")
+    print(f"  Wrote {fc_doppler_packed_file} ({DOPPLER_RANGE_BINS * DOPPLER_TOTAL_BINS} packed IQ words)")
     
     # Save numpy arrays for the full-chain path
     np.save(os.path.join(output_dir, "decimated_range_i.npy"), decim_i)
@@ -1313,7 +1340,7 @@ def main():
     print(f"\n{'=' * 72}")
     print("Stage 3b+c: Doppler FFT on MTI-filtered decimated data")
     mti_doppler_i, mti_doppler_q = run_doppler_fft(
-        mti_i, mti_q, twiddle_file_32=twiddle_32
+        mti_i, mti_q, twiddle_file_16=twiddle_16
     )
     write_hex_files(output_dir, mti_doppler_i, mti_doppler_q, "fullchain_mti_doppler_ref")
     np.save(os.path.join(output_dir, "fullchain_mti_doppler_i.npy"), mti_doppler_i)
@@ -1330,12 +1357,12 @@ def main():
     fc_notched_packed_file = os.path.join(output_dir, "fullchain_notched_ref_packed.hex")
     with open(fc_notched_packed_file, 'w') as f:
         for rbin in range(DOPPLER_RANGE_BINS):
-            for dbin in range(DOPPLER_FFT_SIZE):
+            for dbin in range(DOPPLER_TOTAL_BINS):
                 i_val = int(notched_i[rbin, dbin]) & 0xFFFF
                 q_val = int(notched_q[rbin, dbin]) & 0xFFFF
                 packed = (q_val << 16) | i_val
                 f.write(f"{packed:08X}\n")
-    print(f"  Wrote {fc_notched_packed_file} ({DOPPLER_RANGE_BINS * DOPPLER_FFT_SIZE} packed IQ words)")
+    print(f"  Wrote {fc_notched_packed_file} ({DOPPLER_RANGE_BINS * DOPPLER_TOTAL_BINS} packed IQ words)")
     
     # CFAR on DC-notched data
     CFAR_GUARD = 2
@@ -1355,28 +1382,28 @@ def main():
     cfar_mag_file = os.path.join(output_dir, "fullchain_cfar_mag.hex")
     with open(cfar_mag_file, 'w') as f:
         for rbin in range(DOPPLER_RANGE_BINS):
-            for dbin in range(DOPPLER_FFT_SIZE):
+            for dbin in range(DOPPLER_TOTAL_BINS):
                 m = int(cfar_mag[rbin, dbin]) & 0x1FFFF
                 f.write(f"{m:05X}\n")
-    print(f"  Wrote {cfar_mag_file} ({DOPPLER_RANGE_BINS * DOPPLER_FFT_SIZE} mag values)")
+    print(f"  Wrote {cfar_mag_file} ({DOPPLER_RANGE_BINS * DOPPLER_TOTAL_BINS} mag values)")
     
     # 2. Threshold map (17-bit unsigned)
     cfar_thr_file = os.path.join(output_dir, "fullchain_cfar_thr.hex")
     with open(cfar_thr_file, 'w') as f:
         for rbin in range(DOPPLER_RANGE_BINS):
-            for dbin in range(DOPPLER_FFT_SIZE):
+            for dbin in range(DOPPLER_TOTAL_BINS):
                 t = int(cfar_thr[rbin, dbin]) & 0x1FFFF
                 f.write(f"{t:05X}\n")
-    print(f"  Wrote {cfar_thr_file} ({DOPPLER_RANGE_BINS * DOPPLER_FFT_SIZE} threshold values)")
+    print(f"  Wrote {cfar_thr_file} ({DOPPLER_RANGE_BINS * DOPPLER_TOTAL_BINS} threshold values)")
     
     # 3. Detection flags (1-bit per cell)
     cfar_det_file = os.path.join(output_dir, "fullchain_cfar_det.hex")
     with open(cfar_det_file, 'w') as f:
         for rbin in range(DOPPLER_RANGE_BINS):
-            for dbin in range(DOPPLER_FFT_SIZE):
+            for dbin in range(DOPPLER_TOTAL_BINS):
                 d = 1 if cfar_flags[rbin, dbin] else 0
                 f.write(f"{d:01X}\n")
-    print(f"  Wrote {cfar_det_file} ({DOPPLER_RANGE_BINS * DOPPLER_FFT_SIZE} detection flags)")
+    print(f"  Wrote {cfar_det_file} ({DOPPLER_RANGE_BINS * DOPPLER_TOTAL_BINS} detection flags)")
     
     # 4. Detection list (text)
     cfar_detections = np.argwhere(cfar_flags)
@@ -1416,10 +1443,10 @@ def main():
     fc_det_mag_file = os.path.join(output_dir, "fullchain_detection_mag.hex")
     with open(fc_det_mag_file, 'w') as f:
         for rbin in range(DOPPLER_RANGE_BINS):
-            for dbin in range(DOPPLER_FFT_SIZE):
+            for dbin in range(DOPPLER_TOTAL_BINS):
                 m = int(fc_mag[rbin, dbin]) & 0x1FFFF  # 17-bit unsigned
                 f.write(f"{m:05X}\n")
-    print(f"  Wrote {fc_det_mag_file} ({DOPPLER_RANGE_BINS * DOPPLER_FFT_SIZE} magnitude values)")
+    print(f"  Wrote {fc_det_mag_file} ({DOPPLER_RANGE_BINS * DOPPLER_TOTAL_BINS} magnitude values)")
     
     # -----------------------------------------------------------------------
     # Run detection on direct-path Doppler map (for backward compatibility)
@@ -1480,7 +1507,7 @@ def main():
     print(f"  Chirps processed: {DOPPLER_CHIRPS}")
     print(f"  Samples/chirp: {FFT_SIZE}")
     print(f"  Range FFT: {FFT_SIZE}-point → {snr_range:.1f} dB vs float")
-    print(f"  Doppler FFT (direct): {DOPPLER_FFT_SIZE}-point Hamming → {snr_doppler:.1f} dB vs float")
+    print(f"  Doppler FFT (direct): dual {DOPPLER_FFT_SIZE}-point Hamming → {snr_doppler:.1f} dB vs float")
     print(f"  Detections (direct): {len(detections)} (threshold={args.threshold})")
     print(f"  Full-chain decimator: 1024→64 peak detection")
     print(f"  Full-chain detections: {len(fc_detections)} (threshold={args.threshold})")

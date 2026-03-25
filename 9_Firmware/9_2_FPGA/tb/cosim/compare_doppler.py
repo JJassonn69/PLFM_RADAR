@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 DOPPLER_FFT = 32
 RANGE_BINS = 64
 TOTAL_OUTPUTS = RANGE_BINS * DOPPLER_FFT  # 2048
+SUBFRAME_SIZE = 16
 
 SCENARIOS = {
     'stationary': {
@@ -125,6 +126,19 @@ def find_peak_bin(i_arr, q_arr):
     return max(range(len(mags)), key=lambda k: mags[k])
 
 
+def peak_bins_match(py_peak, rtl_peak):
+    """Return True if peaks match within +/-1 bin inside the same sub-frame."""
+    py_sf = py_peak // SUBFRAME_SIZE
+    rtl_sf = rtl_peak // SUBFRAME_SIZE
+    if py_sf != rtl_sf:
+        return False
+
+    py_bin = py_peak % SUBFRAME_SIZE
+    rtl_bin = rtl_peak % SUBFRAME_SIZE
+    diff = abs(py_bin - rtl_bin)
+    return diff <= 1 or diff >= SUBFRAME_SIZE - 1
+
+
 def total_energy(data_dict):
     """Sum of I^2 + Q^2 across all range bins and Doppler bins."""
     total = 0
@@ -207,8 +221,8 @@ def compare_scenario(name, config, base_dir):
         py_peak = find_peak_bin(py_i, py_q)
         rtl_peak = find_peak_bin(rtl_i, rtl_q)
 
-        # Peak agreement (allow +/- 1 bin tolerance)
-        if abs(py_peak - rtl_peak) <= 1 or abs(py_peak - rtl_peak) >= DOPPLER_FFT - 1:
+        # Peak agreement (allow +/-1 bin tolerance, but only within a sub-frame)
+        if peak_bins_match(py_peak, rtl_peak):
             peak_agreements += 1
 
         py_mag = magnitude_l1(py_i, py_q)
@@ -242,7 +256,7 @@ def compare_scenario(name, config, base_dir):
     avg_corr_q = sum(q_correlations) / len(q_correlations)
 
     print(f"\n  Per-range-bin metrics:")
-    print(f"    Peak Doppler bin agreement (+/-1): {peak_agreements}/{RANGE_BINS} "
+    print(f"    Peak Doppler bin agreement (+/-1 within sub-frame): {peak_agreements}/{RANGE_BINS} "
           f"({peak_agreement_frac:.0%})")
     print(f"    Avg magnitude correlation: {avg_mag_corr:.4f}")
     print(f"    Avg I-channel correlation: {avg_corr_i:.4f}")

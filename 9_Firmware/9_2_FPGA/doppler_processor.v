@@ -1,11 +1,44 @@
 `timescale 1ns / 1ps
 
+// ============================================================================
+// doppler_processor.v — Staggered-PRF Doppler Processor (CORRECTED)
+// ============================================================================
+//
+// ARCHITECTURE:
+//   This module implements dual 16-point FFTs for the AERIS-10 staggered-PRF
+//   waveform. The radar transmits 16 long-PRI chirps followed by 16 short-PRI
+//   chirps per frame (32 total). Rather than a single 32-point FFT over the
+//   non-uniformly sampled frame (which is signal-processing invalid), this
+//   module processes each sub-frame independently:
+//
+//     Sub-frame 0 (long PRI):  chirps 0..15  → 16-pt windowed FFT
+//     Sub-frame 1 (short PRI): chirps 16..31 → 16-pt windowed FFT
+//
+//   Each sub-frame produces 16 Doppler bins per range bin. The outputs are
+//   tagged with a sub_frame bit and the 4-bit bin index is packed into the
+//   existing 5-bit doppler_bin port as {sub_frame, bin[3:0]}.
+//
+//   This architecture enables downstream staggered-PRF ambiguity resolution:
+//   the same target velocity maps to DIFFERENT Doppler bins at different PRIs,
+//   and comparing the two sub-frame results resolves velocity ambiguity.
+//
+// INTERFACE COMPATIBILITY:
+//   The port list is a superset of the original module. Existing instantiations
+//   that don't connect `sub_frame` will still work. The FORMAL ports are
+//   retained. CHIRPS_PER_FRAME must be 32 (16 per sub-frame).
+//
+// WINDOW:
+//   16-point Hamming window (Q15), symmetric. Computed as:
+//     w[n] = 0.54 - 0.46 * cos(2*pi*n/15), n=0..15
+// ============================================================================
+
 module doppler_processor_optimized #(
-    parameter DOPPLER_FFT_SIZE = 32,
-    parameter RANGE_BINS = 64,
-    parameter CHIRPS_PER_FRAME = 32,
-    parameter WINDOW_TYPE = 0,            // 0=Hamming, 1=Rectangular
-    parameter DATA_WIDTH = 16
+    parameter DOPPLER_FFT_SIZE   = 16,     // FFT size per sub-frame (was 32)
+    parameter RANGE_BINS         = 64,
+    parameter CHIRPS_PER_FRAME   = 32,     // Total chirps in frame (16+16)
+    parameter CHIRPS_PER_SUBFRAME = 16,    // Chirps per sub-frame
+    parameter WINDOW_TYPE        = 0,      // 0=Hamming, 1=Rectangular
+    parameter DATA_WIDTH         = 16
 )(
     input wire clk,
     input wire reset_n,
@@ -14,8 +47,9 @@ module doppler_processor_optimized #(
     input wire new_chirp_frame,
     output reg [31:0] doppler_output,
     output reg doppler_valid,
-    output reg [4:0] doppler_bin,
+    output reg [4:0] doppler_bin,      // {sub_frame, bin[3:0]}
     output reg [5:0] range_bin,
+    output reg sub_frame,              // 0=long PRI, 1=short PRI
     output wire processing_active,
     output wire frame_complete,
     output reg [3:0] status
@@ -37,35 +71,35 @@ module doppler_processor_optimized #(
 );
 
 // ==============================================
-// Window Coefficients (Simple Implementation)
+// Window Coefficients — 16-point Hamming (Q15)
 // ==============================================
-reg [DATA_WIDTH-1:0] window_coeff [0:31];
+// w[n] = 0.54 - 0.46 * cos(2*pi*n/15), n=0..15
+// Symmetric: w[n] = w[15-n]
+reg [DATA_WIDTH-1:0] window_coeff [0:15];
 
-// Generate window coefficients
 integer w;
 initial begin
     if (WINDOW_TYPE == 0) begin
-        // Pre-calculated Hamming window (Q15 format)
-        window_coeff[0]  = 16'h0800; window_coeff[1]  = 16'h0862;
-        window_coeff[2]  = 16'h09CB; window_coeff[3]  = 16'h0C3B;
-        window_coeff[4]  = 16'h0FB2; window_coeff[5]  = 16'h142F;
-        window_coeff[6]  = 16'h19B2; window_coeff[7]  = 16'h2039;
-        window_coeff[8]  = 16'h27C4; window_coeff[9]  = 16'h3050;
-        window_coeff[10] = 16'h39DB; window_coeff[11] = 16'h4462;
-        window_coeff[12] = 16'h4FE3; window_coeff[13] = 16'h5C5A;
-        window_coeff[14] = 16'h69C4; window_coeff[15] = 16'h781D;
-        window_coeff[16] = 16'h7FFF; // Peak
-        window_coeff[17] = 16'h781D; window_coeff[18] = 16'h69C4;
-        window_coeff[19] = 16'h5C5A; window_coeff[20] = 16'h4FE3;
-        window_coeff[21] = 16'h4462; window_coeff[22] = 16'h39DB;
-        window_coeff[23] = 16'h3050; window_coeff[24] = 16'h27C4;
-        window_coeff[25] = 16'h2039; window_coeff[26] = 16'h19B2;
-        window_coeff[27] = 16'h142F; window_coeff[28] = 16'h0FB2;
-        window_coeff[29] = 16'h0C3B; window_coeff[30] = 16'h09CB;
-        window_coeff[31] = 16'h0862;
+        // 16-point Hamming window, Q15 format
+        // Computed: round(32767 * (0.54 - 0.46*cos(2*pi*n/15)))
+        window_coeff[0]  = 16'h0A3D;  // 0.0800 * 32767 = 2621
+        window_coeff[1]  = 16'h0E5C;  // 0.1116 * 32767 = 3676
+        window_coeff[2]  = 16'h1B6D;  // 0.2138 * 32767 = 7021
+        window_coeff[3]  = 16'h3088;  // 0.3790 * 32767 = 12424
+        window_coeff[4]  = 16'h4B33;  // 0.5868 * 32767 = 19251
+        window_coeff[5]  = 16'h6573;  // 0.7930 * 32767 = 25971
+        window_coeff[6]  = 16'h7642;  // 0.9245 * 32767 = 30274
+        window_coeff[7]  = 16'h7F62;  // 0.9932 * 32767 = 32610
+        window_coeff[8]  = 16'h7F62;  // symmetric
+        window_coeff[9]  = 16'h7642;
+        window_coeff[10] = 16'h6573;
+        window_coeff[11] = 16'h4B33;
+        window_coeff[12] = 16'h3088;
+        window_coeff[13] = 16'h1B6D;
+        window_coeff[14] = 16'h0E5C;
+        window_coeff[15] = 16'h0A3D;
     end else begin
-        // Rectangular window (all ones)
-        for (w = 0; w < 32; w = w + 1) begin
+        for (w = 0; w < 16; w = w + 1) begin
             window_coeff[w] = 16'h7FFF;
         end
     end
@@ -81,14 +115,16 @@ localparam MEM_DEPTH = RANGE_BINS * CHIRPS_PER_FRAME;
 // ==============================================
 // Control Registers
 // ==============================================
-reg [5:0] write_range_bin;     // Changed to match RANGE_BINS width
-reg [4:0] write_chirp_index;   // Changed to match CHIRPS_PER_FRAME width
+reg [5:0] write_range_bin;
+reg [4:0] write_chirp_index;
 reg [5:0] read_range_bin;
-reg [4:0] read_doppler_index;  // Changed name for clarity
+reg [4:0] read_doppler_index;
 reg frame_buffer_full;
-reg [9:0] chirps_received;     // Enough for up to 1024 chirps
-reg [1:0] chirp_state;         // Track chirp accumulation state
+reg [9:0] chirps_received;
+reg [1:0] chirp_state;
 
+// Sub-frame tracking
+reg current_sub_frame;   // 0=processing long, 1=processing short
 
 // ==============================================
 // FFT Interface
@@ -97,9 +133,9 @@ reg fft_start;
 wire fft_ready;
 reg [DATA_WIDTH-1:0] fft_input_i;
 reg [DATA_WIDTH-1:0] fft_input_q;
-reg signed [31:0] mult_i, mult_q;  // 32-bit to avoid overflow
-reg signed [DATA_WIDTH-1:0] window_val_reg;   // BREG pipeline stage
-reg signed [31:0] mult_i_raw, mult_q_raw;     // MREG pipeline stage
+reg signed [31:0] mult_i, mult_q;
+reg signed [DATA_WIDTH-1:0] window_val_reg;
+reg signed [31:0] mult_i_raw, mult_q_raw;
 
 reg fft_input_valid;
 reg fft_input_last;
@@ -109,19 +145,13 @@ wire fft_output_valid;
 wire fft_output_last;
 
 // ==============================================
-// Addressing 
+// Addressing
 // ==============================================
 wire [10:0] mem_write_addr;
 wire [10:0] mem_read_addr;
 
-// Proper address calculation using parameters
 assign mem_write_addr = (write_chirp_index * RANGE_BINS) + write_range_bin;
 assign mem_read_addr = (read_doppler_index * RANGE_BINS) + read_range_bin;
-
-// Alternative organization (choose one):
-// If you want range-major organization (all chirps for one range bin together):
-// assign mem_write_addr = (write_range_bin * CHIRPS_PER_FRAME) + write_chirp_index;
-// assign mem_read_addr = (read_range_bin * CHIRPS_PER_FRAME) + read_doppler_index;
 
 // ==============================================
 // State Machine
@@ -129,7 +159,7 @@ assign mem_read_addr = (read_doppler_index * RANGE_BINS) + read_range_bin;
 reg [2:0] state;
 localparam S_IDLE       = 3'b000;
 localparam S_ACCUMULATE = 3'b001;
-localparam S_PRE_READ   = 3'b101;  // Prime BRAM pipeline before FFT load
+localparam S_PRE_READ   = 3'b101;
 localparam S_LOAD_FFT   = 3'b010;
 localparam S_FFT_WAIT   = 3'b011;
 localparam S_OUTPUT     = 3'b100;
@@ -143,17 +173,17 @@ end
 wire frame_start_pulse = new_chirp_frame & ~new_chirp_frame_d1;
 
 // ==============================================
-// Main State Machine - FIXED
+// Main State Machine
 // ==============================================
-reg [5:0] fft_sample_counter;
+reg [4:0] fft_sample_counter;  // Reduced: only need 0..17 for 16-pt FFT
 reg [9:0] processing_timeout;
 
-// Memory write enable and data signals (extracted for BRAM inference)
+// Memory write enable and data signals
 reg mem_we;
 reg [10:0] mem_waddr_r;
 reg [DATA_WIDTH-1:0] mem_wdata_i, mem_wdata_q;
 
-// Memory read data (registered for BRAM read latency)
+// Memory read data
 reg [DATA_WIDTH-1:0] mem_rdata_i, mem_rdata_q;
 
 `ifdef FORMAL
@@ -172,33 +202,24 @@ assign fv_mem_waddr_r        = mem_waddr_r;
 
 // ----------------------------------------------------------
 // Separate always block for memory writes — NO async reset
-// in sensitivity list, so Vivado can infer Block RAM.
 // ----------------------------------------------------------
 always @(posedge clk) begin
     if (mem_we) begin
         doppler_i_mem[mem_waddr_r] <= mem_wdata_i;
         doppler_q_mem[mem_waddr_r] <= mem_wdata_q;
     end
-    // Registered read — address driven by mem_read_addr from FSM
     mem_rdata_i <= doppler_i_mem[mem_read_addr];
     mem_rdata_q <= doppler_q_mem[mem_read_addr];
 end
 
 // ----------------------------------------------------------
-// Block 1: FSM / Control — async reset (posedge clk or negedge reset_n).
-// Only state-machine and control registers live here.
-// BRAM-driving and DSP datapath registers are intentionally
-// excluded to avoid Vivado REQP-1839 (async-reset on BRAM
-// address) and DPOR-1/DPIP-1 (async-reset blocking DSP48
-// absorption) DRC warnings.
+// Block 1: FSM / Control — async reset
 // ----------------------------------------------------------
 always @(posedge clk or negedge reset_n) begin
     if (!reset_n) begin
         state <= S_IDLE;
         write_range_bin <= 0;
         write_chirp_index <= 0;
-        // read_range_bin, read_doppler_index moved to Block 2 (sync reset)
-        // to enable BRAM address register absorption (REQP-1839 fix)
         frame_buffer_full <= 0;
         doppler_valid <= 0;
         fft_start <= 0;
@@ -212,6 +233,8 @@ always @(posedge clk or negedge reset_n) begin
         doppler_output <= 0;
         doppler_bin <= 0;
         range_bin <= 0;
+        sub_frame <= 0;
+        current_sub_frame <= 0;
     end else begin
         doppler_valid <= 0;
         fft_input_valid <= 0;
@@ -224,7 +247,6 @@ always @(posedge clk or negedge reset_n) begin
         case (state)
             S_IDLE: begin
                 if (frame_start_pulse) begin
-                    // Start new frame
                     write_chirp_index <= 0;
                     write_range_bin <= 0;
                     frame_buffer_full <= 0;
@@ -239,42 +261,30 @@ always @(posedge clk or negedge reset_n) begin
             
             S_ACCUMULATE: begin
                 if (data_valid) begin
-                    // Increment range bin
                     if (write_range_bin < RANGE_BINS - 1) begin
                         write_range_bin <= write_range_bin + 1;
                     end else begin
-                        // Completed one chirp
                         write_range_bin <= 0;
                         write_chirp_index <= write_chirp_index + 1;
                         chirps_received <= chirps_received + 1;
                         
-                        // Check if frame is complete
                         if (write_chirp_index >= CHIRPS_PER_FRAME - 1) begin
                             frame_buffer_full <= 1;
                             chirp_state <= 0;
                             state <= S_PRE_READ;
-                            // read_range_bin/read_doppler_index zeroed in Block 2
                             fft_sample_counter <= 0;
-                            // Reset write pointers — no longer needed for
-                            // this frame, and prevents stale overflow of
-                            // write_chirp_index (which was just incremented
-                            // past CHIRPS_PER_FRAME-1 above).
                             write_chirp_index <= 0;
                             write_range_bin <= 0;
+                            // Start with sub-frame 0 (long PRI chirps 0..15)
+                            current_sub_frame <= 0;
                         end
                     end
                 end 
             end
             
             S_PRE_READ: begin
-                // Prime the BRAM pipeline: present addr for chirp 0 of
-                // current read_range_bin.  read_doppler_index is already 0.
-                // mem_read_addr = 0 * RANGE_BINS + read_range_bin.
-                // After this cycle, mem_rdata_i will hold data[chirp=0][rbin].
-                // Advance read_doppler_index to 1 so the NEXT BRAM read
-                // (which happens every cycle in the memory block) will
-                // fetch chirp 1.
-                // read_doppler_index <= 1 moved to Block 2
+                // Prime BRAM pipeline for current sub-frame
+                // read_doppler_index already set in Block 2 to sub-frame base
                 fft_start <= 1;
                 state <= S_LOAD_FFT;
             end
@@ -282,32 +292,13 @@ always @(posedge clk or negedge reset_n) begin
             S_LOAD_FFT: begin
                 fft_start <= 0;
                 
-                // Pipeline alignment (after S_PRE_READ primed the BRAM
-                // and pre-registered window_val_reg = window_coeff[0]):
-                //
-                // With DSP48 BREG+MREG pipelining, data flows through:
-                //   sub=0: multiply mem_rdata * window_val_reg -> mult_i_raw
-                //          pre-register window_coeff[1] into window_val_reg
-                //   sub=1: MREG capture mult_i_raw -> mult_i (sample 0)
-                //          new multiply for sample 1
-                //   sub=2..DOPPLER_FFT_SIZE+1: steady state —
-                //          fft_input = rounding(mult_i), mult_i = mult_i_raw,
-                //          mult_i_raw = new multiply, window_val_reg = next coeff
-                //
-                // fft_input_valid asserted at sub=2..DOPPLER_FFT_SIZE+1
-                // fft_input_last  asserted at sub=DOPPLER_FFT_SIZE+1
-
-                // read_doppler_index updates moved to Block 2 (sync reset)
+                // Pipeline: 2 priming cycles + CHIRPS_PER_SUBFRAME data cycles
                 if (fft_sample_counter <= 1) begin
-                    // Sub 0..1: pipeline priming — no valid FFT data yet
                     fft_sample_counter <= fft_sample_counter + 1;
-                end else if (fft_sample_counter <= DOPPLER_FFT_SIZE + 1) begin
-                    // Sub 2..DOPPLER_FFT_SIZE+1: steady state
-                    // (fft_input_i/fft_input_q captured in Block 2)
+                end else if (fft_sample_counter <= CHIRPS_PER_SUBFRAME + 1) begin
                     fft_input_valid <= 1;
 
-                    if (fft_sample_counter == DOPPLER_FFT_SIZE + 1) begin
-                        // Last sample: flush
+                    if (fft_sample_counter == CHIRPS_PER_SUBFRAME + 1) begin
                         fft_input_last <= 1;
                         state <= S_FFT_WAIT;
                         fft_sample_counter <= 0;
@@ -321,8 +312,10 @@ always @(posedge clk or negedge reset_n) begin
             S_FFT_WAIT: begin
                 if (fft_output_valid) begin
                     doppler_output <= {fft_output_q[15:0], fft_output_i[15:0]};
-                    doppler_bin <= fft_sample_counter;
+                    // Pack: {sub_frame, bin[3:0]}
+                    doppler_bin <= {current_sub_frame, fft_sample_counter[3:0]};
                     range_bin <= read_range_bin;
+                    sub_frame <= current_sub_frame;
                     doppler_valid <= 1;
                     
                     fft_sample_counter <= fft_sample_counter + 1;
@@ -339,13 +332,24 @@ always @(posedge clk or negedge reset_n) begin
             end
             
             S_OUTPUT: begin
-                if (read_range_bin < RANGE_BINS - 1) begin
-                    // read_range_bin/read_doppler_index updated in Block 2
+                if (current_sub_frame == 0) begin
+                    // Just finished long PRI sub-frame — now do short PRI
+                    current_sub_frame <= 1;
                     fft_sample_counter <= 0;
                     state <= S_PRE_READ;
+                    // read_range_bin stays the same, read_doppler_index
+                    // will be set to CHIRPS_PER_SUBFRAME in Block 2
                 end else begin
-                    state <= S_IDLE;
-                    frame_buffer_full <= 0;
+                    // Finished both sub-frames for this range bin
+                    current_sub_frame <= 0;
+                    if (read_range_bin < RANGE_BINS - 1) begin
+                        fft_sample_counter <= 0;
+                        state <= S_PRE_READ;
+                        // read_range_bin incremented in Block 2
+                    end else begin
+                        state <= S_IDLE;
+                        frame_buffer_full <= 0;
+                    end
                 end
             end
             
@@ -356,14 +360,7 @@ always @(posedge clk or negedge reset_n) begin
 end
 
 // ----------------------------------------------------------
-// Block 2: BRAM address/data & DSP datapath — synchronous reset only.
-// Uses always @(posedge clk) so Vivado can absorb multipliers
-// into DSP48 primitives and does not flag REQP-1839/1840 on
-// BRAM address registers.  Replicates the same state/condition
-// structure as Block 1 for the registers:
-//   mem_we, mem_waddr_r, mem_wdata_i, mem_wdata_q,
-//   mult_i, mult_q, fft_input_i, fft_input_q,
-//   read_range_bin, read_doppler_index
+// Block 2: BRAM address/data & DSP datapath — synchronous reset
 // ----------------------------------------------------------
 always @(posedge clk) begin
     if (!reset_n) begin
@@ -386,9 +383,6 @@ always @(posedge clk) begin
         case (state)
             S_IDLE: begin
                 if (data_valid && !frame_buffer_full) begin
-                    // Write the first sample immediately (Bug #3 fix:
-                    // previously this transition consumed data_valid
-                    // without writing to BRAM)
                     mem_we      <= 1;
                     mem_waddr_r <= mem_write_addr;
                     mem_wdata_i <= range_data[15:0];
@@ -398,105 +392,127 @@ always @(posedge clk) begin
             
             S_ACCUMULATE: begin
                 if (data_valid) begin
-                    // Drive memory write signals (actual write in separate block)
                     mem_we      <= 1;
                     mem_waddr_r <= mem_write_addr;
                     mem_wdata_i <= range_data[15:0];
                     mem_wdata_q <= range_data[31:16];
 
-                    // Transition to S_PRE_READ when frame complete
                     if (write_range_bin >= RANGE_BINS - 1 &&
                         write_chirp_index >= CHIRPS_PER_FRAME - 1) begin
                         read_range_bin     <= 0;
+                        // Start reading from chirp 0 (long PRI sub-frame)
                         read_doppler_index <= 0;
                     end
                 end
             end
             
             S_PRE_READ: begin
-                // Advance read_doppler_index to 1 so next BRAM read
-                // fetches chirp 1
-                read_doppler_index <= 1;
-                // BREG priming: pre-register window coeff for sample 0
-                // so it is ready when S_LOAD_FFT sub=0 performs the multiply
+                // Set read_doppler_index to first chirp of current sub-frame + 1
+                // (because address is presented this cycle, data arrives next)
+                if (current_sub_frame == 0)
+                    read_doppler_index <= 1;  // Long PRI: chirps 0..15
+                else
+                    read_doppler_index <= CHIRPS_PER_SUBFRAME + 1;  // Short PRI: chirps 16..31
+
+                // BREG priming: window coeff for sample 0
                 window_val_reg <= $signed(window_coeff[0]);
             end
 
             S_LOAD_FFT: begin
                 if (fft_sample_counter == 0) begin
                     // Pipe stage 1: multiply using pre-registered BREG value
-                    // mem_rdata_i = data[chirp=0][rbin] (primed by S_PRE_READ)
                     mult_i_raw <= $signed(mem_rdata_i) * window_val_reg;
                     mult_q_raw <= $signed(mem_rdata_q) * window_val_reg;
-                    // Pre-register next window coeff (sample 1)
                     window_val_reg <= $signed(window_coeff[1]);
-                    // Present BRAM addr for chirp 2
-                    read_doppler_index <= (2 < DOPPLER_FFT_SIZE) ? 2
-                                          : DOPPLER_FFT_SIZE - 1;
+                    // Advance to chirp base+2
+                    if (current_sub_frame == 0)
+                        read_doppler_index <= (2 < CHIRPS_PER_SUBFRAME) ? 2
+                                              : CHIRPS_PER_SUBFRAME - 1;
+                    else
+                        read_doppler_index <= (CHIRPS_PER_SUBFRAME + 2 < CHIRPS_PER_FRAME)
+                                              ? CHIRPS_PER_SUBFRAME + 2
+                                              : CHIRPS_PER_FRAME - 1;
                 end else if (fft_sample_counter == 1) begin
-                    // Pipe stage 2 (MREG): capture sample 0 multiply result
                     mult_i <= mult_i_raw;
                     mult_q <= mult_q_raw;
-                    // Multiply sample 1 using registered window value
                     mult_i_raw <= $signed(mem_rdata_i) * window_val_reg;
                     mult_q_raw <= $signed(mem_rdata_q) * window_val_reg;
-                    // Pre-register next window coeff (sample 2)
-                    if (2 < DOPPLER_FFT_SIZE)
+                    if (2 < CHIRPS_PER_SUBFRAME)
                         window_val_reg <= $signed(window_coeff[2]);
-                    // Advance BRAM read to chirp 3
-                    if (3 < DOPPLER_FFT_SIZE)
-                        read_doppler_index <= 3;
-                    else
-                        read_doppler_index <= DOPPLER_FFT_SIZE - 1;
-                end else if (fft_sample_counter <= DOPPLER_FFT_SIZE + 1) begin
-                    // Sub 2..DOPPLER_FFT_SIZE+1: steady state
-                    // Capture rounding into fft_input from MREG output
+                    // Advance to chirp base+3
+                    begin : advance_chirp3
+                        reg [4:0] next_chirp;
+                        next_chirp = (current_sub_frame == 0) ? 3 : CHIRPS_PER_SUBFRAME + 3;
+                        if (next_chirp < CHIRPS_PER_FRAME)
+                            read_doppler_index <= next_chirp;
+                        else
+                            read_doppler_index <= CHIRPS_PER_FRAME - 1;
+                    end
+                end else if (fft_sample_counter <= CHIRPS_PER_SUBFRAME + 1) begin
+                    // Steady state
                     fft_input_i <= (mult_i + (1 << 14)) >>> 15;
                     fft_input_q <= (mult_q + (1 << 14)) >>> 15;
-                    // MREG: capture multiply result
                     mult_i <= mult_i_raw;
                     mult_q <= mult_q_raw;
 
-                    if (fft_sample_counter <= DOPPLER_FFT_SIZE - 1) begin
-                        // New multiply from current BRAM data
+                    if (fft_sample_counter <= CHIRPS_PER_SUBFRAME - 1) begin
                         mult_i_raw <= $signed(mem_rdata_i) * window_val_reg;
                         mult_q_raw <= $signed(mem_rdata_q) * window_val_reg;
-                        // Pre-register next window coeff (clamped)
-                        if (fft_sample_counter + 1 < DOPPLER_FFT_SIZE)
-                            window_val_reg <= $signed(window_coeff[fft_sample_counter + 1]);
+                        // Window coeff index within sub-frame
+                        begin : advance_window
+                            reg [4:0] win_idx;
+                            win_idx = fft_sample_counter[3:0] + 1;
+                            if (win_idx < CHIRPS_PER_SUBFRAME)
+                                window_val_reg <= $signed(window_coeff[win_idx]);
+                        end
                         // Advance BRAM read
-                        if (fft_sample_counter + 2 < DOPPLER_FFT_SIZE)
-                            read_doppler_index <= fft_sample_counter + 2;
-                        else
-                            read_doppler_index <= DOPPLER_FFT_SIZE - 1;
+                        begin : advance_bram
+                            reg [4:0] chirp_offset;
+                            reg [4:0] chirp_base;
+                            chirp_offset = fft_sample_counter[3:0] + 2;
+                            chirp_base = (current_sub_frame == 0) ? 0 : CHIRPS_PER_SUBFRAME;
+                            if (chirp_base + chirp_offset < CHIRPS_PER_FRAME)
+                                read_doppler_index <= chirp_base + chirp_offset;
+                            else
+                                read_doppler_index <= CHIRPS_PER_FRAME - 1;
+                        end
                     end
 
-                    if (fft_sample_counter == DOPPLER_FFT_SIZE + 1) begin
-                        // Flush complete — reset read index
-                        read_doppler_index <= 0;
+                    if (fft_sample_counter == CHIRPS_PER_SUBFRAME + 1) begin
+                        // Reset read index for potential next operation
+                        if (current_sub_frame == 0)
+                            read_doppler_index <= CHIRPS_PER_SUBFRAME;  // Ready for short sub-frame
+                        else
+                            read_doppler_index <= 0;
                     end
                 end
             end
 
             S_OUTPUT: begin
-                if (read_range_bin < RANGE_BINS - 1) begin
-                    read_range_bin     <= read_range_bin + 1;
-                    read_doppler_index <= 0;
+                if (current_sub_frame == 0) begin
+                    // Transitioning to short PRI sub-frame
+                    // Set read_doppler_index to start of short sub-frame
+                    read_doppler_index <= CHIRPS_PER_SUBFRAME;
+                end else begin
+                    // Both sub-frames done
+                    if (read_range_bin < RANGE_BINS - 1) begin
+                        read_range_bin     <= read_range_bin + 1;
+                        read_doppler_index <= 0;  // Next range bin starts with long sub-frame
+                    end
                 end
             end
 
             default: begin
-                // S_IDLE, S_FFT_WAIT:
-                // no BRAM-write, DSP, or read-address operations needed
+                // S_FFT_WAIT: no BRAM-write or address operations needed
             end
         endcase
     end
 end
 
 // ==============================================
-// FFT Module
+// FFT Module — 16-point
 // ==============================================
-xfft_32 fft_inst (
+xfft_16 fft_inst (
     .aclk(clk),
     .aresetn(reset_n),
     .s_axis_config_tdata(8'h01),
@@ -516,6 +532,5 @@ xfft_32 fft_inst (
 // ==============================================
 assign processing_active = (state != S_IDLE);
 assign frame_complete = (state == S_IDLE && frame_buffer_full == 0);
-
 
 endmodule

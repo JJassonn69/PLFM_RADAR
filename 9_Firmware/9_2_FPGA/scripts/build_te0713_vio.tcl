@@ -83,11 +83,11 @@ if {![string match "*Complete*" $synth_status]} {
 # Open synthesized design to configure debug hub clock frequency
 # The debug hub defaults to 300 MHz but our FIFO0CLK is 50 MHz
 open_run synth_1
-puts "INFO: Configuring debug hub for 50 MHz clock..."
-set_property C_CLK_INPUT_FREQ_HZ 50000000 [get_debug_cores dbg_hub]
+puts "INFO: Configuring debug hub for 65 MHz internal clock..."
+set_property C_CLK_INPUT_FREQ_HZ 65000000 [get_debug_cores dbg_hub]
 set_property C_ENABLE_CLK_DIVIDER false [get_debug_cores dbg_hub]
 # Explicitly connect debug hub clock to our buffered clock net
-connect_debug_port dbg_hub/clk [get_nets bufg_clk/O]
+connect_debug_port dbg_hub/clk [get_nets clk_buf]
 implement_debug_core
 close_design
 

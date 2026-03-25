@@ -8,8 +8,8 @@
 // Single-clock design: clk is an input wire, async2sync handles async reset.
 // Each formal step = one clock edge.
 //
-// Parameters reduced: RANGE_BINS=4, CHIRPS_PER_FRAME=4, DOPPLER_FFT_SIZE=4.
-// Includes full xfft_32 and fft_engine sub-modules.
+// Parameters reduced: RANGE_BINS=4, CHIRPS_PER_FRAME=4, CHIRPS_PER_SUBFRAME=2, DOPPLER_FFT_SIZE=2.
+// Includes full xfft_16 and fft_engine sub-modules.
 //
 // Focus: memory address bounds (highest-value finding) and state encoding.
 // ============================================================================
@@ -20,7 +20,8 @@ module fv_doppler_processor (
     // Reduced parameters for tractable BMC
     localparam RANGE_BINS       = 4;
     localparam CHIRPS_PER_FRAME = 4;
-    localparam DOPPLER_FFT_SIZE = 4;
+    localparam CHIRPS_PER_SUBFRAME = 2;  // Dual sub-frame: 2 chirps per sub-frame
+    localparam DOPPLER_FFT_SIZE = 2;     // FFT size matches sub-frame size
     localparam MEM_DEPTH        = RANGE_BINS * CHIRPS_PER_FRAME;  // 16
 
     // State encoding (mirrors DUT localparams)
@@ -62,6 +63,7 @@ module fv_doppler_processor (
     wire        doppler_valid;
     wire [4:0]  doppler_bin;
     wire [5:0]  range_bin;
+    wire        sub_frame;
     wire        processing_active;
     wire        frame_complete;
     wire [3:0]  status;
@@ -86,6 +88,7 @@ module fv_doppler_processor (
         .DOPPLER_FFT_SIZE (DOPPLER_FFT_SIZE),
         .RANGE_BINS       (RANGE_BINS),
         .CHIRPS_PER_FRAME (CHIRPS_PER_FRAME),
+        .CHIRPS_PER_SUBFRAME (CHIRPS_PER_SUBFRAME),
         .WINDOW_TYPE      (1),   // Rectangular — simpler for formal
         .DATA_WIDTH       (16)
     ) dut (
@@ -98,6 +101,7 @@ module fv_doppler_processor (
         .doppler_valid    (doppler_valid),
         .doppler_bin      (doppler_bin),
         .range_bin        (range_bin),
+        .sub_frame        (sub_frame),
         .processing_active(processing_active),
         .frame_complete   (frame_complete),
         .status           (status),

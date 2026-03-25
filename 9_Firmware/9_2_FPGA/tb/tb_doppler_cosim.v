@@ -91,6 +91,7 @@ doppler_processor_optimized dut (
     .doppler_valid(doppler_valid),
     .doppler_bin(doppler_bin),
     .range_bin(range_bin),
+    .sub_frame(),                   // Not used in this testbench
     .processing_active(processing_active),
     .frame_complete(frame_complete),
     .status(dut_status)

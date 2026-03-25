@@ -148,6 +148,7 @@ endfunction
 integer fft_stage, fft_k, fft_j, fft_half, fft_span;
 integer fft_idx_even, fft_idx_odd;
 reg signed [31:0] tw_re, tw_im;
+reg signed [63:0] t_re_wide, t_im_wide;  // 64-bit for twiddle multiply
 reg signed [31:0] t_re, t_im;
 reg signed [31:0] u_re, u_im;
 real tw_angle;
@@ -243,8 +244,12 @@ always @(posedge clk or negedge reset_n) begin
                         tw_re = $rtoi($cos(tw_angle) * 32767.0);
                         tw_im = $rtoi($sin(tw_angle) * 32767.0);
 
-                        t_re = (work_re[fft_idx_odd] * tw_re - work_im[fft_idx_odd] * tw_im) >>> 15;
-                        t_im = (work_re[fft_idx_odd] * tw_im + work_im[fft_idx_odd] * tw_re) >>> 15;
+                        t_re_wide = ({{32{work_re[fft_idx_odd][31]}}, work_re[fft_idx_odd]} * {{32{tw_re[31]}}, tw_re}
+                                   - {{32{work_im[fft_idx_odd][31]}}, work_im[fft_idx_odd]} * {{32{tw_im[31]}}, tw_im});
+                        t_im_wide = ({{32{work_re[fft_idx_odd][31]}}, work_re[fft_idx_odd]} * {{32{tw_im[31]}}, tw_im}
+                                   + {{32{work_im[fft_idx_odd][31]}}, work_im[fft_idx_odd]} * {{32{tw_re[31]}}, tw_re});
+                        t_re = t_re_wide >>> 15;
+                        t_im = t_im_wide >>> 15;
 
                         u_re = work_re[fft_idx_even];
                         u_im = work_im[fft_idx_even];
@@ -309,8 +314,12 @@ always @(posedge clk or negedge reset_n) begin
                         tw_re = $rtoi($cos(tw_angle) * 32767.0);
                         tw_im = $rtoi($sin(tw_angle) * 32767.0);
 
-                        t_re = (work_re[fft_idx_odd] * tw_re - work_im[fft_idx_odd] * tw_im) >>> 15;
-                        t_im = (work_re[fft_idx_odd] * tw_im + work_im[fft_idx_odd] * tw_re) >>> 15;
+                        t_re_wide = ({{32{work_re[fft_idx_odd][31]}}, work_re[fft_idx_odd]} * {{32{tw_re[31]}}, tw_re}
+                                   - {{32{work_im[fft_idx_odd][31]}}, work_im[fft_idx_odd]} * {{32{tw_im[31]}}, tw_im});
+                        t_im_wide = ({{32{work_re[fft_idx_odd][31]}}, work_re[fft_idx_odd]} * {{32{tw_im[31]}}, tw_im}
+                                   + {{32{work_im[fft_idx_odd][31]}}, work_im[fft_idx_odd]} * {{32{tw_re[31]}}, tw_re});
+                        t_re = t_re_wide >>> 15;
+                        t_im = t_im_wide >>> 15;
 
                         u_re = work_re[fft_idx_even];
                         u_im = work_im[fft_idx_even];
@@ -423,8 +432,12 @@ always @(posedge clk or negedge reset_n) begin
                         tw_re = $rtoi($cos(tw_angle) * 32767.0);
                         tw_im = $rtoi($sin(tw_angle) * 32767.0);
 
-                        t_re = (work_re[fft_idx_odd] * tw_re - work_im[fft_idx_odd] * tw_im) >>> 15;
-                        t_im = (work_re[fft_idx_odd] * tw_im + work_im[fft_idx_odd] * tw_re) >>> 15;
+                        t_re_wide = ({{32{work_re[fft_idx_odd][31]}}, work_re[fft_idx_odd]} * {{32{tw_re[31]}}, tw_re}
+                                   - {{32{work_im[fft_idx_odd][31]}}, work_im[fft_idx_odd]} * {{32{tw_im[31]}}, tw_im});
+                        t_im_wide = ({{32{work_re[fft_idx_odd][31]}}, work_re[fft_idx_odd]} * {{32{tw_im[31]}}, tw_im}
+                                   + {{32{work_im[fft_idx_odd][31]}}, work_im[fft_idx_odd]} * {{32{tw_re[31]}}, tw_re});
+                        t_re = t_re_wide >>> 15;
+                        t_im = t_im_wide >>> 15;
 
                         u_re = work_re[fft_idx_even];
                         u_im = work_im[fft_idx_even];
