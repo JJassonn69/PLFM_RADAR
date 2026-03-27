@@ -20,6 +20,7 @@ USB Packet Protocol (v7c — all transfers use BE=1111, 4-byte aligned):
 
 import json
 import os
+import socket
 import struct
 import time
 import threading
@@ -596,6 +597,144 @@ class FT601Connection:
                 self._mock_frame_num += 1
 
         return bytes(buf[:pos])
+
+
+# ============================================================================
+# Socket Connection — TCP bridge for remote FPGA streaming
+# ============================================================================
+
+class SocketConnection:
+    """
+    TCP socket connection to a remote ft601_stream_server.py instance.
+
+    Same interface as FT601Connection (open/close/read/write/is_open)
+    so the GUI and RadarAcquisition can use it interchangeably.
+
+    Protocol matches ft601_stream_server.py:
+      Server -> Client: [4 bytes: length (BE uint32)] [data bytes]
+      Client -> Server: [4 bytes: length (BE uint32)] [command bytes]
+    """
+
+    def __init__(self, host: str = "localhost", port: int = 9000):
+        self._host = host
+        self._port = port
+        self._sock: Optional[socket.socket] = None
+        self._lock = threading.Lock()
+        self.is_open = False
+        # Receive buffer for reassembling framed messages
+        self._recv_buf = bytearray()
+
+    def open(self, device_index: int = 0) -> bool:
+        """Connect to remote stream server."""
+        try:
+            self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._sock.setsockopt(socket.IPPROTO_TCP,
+                                  socket.TCP_NODELAY, 1)
+            self._sock.settimeout(5.0)
+            self._sock.connect((self._host, self._port))
+            self._recv_buf = bytearray()
+            self.is_open = True
+            log.info(f"Connected to stream server {self._host}:{self._port}")
+            return True
+        except Exception as e:
+            log.error(f"Socket connect failed: {e}")
+            if self._sock is not None:
+                try:
+                    self._sock.close()
+                except Exception:
+                    pass
+            self._sock = None
+            return False
+
+    def close(self):
+        """Disconnect from remote stream server."""
+        if self._sock is not None:
+            try:
+                self._sock.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+            try:
+                self._sock.close()
+            except Exception:
+                pass
+            self._sock = None
+        self.is_open = False
+        self._recv_buf = bytearray()
+
+    def read(self, size: int = 16384) -> Optional[bytes]:
+        """
+        Read one framed message from the server.
+        Returns the raw USB data bytes (same as FT601Connection.read).
+        """
+        if not self.is_open or self._sock is None:
+            return None
+
+        try:
+            # Read length-prefixed message: [4 bytes len] [data]
+            # First, ensure we have the 4-byte header
+            while len(self._recv_buf) < 4:
+                self._sock.settimeout(0.2)
+                try:
+                    chunk = self._sock.recv(65536)
+                except socket.timeout:
+                    return None
+                if not chunk:
+                    self.is_open = False
+                    return None
+                self._recv_buf.extend(chunk)
+
+            # Parse length
+            msg_len = struct.unpack_from(">I", self._recv_buf, 0)[0]
+
+            if msg_len == 0:
+                # Keepalive — consume header, return empty
+                self._recv_buf = self._recv_buf[4:]
+                return None
+
+            # Read until we have header + full message
+            total_needed = 4 + msg_len
+            while len(self._recv_buf) < total_needed:
+                self._sock.settimeout(0.5)
+                try:
+                    chunk = self._sock.recv(65536)
+                except socket.timeout:
+                    return None
+                if not chunk:
+                    self.is_open = False
+                    return None
+                self._recv_buf.extend(chunk)
+
+            # Extract message
+            data = bytes(self._recv_buf[4:total_needed])
+            self._recv_buf = self._recv_buf[total_needed:]
+            return data
+
+        except (ConnectionResetError, BrokenPipeError):
+            self.is_open = False
+            return None
+        except Exception as e:
+            log.error(f"Socket read error: {e}")
+            return None
+
+    def write(self, data: bytes) -> bool:
+        """
+        Send a command to the remote server (forwarded to FT601).
+        Uses length-prefixed framing matching the server protocol.
+        """
+        if not self.is_open or self._sock is None:
+            return False
+
+        with self._lock:
+            try:
+                hdr = struct.pack(">I", len(data))
+                self._sock.sendall(hdr + data)
+                return True
+            except (BrokenPipeError, ConnectionResetError):
+                self.is_open = False
+                return False
+            except Exception as e:
+                log.error(f"Socket write error: {e}")
+                return False
 
 
 # ============================================================================

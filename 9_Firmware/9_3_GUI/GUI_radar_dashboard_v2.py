@@ -56,7 +56,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from radar_protocol import (
-    RadarProtocol, FT601Connection, ReplayConnection,
+    RadarProtocol, FT601Connection, SocketConnection, ReplayConnection,
     DataRecorder, RadarAcquisition,
     RadarFrame, StatusResponse, Opcode,
     NUM_RANGE_BINS, NUM_DOPPLER_BINS, WATERFALL_DEPTH,
@@ -1424,6 +1424,9 @@ def main():
     parser = argparse.ArgumentParser(description="AERIS-10 Radar Dashboard V2")
     parser.add_argument("--live", action="store_true",
                         help="Use real FT601 hardware (default: mock mode)")
+    parser.add_argument("--remote", type=str, metavar="HOST:PORT",
+                        help="Connect to remote FT601 stream server "
+                             "(e.g. localhost:9000 via SSH tunnel)")
     parser.add_argument("--replay", type=str, metavar="NPY_DIR",
                         help="Replay real data from .npy directory")
     parser.add_argument("--no-mti", action="store_true",
@@ -1436,13 +1439,20 @@ def main():
                         help="Mock mode: simulate approaching target")
     args = parser.parse_args()
 
-    # Determine range-only mode: live and mock both use v7c range-only format
+    # Determine range-only mode: live, remote, and mock all use v7c range-only
     range_only = not args.replay  # replay has full Doppler data
 
     if args.replay:
         npy_dir = os.path.abspath(args.replay)
         conn = ReplayConnection(npy_dir, use_mti=not args.no_mti)
         mode_str = f"REPLAY ({npy_dir})"
+    elif args.remote:
+        # Parse host:port
+        parts = args.remote.rsplit(":", 1)
+        host = parts[0] if len(parts) == 2 else "localhost"
+        port = int(parts[1]) if len(parts) == 2 else 9000
+        conn = SocketConnection(host=host, port=port)
+        mode_str = f"REMOTE ({host}:{port})"
     elif args.live:
         conn = FT601Connection(mock=False)
         mode_str = "LIVE"

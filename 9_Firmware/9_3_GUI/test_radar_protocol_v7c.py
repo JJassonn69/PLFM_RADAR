@@ -15,7 +15,9 @@ All tests run locally without hardware (mock mode or synthetic buffers).
 
 import struct
 import queue
+import socket
 import time
+import threading
 import unittest
 import numpy as np
 
@@ -24,6 +26,7 @@ from radar_protocol import (
     RadarFrame,
     StatusResponse,
     FT601Connection,
+    SocketConnection,
     RadarAcquisition,
     HEADER_BYTE,
     FOOTER_BYTE,
@@ -766,6 +769,211 @@ class TestPacketConstants(unittest.TestCase):
     def test_status_packet_matches(self):
         pkt = make_status_packet()
         self.assertEqual(len(pkt), RadarProtocol.V7C_STATUS_PACKET_SIZE)
+
+
+# ============================================================================
+# SocketConnection tests (uses a local mock TCP server)
+# ============================================================================
+
+def _find_free_port():
+    """Find a free TCP port on localhost."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+class _MockStreamServer:
+    """
+    Minimal TCP server that mimics ft601_stream_server.py protocol.
+    Sends length-prefixed data messages and receives length-prefixed commands.
+    """
+
+    def __init__(self, port):
+        self.port = port
+        self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_sock.bind(("127.0.0.1", port))
+        self.server_sock.listen(1)
+        self.server_sock.settimeout(5.0)
+        self.client_sock = None
+        self.received_commands = []
+        self._stop = threading.Event()
+        self._thread = None
+
+    def accept(self):
+        self.client_sock, _ = self.server_sock.accept()
+        self.client_sock.settimeout(2.0)
+
+    def send_data(self, data: bytes):
+        """Send a length-prefixed data message to the client."""
+        hdr = struct.pack(">I", len(data))
+        self.client_sock.sendall(hdr + data)
+
+    def recv_command(self) -> bytes:
+        """Receive one length-prefixed command from the client."""
+        hdr = self.client_sock.recv(4)
+        if len(hdr) < 4:
+            return b""
+        length = struct.unpack(">I", hdr)[0]
+        if length == 0:
+            return b""
+        return self.client_sock.recv(length)
+
+    def close(self):
+        self._stop.set()
+        if self.client_sock:
+            try:
+                self.client_sock.close()
+            except Exception:
+                pass
+        self.server_sock.close()
+
+
+class TestSocketConnection(unittest.TestCase):
+
+    def setUp(self):
+        self.port = _find_free_port()
+        self.server = _MockStreamServer(self.port)
+        # Accept in a thread so client can connect
+        self._accept_thread = threading.Thread(target=self.server.accept,
+                                                daemon=True)
+        self._accept_thread.start()
+
+    def tearDown(self):
+        self.server.close()
+
+    def _connect(self) -> SocketConnection:
+        conn = SocketConnection(host="127.0.0.1", port=self.port)
+        ok = conn.open()
+        self._accept_thread.join(timeout=2)
+        self.assertTrue(ok)
+        self.assertTrue(conn.is_open)
+        return conn
+
+    def test_open_close(self):
+        """SocketConnection can connect and disconnect."""
+        conn = self._connect()
+        self.assertTrue(conn.is_open)
+        conn.close()
+        self.assertFalse(conn.is_open)
+
+    def test_open_fail_no_server(self):
+        """open() returns False when no server is listening."""
+        self.server.close()
+        time.sleep(0.1)
+        conn = SocketConnection(host="127.0.0.1", port=_find_free_port())
+        ok = conn.open()
+        self.assertFalse(ok)
+        self.assertFalse(conn.is_open)
+
+    def test_read_data_packet(self):
+        """read() receives a framed data packet from the server."""
+        conn = self._connect()
+        # Server sends a v7c data packet
+        pkt = make_data_packet(1000, 2000)
+        self.server.send_data(pkt)
+        time.sleep(0.05)
+        data = conn.read()
+        self.assertIsNotNone(data)
+        self.assertEqual(data, pkt)
+        conn.close()
+
+    def test_read_multiple_packets(self):
+        """read() returns packets one at a time (length-prefixed)."""
+        conn = self._connect()
+        pkt1 = make_data_packet(100, 200)
+        pkt2 = make_data_packet(300, 400)
+        self.server.send_data(pkt1)
+        self.server.send_data(pkt2)
+        time.sleep(0.05)
+        d1 = conn.read()
+        d2 = conn.read()
+        self.assertEqual(d1, pkt1)
+        self.assertEqual(d2, pkt2)
+        conn.close()
+
+    def test_write_command(self):
+        """write() sends a length-prefixed command to the server."""
+        conn = self._connect()
+        cmd = RadarProtocol.build_command(Opcode.STREAM_CONTROL, 0x01)
+        ok = conn.write(cmd)
+        self.assertTrue(ok)
+        time.sleep(0.05)
+        received = self.server.recv_command()
+        self.assertEqual(received, cmd)
+        conn.close()
+
+    def test_write_multiple_commands(self):
+        """Multiple write() calls are received in order."""
+        conn = self._connect()
+        cmd1 = RadarProtocol.build_command(Opcode.STREAM_CONTROL, 0x01)
+        cmd2 = RadarProtocol.build_command(Opcode.STATUS_REQUEST, 0x01)
+        conn.write(cmd1)
+        conn.write(cmd2)
+        time.sleep(0.05)
+        r1 = self.server.recv_command()
+        r2 = self.server.recv_command()
+        self.assertEqual(r1, cmd1)
+        self.assertEqual(r2, cmd2)
+        conn.close()
+
+    def test_read_status_packet(self):
+        """read() handles status packets (40 bytes)."""
+        conn = self._connect()
+        pkt = make_status_packet(threshold=0xABCD, long_chirp=5000)
+        self.server.send_data(pkt)
+        time.sleep(0.05)
+        data = conn.read()
+        self.assertIsNotNone(data)
+        self.assertEqual(len(data), 40)
+        status = RadarProtocol.parse_status_packet(data)
+        self.assertIsNotNone(status)
+        self.assertEqual(status.cfar_threshold, 0xABCD)
+        self.assertEqual(status.long_chirp, 5000)
+        conn.close()
+
+    def test_read_timeout_returns_none(self):
+        """read() returns None when no data is available (timeout)."""
+        conn = self._connect()
+        # Don't send anything — should timeout
+        data = conn.read()
+        self.assertIsNone(data)
+        conn.close()
+
+    def test_bidirectional_data_and_commands(self):
+        """Full duplex: server sends data while client sends commands."""
+        conn = self._connect()
+        # Client sends a command
+        cmd = RadarProtocol.build_command(Opcode.STREAM_CONTROL, 0x01)
+        conn.write(cmd)
+        # Server sends data
+        pkt = make_data_packet(5000, 6000)
+        self.server.send_data(pkt)
+        time.sleep(0.05)
+        # Client reads data
+        data = conn.read()
+        self.assertEqual(data, pkt)
+        # Server reads command
+        received = self.server.recv_command()
+        self.assertEqual(received, cmd)
+        conn.close()
+
+    def test_large_burst(self):
+        """Handle a burst of 64 packets (one full frame)."""
+        conn = self._connect()
+        # Server sends 64 data packets as one big message
+        all_pkts = b""
+        for i in range(NUM_RANGE_BINS):
+            all_pkts += make_data_packet(i * 100, i * 50)
+        self.server.send_data(all_pkts)
+        time.sleep(0.1)
+        data = conn.read()
+        self.assertIsNotNone(data)
+        self.assertEqual(len(data), NUM_RANGE_BINS * 24)
+        # Verify we can parse all packets
+        boundaries = RadarProtocol.find_packet_boundaries(data)
+        self.assertEqual(len(boundaries), NUM_RANGE_BINS)
+        conn.close()
 
 
 if __name__ == "__main__":
