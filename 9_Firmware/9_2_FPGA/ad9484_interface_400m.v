@@ -15,6 +15,35 @@ module ad9484_interface_400m (
     output wire adc_dco_bufg         // Buffered 400MHz DCO clock for downstream use
 );
 
+`ifdef SIMULATION
+// ============================================================================
+// Simulation behavioral model — no Xilinx primitives (IBUFDS/BUFIO/IDDR)
+// Treat P input as the single-ended data, DCO P as the clock.
+// ============================================================================
+wire adc_dco_buffered = adc_dco_p;  // Use P side as clock directly
+assign adc_dco_bufg = adc_dco_buffered;
+
+reg [7:0] adc_data_400m_reg;
+reg adc_data_valid_400m_reg;
+
+always @(posedge adc_dco_buffered or negedge reset_n) begin
+    if (!reset_n) begin
+        adc_data_400m_reg <= 8'b0;
+        adc_data_valid_400m_reg <= 1'b0;
+    end else begin
+        adc_data_400m_reg <= adc_d_p;
+        adc_data_valid_400m_reg <= 1'b1;
+    end
+end
+
+assign adc_data_400m = adc_data_400m_reg;
+assign adc_data_valid_400m = adc_data_valid_400m_reg;
+
+`else
+// ============================================================================
+// Synthesis — full Xilinx primitive implementation
+// ============================================================================
+
 // LVDS to single-ended conversion
 wire [7:0] adc_data;
 wire adc_dco;
@@ -161,5 +190,7 @@ end
 
 assign adc_data_400m = adc_data_400m_reg;
 assign adc_data_valid_400m = adc_data_valid_400m_reg;
+
+`endif
 
 endmodule

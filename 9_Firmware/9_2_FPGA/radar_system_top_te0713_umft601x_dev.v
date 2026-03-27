@@ -1,7 +1,8 @@
 `timescale 1ns / 1ps
 
 module radar_system_top_te0713_umft601x_dev (
-    input  wire        ft601_clk_in,
+    input  wire        osc_50m,           // TE0713 on-board 50 MHz oscillator (U20)
+    input  wire        ft601_clk_in,      // 100 MHz clock from FT601 chip
     inout  wire [31:0] ft601_data,
     output wire [3:0]  ft601_be,
     input  wire        ft601_txe,
@@ -16,10 +17,28 @@ module radar_system_top_te0713_umft601x_dev (
     output wire        ft601_gpio1
 );
 
+// =========================================================================
+// FT601 chip reset — keep HIGH (deasserted) at all times
+// =========================================================================
+// The FT601 is already running on USB before the FPGA is programmed.
+// The XDC PULLUP on ft601_chip_reset_n (A14) keeps it HIGH during FPGA
+// configuration. Once the RTL loads, we drive it HIGH immediately — no
+// deliberate reset pulse. Resetting the FT601 in 245 Sync FIFO mode
+// causes a USB disconnect that never recovers (confirmed empirically:
+// 600 mode tolerates reset, 245 mode does not).
+//
+// The osc_50m clock is still used for internal POR (sys_reset_n below
+// waits for ft601_clk_in), but ft601_chip_reset_n is unconditionally HIGH.
+// =========================================================================
+assign ft601_chip_reset_n = 1'b1;
+
+// =========================================================================
+// FT601-domain system POR — waits for ft601_clk_in to be alive
+// =========================================================================
 reg [15:0] por_counter = 16'd0;
 reg [31:0] hb_counter = 32'd0;
 reg [15:0] packet_div = 16'd0;
-reg [2:0] stream_control_reg = 3'b001;
+reg [2:0] stream_control_reg = 3'b000;  // default OFF — host must enable via opcode 0x04
 reg        status_request_reg = 1'b0;
 reg [31:0] range_profile_reg = 32'd0;
 reg        range_valid_reg = 1'b0;
@@ -39,6 +58,12 @@ wire        ft601_clk_out_unused;
 wire        ft601_txe_n_unused;
 wire        ft601_rxf_n_unused;
 
+// Debug instrumentation (v7b)
+wire [15:0] dbg_wr_strobes;
+wire [15:0] dbg_txe_blocks;
+wire [15:0] dbg_pkt_starts;
+wire [15:0] dbg_pkt_completions;
+
 // Self-test wiring
 reg         self_test_trigger = 1'b0;
 wire        self_test_busy;
@@ -52,7 +77,6 @@ reg  [4:0]  self_test_flags_latched = 5'b00000;
 reg  [7:0]  self_test_detail_latched = 8'd0;
 
 assign sys_reset_n = por_counter[15];
-assign ft601_chip_reset_n = sys_reset_n;
 assign ft601_wakeup_n = 1'b1;
 assign ft601_gpio0 = hb_counter[24];
 assign ft601_gpio1 = sys_reset_n;
@@ -62,7 +86,7 @@ always @(posedge ft601_clk_in) begin
         por_counter <= por_counter + 1'b1;
         hb_counter <= 32'd0;
         packet_div <= 16'd0;
-        stream_control_reg <= 3'b001;
+        stream_control_reg <= 3'b000;  // OFF until host enables
         status_request_reg <= 1'b0;
         range_profile_reg <= 32'd0;
         range_valid_reg <= 1'b0;
@@ -159,7 +183,11 @@ usb_data_interface usb_inst (
     .status_range_mode(2'b01),
     .status_self_test_flags(self_test_flags_latched),
     .status_self_test_detail(self_test_detail_latched),
-    .status_self_test_busy(self_test_busy)
+    .status_self_test_busy(self_test_busy),
+    .dbg_wr_strobes(dbg_wr_strobes),
+    .dbg_txe_blocks(dbg_txe_blocks),
+    .dbg_pkt_starts(dbg_pkt_starts),
+    .dbg_pkt_completions(dbg_pkt_completions)
 );
 
 // Board bring-up self-test controller

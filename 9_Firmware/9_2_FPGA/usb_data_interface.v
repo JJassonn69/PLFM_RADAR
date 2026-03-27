@@ -77,7 +77,15 @@ module usb_data_interface (
     // Self-test status readback (opcode 0x31 / included in 0xFF status packet)
     input wire [4:0]  status_self_test_flags,  // Per-test PASS(1)/FAIL(0) latched
     input wire [7:0]  status_self_test_detail, // Diagnostic detail byte latched
-    input wire        status_self_test_busy    // Self-test FSM still running
+    input wire        status_self_test_busy,   // Self-test FSM still running
+
+    // ========== DEBUG INSTRUMENTATION (v7b) ==========
+    // Free-running counters visible via status packet for diagnosing the
+    // 5-byte-per-packet write FSM stall. All counters are in ft601_clk domain.
+    output wire [15:0] dbg_wr_strobes,     // Total WR_N=0 assertions (write cycles)
+    output wire [15:0] dbg_txe_blocks,     // Cycles where FSM wanted to write but TXE was high
+    output wire [15:0] dbg_pkt_starts,     // SEND_HEADER entries (packet starts)
+    output wire [15:0] dbg_pkt_completions // WAIT_ACK entries (packet completions)
 );
 
 // USB packet structure (same as before)
@@ -106,6 +114,17 @@ reg [31:0] data_buffer;
 reg [31:0] ft601_data_out;
 reg ft601_data_oe;  // Output enable for bidirectional data bus
 
+// ========== DEBUG COUNTERS (v7b) ==========
+reg [15:0] dbg_wr_strobes_r;      // Incremented each cycle WR_N is asserted LOW
+reg [15:0] dbg_txe_blocks_r;      // Incremented when FSM is in a write state but TXE is HIGH
+reg [15:0] dbg_pkt_starts_r;      // Incremented on each SEND_HEADER entry
+reg [15:0] dbg_pkt_completions_r; // Incremented on each WAIT_ACK entry
+
+assign dbg_wr_strobes     = dbg_wr_strobes_r;
+assign dbg_txe_blocks     = dbg_txe_blocks_r;
+assign dbg_pkt_starts     = dbg_pkt_starts_r;
+assign dbg_pkt_completions = dbg_pkt_completions_r;
+
 // ============================================================================
 // READ FSM State definitions (Gap 4: USB Read Path)
 // ============================================================================
@@ -127,6 +146,23 @@ localparam [2:0] RD_IDLE      = 3'd0,  // Waiting for RXF
 
 reg [2:0] read_state;
 reg [31:0] rx_data_captured;  // Data word read from host
+
+// ========== POST-POR STARTUP LOCKOUT ==========
+// After reset release, the CDC synchronizers need several cycles to settle.
+// During this window, stale edges on status_req_edge (or other CDC artifacts)
+// could cause the write FSM to enter SEND_STATUS spuriously. A lockout counter
+// prevents the write FSM from leaving IDLE for 256 ft601_clk cycles (~2.56us
+// at 100MHz). Any status_req_edge pulses during lockout are harmlessly consumed
+// because the IDLE state won't act on them.
+reg [7:0] startup_lockout_ctr;
+wire startup_lockout_active = (startup_lockout_ctr != 8'hFF);
+
+// ========== SEND_STATUS WATCHDOG ==========
+// If the write FSM enters SEND_STATUS and TXE_N stays HIGH (FT601 IN FIFO
+// full / backpressure), the FSM would stall forever, blocking the read FSM
+// from accepting new host commands. A watchdog counter aborts the status
+// send if it can't complete within 65536 cycles (~655us).
+reg [15:0] status_watchdog_ctr;
 
 // ========== CDC INPUT SYNCHRONIZERS (clk domain -> ft601_clk_in domain) ==========
 // The valid signals arrive from clk_100m but the state machine runs on ft601_clk_in.
@@ -210,13 +246,25 @@ wire stream_cfar_en    = stream_ctrl_sync_1[2];
 // NOTE: status_req_toggle_100m declared above (before source-domain always block)
 (* ASYNC_REG = "TRUE" *) reg [1:0] status_req_sync;
 reg status_req_sync_prev;
-wire status_req_ft601 = status_req_sync[1] ^ status_req_sync_prev;
+wire status_req_edge = status_req_sync[1] ^ status_req_sync_prev;
+
+// v7c: Status request pending flag — set by CDC edge, cleared when consumed.
+// This prevents the combinational XOR wire from re-triggering on subsequent
+// cycles if the sync chain produces multi-cycle glitches or if both clocks
+// are the same (dev wrapper) and timing is marginal.
+reg status_req_pending;
+
+// v7c: Status busy flag — HIGH while SEND_STATUS is active. Prevents
+// re-entry from IDLE into SEND_STATUS if status_req_pending somehow
+// re-asserts before the previous status send completes. Belt-and-suspenders.
+reg status_busy;
 
 // Status snapshot: captured in ft601_clk domain when status request arrives.
 // The clk_100m-domain status inputs are stable for many cycles after the
 // command decode, so sampling them a few ft601_clk cycles later is safe.
-reg [31:0] status_words [0:5];  // 6 status words (word 5 = self-test)
-reg [2:0] status_word_idx;
+// v7b: expanded to 8 words (added 2 debug counter words)
+reg [31:0] status_words [0:7];  // 8 status words (6 config + 2 debug)
+reg [3:0] status_word_idx;      // v7b: expanded from 3 to 4 bits for 10 transfers
 
 wire range_valid_ft;
 wire doppler_valid_ft;
@@ -234,13 +282,12 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
         doppler_real_cap   <= 16'd0;
         doppler_imag_cap   <= 16'd0;
         cfar_detection_cap <= 1'b0;
-        // Fix #5: Default to range-only on reset (prevents write FSM deadlock)
-        stream_ctrl_sync_0 <= 3'b001;
-        stream_ctrl_sync_1 <= 3'b001;
+        // Default to stream OFF on reset — host must explicitly enable
+        stream_ctrl_sync_0 <= 3'b000;
+        stream_ctrl_sync_1 <= 3'b000;
         // Gap 2: status request CDC reset
         status_req_sync <= 2'b00;
         status_req_sync_prev <= 1'b0;
-        status_word_idx <= 3'd0;
     end else begin
         // Synchronize valid strobes (2-stage sync chain)
         range_valid_sync   <= {range_valid_sync[0],   range_valid};
@@ -255,8 +302,12 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
         status_req_sync <= {status_req_sync[0], status_req_toggle_100m};
         status_req_sync_prev <= status_req_sync[1];
 
+        // v7c: status_req_pending and status_busy are driven in the main
+        // FSM always block below (same block) to avoid multi-driver DRC.
+
         // Gap 2: Capture status snapshot when request arrives in ft601 domain
-        if (status_req_ft601) begin
+        // v7c: Capture on the CDC edge itself (before pending could be cleared)
+        if (status_req_edge) begin
             // Pack register values into 5x 32-bit status words
             // Word 0: {0xFF, mode[1:0], stream_ctrl[2:0], cfar_threshold[15:0]}
             status_words[0] <= {8'hFF, 3'b000, status_radar_mode,
@@ -274,6 +325,10 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
             status_words[5] <= {7'd0, status_self_test_busy,
                                 8'd0, status_self_test_detail,
                                 3'd0, status_self_test_flags};
+            // Word 6: Debug counters {dbg_wr_strobes[15:0], dbg_txe_blocks[15:0]}
+            status_words[6] <= {dbg_wr_strobes_r, dbg_txe_blocks_r};
+            // Word 7: Debug counters {dbg_pkt_starts[15:0], dbg_pkt_completions[15:0]}
+            status_words[7] <= {dbg_pkt_starts_r, dbg_pkt_completions_r};
         end
 
         // Delayed version of sync[1] for edge detection
@@ -338,6 +393,15 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
         cfar_data_pending <= 1'b0;
         ft601_txe_r <= 1'b1;  // Default: FIFO not ready
         ft601_rxf_r <= 1'b1;  // Default: no host data
+        startup_lockout_ctr <= 8'd0;  // Start lockout on reset
+        status_watchdog_ctr <= 16'd0;
+        dbg_wr_strobes_r <= 16'd0;
+        dbg_txe_blocks_r <= 16'd0;
+        dbg_pkt_starts_r <= 16'd0;
+        dbg_pkt_completions_r <= 16'd0;
+        status_word_idx <= 4'd0;       // v7c: moved from CDC block to avoid multi-driver
+        status_req_pending <= 1'b0;    // v7c: status request pending flag
+        status_busy <= 1'b0;           // v7c: status send in progress flag
         // NOTE: ft601_clk_out is driven by the clk-domain always block below.
         // Do NOT assign it here (ft601_clk_in domain) — causes multi-driven net.
     end else begin
@@ -347,6 +411,20 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
         // Input pipeline registers (timing fix: breaks pad-to-fabric critical path)
         ft601_txe_r <= ft601_txe;
         ft601_rxf_r <= ft601_rxf;
+
+        // Post-POR startup lockout: count up to 255, then stay at 255.
+        // During lockout, write FSM stays in IDLE and ignores all triggers.
+        if (startup_lockout_active) begin
+            startup_lockout_ctr <= startup_lockout_ctr + 8'd1;
+            // v7c: Drain any spurious status_req_pending during lockout
+            status_req_pending <= 1'b0;
+        end else begin
+            // v7c: Set pending flag on CDC edge if not already busy.
+            // This is the ONLY place status_req_pending is set (outside reset).
+            // It is cleared by: IDLE→SEND_STATUS transition, or startup lockout drain.
+            if (status_req_edge && !status_busy)
+                status_req_pending <= 1'b1;
+        end
 
         // Data-pending flag management: set on valid edge, cleared when
         // consumed or skipped by write FSM. Must be in this always block
@@ -403,11 +481,17 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
 
             RD_PROCESS: begin
                 // Decode the received command word and pulse cmd_valid.
-                // Format: {opcode[31:24], addr[23:16], value[15:0]}
+                // FT601 245 mode byte lane mapping (little-endian):
+                //   DATA[7:0]   = first USB byte  = opcode
+                //   DATA[15:8]  = second USB byte = addr
+                //   DATA[31:16] = bytes 3-4       = value (big-endian within)
+                // Host sends: struct.pack(">I", (opcode<<24)|(addr<<16)|value)
+                //   => wire bytes: [opcode, addr, value_hi, value_lo]
+                //   => FT601 presents: DATA = {value_lo, value_hi, addr, opcode}
                 cmd_data   <= rx_data_captured;
-                cmd_opcode <= rx_data_captured[31:24];
-                cmd_addr   <= rx_data_captured[23:16];
-                cmd_value  <= rx_data_captured[15:0];
+                cmd_opcode <= rx_data_captured[7:0];
+                cmd_addr   <= rx_data_captured[15:8];
+                cmd_value  <= {rx_data_captured[23:16], rx_data_captured[31:24]};
                 cmd_valid  <= 1'b1;
                 read_state <= RD_IDLE;
             end
@@ -421,25 +505,44 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
         // Only operates when read FSM is idle (no bus contention).
         // ================================================================
         if (read_state == RD_IDLE) begin
+            // Per-cycle safe defaults: deassert write signals every cycle.
+            // Individual states re-assert them only when TXE allows a write.
+            // This prevents WR_N from staying LOW when TXE_N goes HIGH mid-packet.
+            ft601_wr_n <= 1'b1;
+            ft601_data_oe <= 1'b0;
+
+            // ============ DEBUG COUNTER LOGIC (v7b) ============
+            // Count TXE blocks: FSM is in a write-capable state but TXE is HIGH.
+            // This tells us whether the FSM is stalling on FT601 backpressure.
+            if (current_state != IDLE && current_state != WAIT_ACK && ft601_txe_r)
+                dbg_txe_blocks_r <= dbg_txe_blocks_r + 16'd1;
+
             case (current_state)
                 IDLE: begin
-                    ft601_wr_n <= 1;
-                    ft601_data_oe <= 0;  // Release data bus
-                    // Gap 2: Status readback takes priority
-                    if (status_req_ft601 && ft601_rxf_r) begin
-                        current_state <= SEND_STATUS;
-                        status_word_idx <= 3'd0;
-                    end
-                    // Trigger write FSM on range_valid edge (primary data source).
-                    // Doppler/cfar data_pending flags are checked inside
-                    // SEND_DOPPLER_DATA and SEND_DETECTION_DATA to skip or send.
-                    // Do NOT trigger on pending flags alone — they're sticky and
-                    // would cause repeated packet starts without new range data.
-                    else if (range_valid_ft && stream_range_en) begin
-                        // Don't start write if a read is about to begin
-                        if (ft601_rxf_r) begin  // rxf=1 means no host data pending
-                            current_state <= SEND_HEADER;
-                            byte_counter <= 0;
+                    // During startup lockout, ignore all triggers.
+                    // Any status_req_pending flags set during lockout are
+                    // harmlessly consumed when the lockout expires.
+                    if (!startup_lockout_active) begin
+                        // Gap 2: Status readback takes priority
+                        // v7c: Use registered pending flag + !busy guard
+                        if (status_req_pending && !status_busy && ft601_rxf_r) begin
+                            current_state <= SEND_STATUS;
+                            status_word_idx <= 4'd0;
+                            status_watchdog_ctr <= 16'd0;
+                            status_busy <= 1'b1;       // v7c: Mark status send in progress
+                            status_req_pending <= 1'b0; // v7c: Consume the request
+                        end
+                        // Trigger write FSM on range_valid edge (primary data source).
+                        // Doppler/cfar data_pending flags are checked inside
+                        // SEND_DOPPLER_DATA and SEND_DETECTION_DATA to skip or send.
+                        // Do NOT trigger on pending flags alone — they're sticky and
+                        // would cause repeated packet starts without new range data.
+                        else if (range_valid_ft && stream_range_en) begin
+                            // Don't start write if a read is about to begin
+                            if (ft601_rxf_r) begin  // rxf=1 means no host data pending
+                                current_state <= SEND_HEADER;
+                                byte_counter <= 0;
+                            end
                         end
                     end
                 end
@@ -447,9 +550,11 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                 SEND_HEADER: begin
                     if (!ft601_txe_r) begin  // FT601 TX FIFO not empty
                         ft601_data_oe <= 1;
-                        ft601_data_out <= {24'b0, HEADER};
-                        ft601_be <= 4'b0001;  // Only lower byte valid
+                        ft601_data_out <= {24'h000000, HEADER};  // v7b: Header in full 32-bit word
+                        ft601_be <= 4'b1111;  // v7b: Always use full 32-bit BE
                         ft601_wr_n <= 0;     // Assert write strobe
+                        dbg_wr_strobes_r <= dbg_wr_strobes_r + 16'd1;
+                        dbg_pkt_starts_r <= dbg_pkt_starts_r + 16'd1;
                         // Gap 2: skip to first enabled stream
                         if (stream_range_en)
                             current_state <= SEND_RANGE_DATA;
@@ -475,6 +580,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                         endcase
                         
                         ft601_wr_n <= 0;
+                        dbg_wr_strobes_r <= dbg_wr_strobes_r + 16'd1;
                         
                         if (byte_counter == 3) begin
                             byte_counter <= 0;
@@ -504,6 +610,7 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                         endcase
                         
                         ft601_wr_n <= 0;
+                        dbg_wr_strobes_r <= dbg_wr_strobes_r + 16'd1;
                         
                         if (byte_counter == 3) begin
                             byte_counter <= 0;
@@ -528,9 +635,10 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                 SEND_DETECTION_DATA: begin
                     if (!ft601_txe_r && cfar_data_pending) begin
                         ft601_data_oe <= 1;
-                        ft601_be <= 4'b0001;
+                        ft601_be <= 4'b1111;  // v7b: full 32-bit word
                         ft601_data_out <= {24'b0, 7'b0, cfar_detection_cap};
                         ft601_wr_n <= 0;
+                        dbg_wr_strobes_r <= dbg_wr_strobes_r + 16'd1;
                         cfar_data_pending <= 1'b0;
                         current_state <= SEND_FOOTER;
                     end else if (!cfar_data_pending) begin
@@ -542,41 +650,50 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                 SEND_FOOTER: begin
                     if (!ft601_txe_r) begin
                         ft601_data_oe <= 1;
-                        ft601_be <= 4'b0001;
-                        ft601_data_out <= {24'b0, FOOTER};
+                        ft601_be <= 4'b1111;  // v7b: full 32-bit word
+                        ft601_data_out <= {24'h000000, FOOTER};
                         ft601_wr_n <= 0;
+                        dbg_wr_strobes_r <= dbg_wr_strobes_r + 16'd1;
                         current_state <= WAIT_ACK;
                     end
                 end
 
-                // Gap 2: Status readback — send 6 x 32-bit status words
-                // Format: HEADER, status_words[0..5], FOOTER
+                // Gap 2: Status readback — send 8 x 32-bit status words (v7b: +2 debug)
+                // Format: BB_HEADER, status_words[0..7], FOOTER = 10 transfers
+                // Watchdog: abort if can't complete within 65536 cycles
                 SEND_STATUS: begin
-                    if (!ft601_txe_r) begin
+                    status_watchdog_ctr <= status_watchdog_ctr + 16'd1;
+                    if (status_watchdog_ctr == 16'hFFFF) begin
+                        // Watchdog timeout — abort status send, return to IDLE
+                        status_word_idx <= 4'd0;
+                        status_busy <= 1'b0;  // v7c: Clear busy on watchdog abort
+                        current_state <= IDLE;
+                    end else if (!ft601_txe_r) begin
                         ft601_data_oe <= 1;
-                        ft601_be <= 4'b1111;
+                        ft601_be <= 4'b1111;  // v7b: always full 32-bit
                         case (status_word_idx)
-                            3'd0: begin
+                            4'd0: begin
                                 // Send status header marker (0xBB = status response)
-                                ft601_data_out <= {24'b0, 8'hBB};
-                                ft601_be <= 4'b0001;
+                                ft601_data_out <= {24'h000000, 8'hBB};
                             end
-                            3'd1: ft601_data_out <= status_words[0];
-                            3'd2: ft601_data_out <= status_words[1];
-                            3'd3: ft601_data_out <= status_words[2];
-                            3'd4: ft601_data_out <= status_words[3];
-                            3'd5: ft601_data_out <= status_words[4];
-                            3'd6: ft601_data_out <= status_words[5];
-                            3'd7: begin
+                            4'd1: ft601_data_out <= status_words[0];
+                            4'd2: ft601_data_out <= status_words[1];
+                            4'd3: ft601_data_out <= status_words[2];
+                            4'd4: ft601_data_out <= status_words[3];
+                            4'd5: ft601_data_out <= status_words[4];
+                            4'd6: ft601_data_out <= status_words[5];
+                            4'd7: ft601_data_out <= status_words[6];  // v7b: debug word 1
+                            4'd8: ft601_data_out <= status_words[7];  // v7b: debug word 2
+                            4'd9: begin
                                 // Send status footer
-                                ft601_data_out <= {24'b0, FOOTER};
-                                ft601_be <= 4'b0001;
+                                ft601_data_out <= {24'h000000, FOOTER};
                             end
                             default: ;
                         endcase
                         ft601_wr_n <= 0;
-                        if (status_word_idx == 3'd7) begin
-                            status_word_idx <= 3'd0;
+                        dbg_wr_strobes_r <= dbg_wr_strobes_r + 16'd1;
+                        if (status_word_idx == 4'd9) begin
+                            status_word_idx <= 4'd0;
                             current_state <= WAIT_ACK;
                         end else begin
                             status_word_idx <= status_word_idx + 1;
@@ -585,8 +702,9 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                 end
                 
                 WAIT_ACK: begin
-                    ft601_wr_n <= 1;
-                    ft601_data_oe <= 0;  // Release data bus
+                    // wr_n and data_oe already deasserted by per-cycle defaults
+                    dbg_pkt_completions_r <= dbg_pkt_completions_r + 16'd1;
+                    status_busy <= 1'b0;  // v7c: Clear busy flag (safe for data packets too)
                     current_state <= IDLE;
                 end
             endcase

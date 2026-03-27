@@ -523,10 +523,12 @@ class RadarDashboardV2:
 
     C = 3e8
 
-    def __init__(self, root: tk.Tk, connection, recorder: DataRecorder):
+    def __init__(self, root: tk.Tk, connection, recorder: DataRecorder,
+                 range_only: bool = False):
         self.root = root
         self.conn = connection
         self.recorder = recorder
+        self._range_only = range_only
 
         if hasattr(connection, "radar_config"):
             self._radar_cfg = connection.radar_config
@@ -957,6 +959,10 @@ class RadarDashboardV2:
     # ----------------------------------------------------------- Actions
     def _on_connect(self):
         if self.conn.is_open:
+            # Disable streaming before disconnect
+            if self._range_only:
+                self._send_cmd(Opcode.STREAM_CONTROL, 0x00)
+                log.info("Sent stream_control=0x00 (disable streaming)")
             if self._acq_thread is not None:
                 self._acq_thread.stop()
                 self._acq_thread.join(timeout=2)
@@ -993,8 +999,13 @@ class RadarDashboardV2:
             self.btn_connect.config(text="Disconnect")
             self._acq_thread = RadarAcquisition(
                 self.conn, self.frame_queue, self.recorder,
-                status_callback=self._on_status_received)
+                status_callback=self._on_status_received,
+                range_only=self._range_only)
             self._acq_thread.start()
+            # In live mode, enable range-only streaming on the FPGA
+            if self._range_only:
+                self._send_cmd(Opcode.STREAM_CONTROL, 0x01)
+                log.info("Sent stream_control=0x01 (range-only enable)")
             log.info("Connected and acquisition started")
         else:
             self.lbl_status.config(text="CONNECT FAILED", foreground=RED)
@@ -1274,58 +1285,79 @@ class RadarDashboardV2:
             self._frame_count = 0
             self._fps_ts = now
 
-        # fftshift Doppler axis FIRST so all downstream code uses shifted indices
-        mag = np.fft.fftshift(frame.magnitude, axes=1)
-        det_shifted = np.fft.fftshift(frame.detections, axes=1)
+        if self._range_only:
+            # Range-only mode: display range profile and waterfall only
+            # Range-Doppler heatmap shows range profile in column 0
+            mag = frame.magnitude
+            self._rd_img.set_data(mag)
+            frame_vmax = float(np.max(mag)) if np.max(mag) > 0 else 1.0
+            self._vmax_ema = (self._vmax_alpha * frame_vmax +
+                              (1.0 - self._vmax_alpha) * self._vmax_ema)
+            stable_vmax = max(self._vmax_ema, 1.0)
+            self._rd_img.set_clim(vmin=0, vmax=stable_vmax)
 
-        # Extract detections for tracking from SHIFTED arrays
-        det_coords = np.argwhere(det_shifted > 0)
-        raw_targets = []
-        for rbin, dbin in det_coords:
-            t = RadarTarget(
-                range_m=(float(rbin) + 0.5) * self._range_per_bin,
-                velocity=self._vel_lo + (float(dbin) + 0.5) * self._vel_per_bin,
-                snr=float(mag[rbin, dbin]),
-                elevation=0, azimuth=0,
-                timestamp=frame.timestamp)
-            raw_targets.append(t)
-
-        # Run tracker
-        self._tracked_targets = self._tracker.update(
-            raw_targets, self._current_gps)
-
-        # Update labels
-        self.lbl_fps.config(text=f"{self._fps:.1f} fps")
-        self.lbl_detections.config(text=f"Det: {frame.detection_count}")
-        self.lbl_frame.config(text=f"Frame: {frame.frame_number}")
-        self.lbl_tracks.config(text=f"Tracks: {len(self._tracker.tracks)}")
-
-        frame_vmax = float(np.max(mag)) if np.max(mag) > 0 else 1.0
-        self._vmax_ema = (self._vmax_alpha * frame_vmax +
-                          (1.0 - self._vmax_alpha) * self._vmax_ema)
-        stable_vmax = max(self._vmax_ema, 1.0)
-
-        self._rd_img.set_data(mag)
-        self._rd_img.set_clim(vmin=0, vmax=stable_vmax)
-
-        # CFAR overlay
-        det_idx = np.argwhere(det_shifted > 0)
-        if len(det_idx) > 0:
-            range_m = (det_idx[:, 0] + 0.5) * self._range_per_bin
-            vel_ms = self._vel_lo + (det_idx[:, 1] + 0.5) * self._vel_per_bin
-            self._det_scatter.set_offsets(np.column_stack([vel_ms, range_m]))
-        else:
+            # No CFAR detections or tracking in range-only mode
             self._det_scatter.set_offsets(np.empty((0, 2)))
-
-        # Tracked targets overlay
-        if self._tracked_targets:
-            t_offsets = np.array([[t.velocity, t.range_m]
-                                  for t in self._tracked_targets])
-            self._track_scatter.set_offsets(t_offsets)
-        else:
             self._track_scatter.set_offsets(np.empty((0, 2)))
 
-        # Waterfall
+            # Update labels
+            self.lbl_fps.config(text=f"{self._fps:.1f} fps")
+            self.lbl_detections.config(text=f"Det: --")
+            self.lbl_frame.config(text=f"Frame: {frame.frame_number}")
+            self.lbl_tracks.config(text=f"Tracks: --")
+        else:
+            # Full mode: fftshift Doppler axis, run tracker, etc.
+            mag = np.fft.fftshift(frame.magnitude, axes=1)
+            det_shifted = np.fft.fftshift(frame.detections, axes=1)
+
+            # Extract detections for tracking from SHIFTED arrays
+            det_coords = np.argwhere(det_shifted > 0)
+            raw_targets = []
+            for rbin, dbin in det_coords:
+                t = RadarTarget(
+                    range_m=(float(rbin) + 0.5) * self._range_per_bin,
+                    velocity=self._vel_lo + (float(dbin) + 0.5) * self._vel_per_bin,
+                    snr=float(mag[rbin, dbin]),
+                    elevation=0, azimuth=0,
+                    timestamp=frame.timestamp)
+                raw_targets.append(t)
+
+            # Run tracker
+            self._tracked_targets = self._tracker.update(
+                raw_targets, self._current_gps)
+
+            # Update labels
+            self.lbl_fps.config(text=f"{self._fps:.1f} fps")
+            self.lbl_detections.config(text=f"Det: {frame.detection_count}")
+            self.lbl_frame.config(text=f"Frame: {frame.frame_number}")
+            self.lbl_tracks.config(text=f"Tracks: {len(self._tracker.tracks)}")
+
+            frame_vmax = float(np.max(mag)) if np.max(mag) > 0 else 1.0
+            self._vmax_ema = (self._vmax_alpha * frame_vmax +
+                              (1.0 - self._vmax_alpha) * self._vmax_ema)
+            stable_vmax = max(self._vmax_ema, 1.0)
+
+            self._rd_img.set_data(mag)
+            self._rd_img.set_clim(vmin=0, vmax=stable_vmax)
+
+            # CFAR overlay
+            det_idx = np.argwhere(det_shifted > 0)
+            if len(det_idx) > 0:
+                range_m = (det_idx[:, 0] + 0.5) * self._range_per_bin
+                vel_ms = self._vel_lo + (det_idx[:, 1] + 0.5) * self._vel_per_bin
+                self._det_scatter.set_offsets(np.column_stack([vel_ms, range_m]))
+            else:
+                self._det_scatter.set_offsets(np.empty((0, 2)))
+
+            # Tracked targets overlay
+            if self._tracked_targets:
+                t_offsets = np.array([[t.velocity, t.range_m]
+                                      for t in self._tracked_targets])
+                self._track_scatter.set_offsets(t_offsets)
+            else:
+                self._track_scatter.set_offsets(np.empty((0, 2)))
+
+        # Waterfall (works in both modes)
         self._waterfall.append(frame.range_profile.copy())
         wf_arr = np.array(list(self._waterfall))
         wf_max = max(np.max(wf_arr), 1.0)
@@ -1335,7 +1367,7 @@ class RadarDashboardV2:
         self._canvas.draw_idle()
 
         # Update targets treeview (every 5th frame to reduce overhead)
-        if frame.frame_number % 5 == 0:
+        if not self._range_only and frame.frame_number % 5 == 0:
             self._update_targets_tree()
 
     def _update_targets_tree(self):
@@ -1404,6 +1436,9 @@ def main():
                         help="Mock mode: simulate approaching target")
     args = parser.parse_args()
 
+    # Determine range-only mode: live and mock both use v7c range-only format
+    range_only = not args.replay  # replay has full Doppler data
+
     if args.replay:
         npy_dir = os.path.abspath(args.replay)
         conn = ReplayConnection(npy_dir, use_mti=not args.no_mti)
@@ -1417,7 +1452,7 @@ def main():
 
     recorder = DataRecorder()
     root = tk.Tk()
-    dashboard = RadarDashboardV2(root, conn, recorder)
+    dashboard = RadarDashboardV2(root, conn, recorder, range_only=range_only)
 
     if args.record:
         filepath = os.path.join(
@@ -1435,10 +1470,10 @@ def main():
         root.destroy()
 
     root.protocol("WM_DELETE_WINDOW", on_closing)
-    log.info(f"Dashboard V2 started (mode={mode_str})")
+    log.info(f"Dashboard V2 started (mode={mode_str}, range_only={range_only})")
 
-    if not args.live:
-        root.after(200, dashboard._on_connect)
+    # Auto-connect in all modes (mock, live, replay)
+    root.after(200, dashboard._on_connect)
 
     root.mainloop()
 

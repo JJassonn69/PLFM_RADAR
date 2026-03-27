@@ -538,6 +538,10 @@ run_test "Radar Mode Controller" \
     tb/tb_rmc_reg.vvp \
     tb/tb_radar_mode_controller.v radar_mode_controller.v
 
+run_test "Radar Mode Pass-through Contract" \
+    tb/tb_rmc_pass_contract_reg.vvp \
+    tb/tb_radar_mode_pass_through_contract.v radar_mode_controller.v
+
 echo ""
 
 # ===========================================================================

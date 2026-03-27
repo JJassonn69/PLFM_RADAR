@@ -27,6 +27,17 @@
 # ============================================================================
 
 # --------------------------------------------------------------------------
+# TE0713 On-board 50 MHz Oscillator (Bank 14, pin U20)
+# Used for free-running POR to release FT601 chip reset without deadlock.
+# The FT601 can't provide ft601_clk_in while chip_reset_n is held low,
+# so this independent clock breaks the chicken-and-egg.
+# --------------------------------------------------------------------------
+set_property PACKAGE_PIN U20 [get_ports {osc_50m}]
+set_property IOSTANDARD LVCMOS33 [get_ports {osc_50m}]
+create_clock -name osc_50m -period 20.000 [get_ports {osc_50m}]
+set_input_jitter [get_clocks osc_50m] 0.100
+
+# --------------------------------------------------------------------------
 # FT601 Clock Input — 100 MHz from FT601 chip
 # FMC: LA18_P_CC → FPGA J20 (Bank 15, IO_L11P_T1_SRCC_15)
 # SRCC is sufficient for 100 MHz FIFO clock via IBUF→BUFG
@@ -35,6 +46,14 @@ set_property PACKAGE_PIN J20 [get_ports {ft601_clk_in}]
 set_property IOSTANDARD LVCMOS33 [get_ports {ft601_clk_in}]
 create_clock -name ft601_clk_in -period 10.000 [get_ports {ft601_clk_in}]
 set_input_jitter [get_clocks ft601_clk_in] 0.100
+
+# --------------------------------------------------------------------------
+# CDC false path: osc_50m POR → ft601_clk_in domain
+# The osc_por_counter drives ft601_chip_reset_n (monotonic 0→1 transition).
+# No metastability risk: the FT601 clock only starts AFTER the reset is
+# released, so the ft601_clk_in domain never samples a changing value.
+# --------------------------------------------------------------------------
+set_false_path -from [get_clocks osc_50m] -to [get_clocks ft601_clk_in]
 
 # --------------------------------------------------------------------------
 # FT601 Data Bus [31:0] — bidirectional, 3.3V LVCMOS
@@ -110,8 +129,8 @@ set_property SLEW FAST [get_ports {ft601_data[*]}]
 set_property DRIVE 8 [get_ports {ft601_data[*]}]
 
 # --------------------------------------------------------------------------
-# FT601 Byte Enable [3:0] — active-low, bidirectional
-# BE_N[0:1] in Bank 16, BE_N[2:3] in Bank 16
+# FT601 Byte Enable [3:0] — active-high, bidirectional
+# BE[0:1] in Bank 16, BE[2:3] in Bank 16
 # --------------------------------------------------------------------------
 # FMC LA15_N → B20
 set_property PACKAGE_PIN B20 [get_ports {ft601_be[0]}]
@@ -148,6 +167,15 @@ set_property SLEW FAST [get_ports {ft601_wr_n}]
 set_property DRIVE 8 [get_ports {ft601_oe_n}]
 set_property DRIVE 8 [get_ports {ft601_rd_n}]
 set_property DRIVE 8 [get_ports {ft601_wr_n}]
+
+# PULLUP on active-low control outputs: during FPGA configuration these pins
+# are tristated. If the FT601 sees OE_N, RD_N, or WR_N LOW, it interprets
+# that as an active bus transaction. Pullups keep them HIGH (inactive) until
+# the FPGA is configured and the RTL takes over.
+set_property PULLUP TRUE [get_ports {ft601_oe_n}]
+set_property PULLUP TRUE [get_ports {ft601_rd_n}]
+set_property PULLUP TRUE [get_ports {ft601_wr_n}]
+set_property PULLUP TRUE [get_ports {ft601_siwu_n}]
 
 # --------------------------------------------------------------------------
 # FT601 Status Signals (Bank 16)
@@ -295,6 +323,31 @@ set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst
 # Input pipeline registers (timing fix: breaks pad-to-fabric critical path)
 set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_txe_r_reg*}]
 set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_rxf_r_reg*}]
+
+# --------------------------------------------------------------------------
+# Configuration bank voltage — required for 7-series to avoid DRC errors
+# and ensure correct I/O behavior during configuration
+# --------------------------------------------------------------------------
+set_property CFGBVS VCCO [current_design]
+set_property CONFIG_VOLTAGE 3.3 [current_design]
+
+# --------------------------------------------------------------------------
+# Pull unused pins HIGH during configuration to prevent floating inputs
+# from glitching active-low signals on adjacent traces.
+# --------------------------------------------------------------------------
+set_property BITSTREAM.CONFIG.UNUSEDPIN Pullup [current_design]
+
+# --------------------------------------------------------------------------
+# PULLUP on ft601_chip_reset_n (A14) and ft601_wakeup_n (A13)
+# CRITICAL: During FPGA configuration (~1-3 seconds), all I/O pins are
+# tristated. Without a pullup, the FT601 RESET_N pin floats and the FT601
+# sees spurious reset pulses, causing USB disconnect/re-enumeration.
+# In 600 mode the FT601 recovers from this; in 245 mode it does not.
+# The internal PULLUP keeps RESET_N HIGH (inactive) throughout config.
+# After configuration, the FPGA drives RESET_N via the two-clock POR.
+# --------------------------------------------------------------------------
+set_property PULLUP TRUE [get_ports {ft601_chip_reset_n}]
+set_property PULLUP TRUE [get_ports {ft601_wakeup_n}]
 
 # --------------------------------------------------------------------------
 # Async / false paths — chip reset and wakeup are not timing-critical
