@@ -11244,7 +11244,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 193.04 510.54 0)
 			(hide yes)
 			(show_name no)
@@ -11331,7 +11331,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 279.4 353.06 0)
 			(hide yes)
 			(show_name no)
@@ -11417,7 +11417,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 177.8 0)
 			(hide yes)
 			(show_name no)
@@ -11507,7 +11507,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 284.48 342.9 0)
 			(hide yes)
 			(show_name no)
@@ -11594,7 +11594,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 711.2 185.42 0)
 			(hide yes)
 			(show_name no)
@@ -11682,7 +11682,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 386.08 0)
 			(hide yes)
 			(show_name no)
@@ -11772,7 +11772,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 63.5 502.92 0)
 			(hide yes)
 			(show_name no)
@@ -11859,7 +11859,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 845.82 261.62 0)
 			(hide yes)
 			(show_name no)
@@ -11946,7 +11946,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 842.01 289.56 0)
 			(hide yes)
 			(show_name no)
@@ -12030,7 +12030,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 193.04 414.02 0)
 			(hide yes)
 			(show_name no)
@@ -12117,7 +12117,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 213.36 513.08 0)
 			(hide yes)
 			(show_name no)
@@ -12201,7 +12201,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 193.04 457.2 0)
 			(hide yes)
 			(show_name no)
@@ -12288,7 +12288,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 842.01 280.67 0)
 			(hide yes)
 			(show_name no)
@@ -12482,7 +12482,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 177.8 0)
 			(hide yes)
 			(show_name no)
@@ -12572,7 +12572,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 162.56 256.54 0)
 			(hide yes)
 			(show_name no)
@@ -12658,7 +12658,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 248.92 0)
 			(hide yes)
 			(show_name no)
@@ -12748,7 +12748,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 309.88 185.42 0)
 			(hide yes)
 			(show_name no)
@@ -12833,7 +12833,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 279.4 0)
 			(hide yes)
 			(show_name no)
@@ -12923,7 +12923,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 480.06 259.08 0)
 			(hide yes)
 			(show_name no)
@@ -13009,7 +13009,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 248.92 0)
 			(hide yes)
 			(show_name no)
@@ -13100,7 +13100,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 477.52 0)
 			(hide yes)
 			(show_name no)
@@ -13187,7 +13187,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 711.2 297.18 0)
 			(hide yes)
 			(show_name no)
@@ -13271,7 +13271,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 652.78 218.44 0)
 			(hide yes)
 			(show_name no)
@@ -13355,7 +13355,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 175.26 248.92 0)
 			(hide yes)
 			(show_name no)
@@ -13568,7 +13568,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 161.29 485.14 0)
 			(hide yes)
 			(show_name no)
@@ -13655,7 +13655,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 701.04 332.74 0)
 			(hide yes)
 			(show_name no)
@@ -13739,7 +13739,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 162.56 165.1 0)
 			(hide yes)
 			(show_name no)
@@ -13824,7 +13824,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 388.62 0)
 			(hide yes)
 			(show_name no)
@@ -13914,7 +13914,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "FRAME D Size , 22 x 34 INCH, Landscape"
 			(at 679.45 584.2 0)
 			(hide yes)
 			(show_name no)
@@ -13995,7 +13995,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 287.02 472.44 0)
 			(hide yes)
 			(show_name no)
@@ -14082,7 +14082,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 711.2 332.74 0)
 			(hide yes)
 			(show_name no)
@@ -14166,7 +14166,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 459.74 0)
 			(hide yes)
 			(show_name no)
@@ -14250,7 +14250,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 177.8 378.46 0)
 			(hide yes)
 			(show_name no)
@@ -14334,7 +14334,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 66.04 497.84 0)
 			(hide yes)
 			(show_name no)
@@ -14418,7 +14418,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 701.04 403.86 0)
 			(hide yes)
 			(show_name no)
@@ -14503,7 +14503,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "PIN HEADER"
 			(at 152.4 160.02 0)
 			(hide yes)
 			(show_name no)
@@ -14593,7 +14593,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 701.04 190.5 0)
 			(hide yes)
 			(show_name no)
@@ -14677,7 +14677,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 162.56 142.24 0)
 			(hide yes)
 			(show_name no)
@@ -14761,7 +14761,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 480.06 182.88 0)
 			(hide yes)
 			(show_name no)
@@ -14953,7 +14953,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 38.1 373.38 0)
 			(hide yes)
 			(show_name no)
@@ -15042,7 +15042,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 320.04 0)
 			(hide yes)
 			(show_name no)
@@ -15132,7 +15132,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 167.64 134.62 0)
 			(hide yes)
 			(show_name no)
@@ -15219,7 +15219,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 668.02 190.5 0)
 			(hide yes)
 			(show_name no)
@@ -15305,7 +15305,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 175.26 0)
 			(hide yes)
 			(show_name no)
@@ -15396,7 +15396,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 175.26 0)
 			(hide yes)
 			(show_name no)
@@ -15486,7 +15486,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 652.78 254 0)
 			(hide yes)
 			(show_name no)
@@ -15570,7 +15570,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 480.06 401.32 0)
 			(hide yes)
 			(show_name no)
@@ -15656,7 +15656,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 388.62 0)
 			(hide yes)
 			(show_name no)
@@ -15746,7 +15746,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 830.58 280.67 0)
 			(hide yes)
 			(show_name no)
@@ -15833,7 +15833,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 474.98 175.26 0)
 			(hide yes)
 			(show_name no)
@@ -15921,7 +15921,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 393.7 0)
 			(hide yes)
 			(show_name no)
@@ -16009,7 +16009,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 281.94 0)
 			(hide yes)
 			(show_name no)
@@ -16222,7 +16222,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 436.88 259.08 0)
 			(hide yes)
 			(show_name no)
@@ -16307,7 +16307,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 457.2 0)
 			(hide yes)
 			(show_name no)
@@ -16517,7 +16517,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 830.58 289.56 0)
 			(hide yes)
 			(show_name no)
@@ -16601,7 +16601,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 668.02 297.18 0)
 			(hide yes)
 			(show_name no)
@@ -16685,7 +16685,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 208.28 472.44 0)
 			(hide yes)
 			(show_name no)
@@ -16772,7 +16772,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 295.91 213.36 0)
 			(hide yes)
 			(show_name no)
@@ -16856,7 +16856,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 421.64 215.9 0)
 			(hide yes)
 			(show_name no)
@@ -16940,7 +16940,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 469.9 223.52 0)
 			(hide yes)
 			(show_name no)
@@ -17153,7 +17153,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 469.9 294.64 0)
 			(hide yes)
 			(show_name no)
@@ -17237,7 +17237,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 421.64 144.78 0)
 			(hide yes)
 			(show_name no)
@@ -17321,7 +17321,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 469.9 330.2 0)
 			(hide yes)
 			(show_name no)
@@ -17510,7 +17510,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 474.98 210.82 0)
 			(hide yes)
 			(show_name no)
@@ -17597,7 +17597,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 858.52 269.24 0)
 			(hide yes)
 			(show_name no)
@@ -17789,7 +17789,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 502.92 0)
 			(hide yes)
 			(show_name no)
@@ -17873,7 +17873,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 469.9 152.4 0)
 			(hide yes)
 			(show_name no)
@@ -17957,7 +17957,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 297.18 360.68 0)
 			(hide yes)
 			(show_name no)
@@ -18044,7 +18044,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 38.1 487.68 0)
 			(hide yes)
 			(show_name no)
@@ -18128,7 +18128,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 668.02 226.06 0)
 			(hide yes)
 			(show_name no)
@@ -18213,7 +18213,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 447.04 0)
 			(hide yes)
 			(show_name no)
@@ -18300,7 +18300,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 480.06 365.76 0)
 			(hide yes)
 			(show_name no)
@@ -18386,7 +18386,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 281.94 0)
 			(hide yes)
 			(show_name no)
@@ -18476,7 +18476,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 162.56 119.38 0)
 			(hide yes)
 			(show_name no)
@@ -18560,7 +18560,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 596.9 269.24 0)
 			(hide yes)
 			(show_name no)
@@ -18644,7 +18644,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 347.98 0)
 			(hide yes)
 			(show_name no)
@@ -18731,7 +18731,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 208.28 448.31 0)
 			(hide yes)
 			(show_name no)
@@ -18818,7 +18818,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 469.9 259.08 0)
 			(hide yes)
 			(show_name no)
@@ -18902,7 +18902,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 701.04 368.3 0)
 			(hide yes)
 			(show_name no)
@@ -18986,7 +18986,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 523.24 0)
 			(hide yes)
 			(show_name no)
@@ -19070,7 +19070,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 213.36 353.06 0)
 			(hide yes)
 			(show_name no)
@@ -19156,7 +19156,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 142.24 0)
 			(hide yes)
 			(show_name no)
@@ -19246,7 +19246,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 213.36 459.74 0)
 			(hide yes)
 			(show_name no)
@@ -19331,7 +19331,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 500.38 0)
 			(hide yes)
 			(show_name no)
@@ -19523,7 +19523,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 368.3 0)
 			(hide yes)
 			(show_name no)
@@ -19610,7 +19610,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 279.4 358.14 0)
 			(hide yes)
 			(show_name no)
@@ -19694,7 +19694,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 706.12 177.8 0)
 			(hide yes)
 			(show_name no)
@@ -19781,7 +19781,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 706.12 213.36 0)
 			(hide yes)
 			(show_name no)
@@ -19868,7 +19868,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 480.06 294.64 0)
 			(hide yes)
 			(show_name no)
@@ -19952,7 +19952,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 284.48 396.24 0)
 			(hide yes)
 			(show_name no)
@@ -20041,7 +20041,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 355.6 0)
 			(hide yes)
 			(show_name no)
@@ -20131,7 +20131,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 279.4 459.74 0)
 			(hide yes)
 			(show_name no)
@@ -20215,7 +20215,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 706.12 320.04 0)
 			(hide yes)
 			(show_name no)
@@ -20302,7 +20302,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 706.12 391.16 0)
 			(hide yes)
 			(show_name no)
@@ -20389,7 +20389,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 480.06 223.52 0)
 			(hide yes)
 			(show_name no)
@@ -20474,7 +20474,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 510.54 0)
 			(hide yes)
 			(show_name no)
@@ -20561,7 +20561,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 701.04 261.62 0)
 			(hide yes)
 			(show_name no)
@@ -20645,7 +20645,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 436.88 187.96 0)
 			(hide yes)
 			(show_name no)
@@ -20729,7 +20729,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 167.64 248.92 0)
 			(hide yes)
 			(show_name no)
@@ -20816,7 +20816,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 436.88 294.64 0)
 			(hide yes)
 			(show_name no)
@@ -20902,7 +20902,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 322.58 0)
 			(hide yes)
 			(show_name no)
@@ -20992,7 +20992,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 66.04 391.16 0)
 			(hide yes)
 			(show_name no)
@@ -21076,7 +21076,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 208.28 367.03 0)
 			(hide yes)
 			(show_name no)
@@ -21163,7 +21163,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 175.26 134.62 0)
 			(hide yes)
 			(show_name no)
@@ -21247,7 +21247,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 711.2 363.22 0)
 			(hide yes)
 			(show_name no)
@@ -21334,7 +21334,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 701.04 297.18 0)
 			(hide yes)
 			(show_name no)
@@ -21733,7 +21733,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 279.4 411.48 0)
 			(hide yes)
 			(show_name no)
@@ -21819,7 +21819,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 287.02 0)
 			(hide yes)
 			(show_name no)
@@ -21909,7 +21909,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 175.26 271.78 0)
 			(hide yes)
 			(show_name no)
@@ -21993,7 +21993,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 528.32 0)
 			(hide yes)
 			(show_name no)
@@ -22080,7 +22080,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 193.04 360.68 0)
 			(hide yes)
 			(show_name no)
@@ -22167,7 +22167,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 287.02 419.1 0)
 			(hide yes)
 			(show_name no)
@@ -22254,7 +22254,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 208.28 501.65 0)
 			(hide yes)
 			(show_name no)
@@ -22341,7 +22341,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 426.72 0)
 			(hide yes)
 			(show_name no)
@@ -22425,7 +22425,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 391.16 0)
 			(hide yes)
 			(show_name no)
@@ -22512,7 +22512,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 480.06 289.56 0)
 			(hide yes)
 			(show_name no)
@@ -22599,7 +22599,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 711.2 398.78 0)
 			(hide yes)
 			(show_name no)
@@ -22686,7 +22686,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 43.18 500.38 0)
 			(hide yes)
 			(show_name no)
@@ -22773,7 +22773,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 287.02 525.78 0)
 			(hide yes)
 			(show_name no)
@@ -22860,7 +22860,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 149.86 482.6 0)
 			(hide yes)
 			(show_name no)
@@ -22947,7 +22947,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 706.12 142.24 0)
 			(hide yes)
 			(show_name no)
@@ -23036,7 +23036,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 210.82 0)
 			(hide yes)
 			(show_name no)
@@ -23127,7 +23127,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 414.02 0)
 			(hide yes)
 			(show_name no)
@@ -23216,7 +23216,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 391.16 0)
 			(hide yes)
 			(show_name no)
@@ -23306,7 +23306,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 591.82 254 0)
 			(hide yes)
 			(show_name no)
@@ -23393,7 +23393,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 162.56 210.82 0)
 			(hide yes)
 			(show_name no)
@@ -23478,7 +23478,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 424.18 0)
 			(hide yes)
 			(show_name no)
@@ -23565,7 +23565,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 193.04 467.36 0)
 			(hide yes)
 			(show_name no)
@@ -23652,7 +23652,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 474.98 388.62 0)
 			(hide yes)
 			(show_name no)
@@ -23739,7 +23739,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 853.44 261.62 0)
 			(hide yes)
 			(show_name no)
@@ -23823,7 +23823,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 208.28 525.78 0)
 			(hide yes)
 			(show_name no)
@@ -23910,7 +23910,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 165.1 388.62 0)
 			(hide yes)
 			(show_name no)
@@ -23995,7 +23995,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 172.72 0)
 			(hide yes)
 			(show_name no)
@@ -24190,7 +24190,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 508 0)
 			(hide yes)
 			(show_name no)
@@ -24278,7 +24278,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 137.16 0)
 			(hide yes)
 			(show_name no)
@@ -24369,7 +24369,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 246.38 0)
 			(hide yes)
 			(show_name no)
@@ -24460,7 +24460,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "PIN HEADER"
 			(at 152.4 114.3 0)
 			(hide yes)
 			(show_name no)
@@ -24550,7 +24550,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 706.12 248.92 0)
 			(hide yes)
 			(show_name no)
@@ -24637,7 +24637,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 279.4 513.08 0)
 			(hide yes)
 			(show_name no)
@@ -24723,7 +24723,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 317.5 0)
 			(hide yes)
 			(show_name no)
@@ -24813,7 +24813,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 464.82 0)
 			(hide yes)
 			(show_name no)
@@ -24900,7 +24900,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 497.84 0)
 			(hide yes)
 			(show_name no)
@@ -24988,7 +24988,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 467.36 0)
 			(hide yes)
 			(show_name no)
@@ -25076,7 +25076,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 314.96 0)
 			(hide yes)
 			(show_name no)
@@ -25271,7 +25271,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 213.36 358.14 0)
 			(hide yes)
 			(show_name no)
@@ -25355,7 +25355,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 297.18 350.52 0)
 			(hide yes)
 			(show_name no)
@@ -25442,7 +25442,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 711.2 403.86 0)
 			(hide yes)
 			(show_name no)
@@ -25526,7 +25526,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 513.08 0)
 			(hide yes)
 			(show_name no)
@@ -25611,7 +25611,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "PIN HEADER"
 			(at 152.4 205.74 0)
 			(hide yes)
 			(show_name no)
@@ -25701,7 +25701,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 668.02 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -25785,7 +25785,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 213.36 411.48 0)
 			(hide yes)
 			(show_name no)
@@ -25869,7 +25869,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 652.78 396.24 0)
 			(hide yes)
 			(show_name no)
@@ -25953,7 +25953,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 279.4 518.16 0)
 			(hide yes)
 			(show_name no)
@@ -26037,7 +26037,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 668.02 261.62 0)
 			(hide yes)
 			(show_name no)
@@ -26121,7 +26121,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 612.14 287.02 0)
 			(hide yes)
 			(show_name no)
@@ -26206,7 +26206,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 520.7 0)
 			(hide yes)
 			(show_name no)
@@ -26293,7 +26293,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 208.28 394.97 0)
 			(hide yes)
 			(show_name no)
@@ -26380,7 +26380,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 421.64 287.02 0)
 			(hide yes)
 			(show_name no)
@@ -26569,7 +26569,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 314.96 195.58 0)
 			(hide yes)
 			(show_name no)
@@ -26656,7 +26656,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 436.88 152.4 0)
 			(hide yes)
 			(show_name no)
@@ -26740,7 +26740,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 284.48 449.58 0)
 			(hide yes)
 			(show_name no)
@@ -26932,7 +26932,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 297.18 467.36 0)
 			(hide yes)
 			(show_name no)
@@ -27019,7 +27019,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 711.2 327.66 0)
 			(hide yes)
 			(show_name no)
@@ -27108,7 +27108,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 358.14 0)
 			(hide yes)
 			(show_name no)
@@ -27198,7 +27198,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 284.48 502.92 0)
 			(hide yes)
 			(show_name no)
@@ -27285,7 +27285,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 822.96 281.94 0)
 			(hide yes)
 			(show_name no)
@@ -27369,7 +27369,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 474.98 317.5 0)
 			(hide yes)
 			(show_name no)
@@ -27456,7 +27456,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 175.26 203.2 0)
 			(hide yes)
 			(show_name no)
@@ -27540,7 +27540,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 480.06 325.12 0)
 			(hide yes)
 			(show_name no)
@@ -27629,7 +27629,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 320.04 0)
 			(hide yes)
 			(show_name no)
@@ -27719,7 +27719,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 162.56 187.96 0)
 			(hide yes)
 			(show_name no)
@@ -27803,7 +27803,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 173.99 485.14 0)
 			(hide yes)
 			(show_name no)
@@ -27887,7 +27887,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 284.48 213.36 0)
 			(hide yes)
 			(show_name no)
@@ -27971,7 +27971,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 444.5 0)
 			(hide yes)
 			(show_name no)
@@ -28058,7 +28058,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 295.91 204.47 0)
 			(hide yes)
 			(show_name no)
@@ -28145,7 +28145,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 281.94 193.04 0)
 			(hide yes)
 			(show_name no)
@@ -28229,7 +28229,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 213.36 518.16 0)
 			(hide yes)
 			(show_name no)
@@ -28313,7 +28313,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 668.02 368.3 0)
 			(hide yes)
 			(show_name no)
@@ -28397,7 +28397,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 175.26 180.34 0)
 			(hide yes)
 			(show_name no)
@@ -28481,7 +28481,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 149.86 375.92 0)
 			(hide yes)
 			(show_name no)
@@ -28570,7 +28570,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 353.06 0)
 			(hide yes)
 			(show_name no)
@@ -28661,7 +28661,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 350.52 0)
 			(hide yes)
 			(show_name no)
@@ -28753,7 +28753,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 284.48 0)
 			(hide yes)
 			(show_name no)
@@ -28844,7 +28844,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 350.52 0)
 			(hide yes)
 			(show_name no)
@@ -29036,7 +29036,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 668.02 332.74 0)
 			(hide yes)
 			(show_name no)
@@ -29120,7 +29120,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 396.24 0)
 			(hide yes)
 			(show_name no)
@@ -29204,7 +29204,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 622.3 259.08 0)
 			(hide yes)
 			(show_name no)
@@ -29288,7 +29288,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 175.26 226.06 0)
 			(hide yes)
 			(show_name no)
@@ -29601,7 +29601,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 353.06 0)
 			(hide yes)
 			(show_name no)
@@ -29796,7 +29796,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 421.64 358.14 0)
 			(hide yes)
 			(show_name no)
@@ -29880,7 +29880,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 416.56 0)
 			(hide yes)
 			(show_name no)
@@ -29964,7 +29964,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 652.78 325.12 0)
 			(hide yes)
 			(show_name no)
@@ -30048,7 +30048,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 652.78 360.68 0)
 			(hide yes)
 			(show_name no)
@@ -30132,7 +30132,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 652.78 182.88 0)
 			(hide yes)
 			(show_name no)
@@ -30216,7 +30216,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 469.9 0)
 			(hide yes)
 			(show_name no)
@@ -30300,7 +30300,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 421.64 180.34 0)
 			(hide yes)
 			(show_name no)
@@ -30384,7 +30384,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 701.04 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -30468,7 +30468,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 436.88 365.76 0)
 			(hide yes)
 			(show_name no)
@@ -30552,7 +30552,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 701.04 226.06 0)
 			(hide yes)
 			(show_name no)
@@ -30638,7 +30638,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 246.38 0)
 			(hide yes)
 			(show_name no)
@@ -30730,7 +30730,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 284.48 0)
 			(hide yes)
 			(show_name no)
@@ -30820,7 +30820,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 297.18 510.54 0)
 			(hide yes)
 			(show_name no)
@@ -30907,7 +30907,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 342.9 0)
 			(hide yes)
 			(show_name no)
@@ -31096,7 +31096,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 302.26 185.42 0)
 			(hide yes)
 			(show_name no)
@@ -31185,7 +31185,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 215.9 0)
 			(hide yes)
 			(show_name no)
@@ -31275,7 +31275,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 337.82 0)
 			(hide yes)
 			(show_name no)
@@ -31362,7 +31362,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 167.64 111.76 0)
 			(hide yes)
 			(show_name no)
@@ -31451,7 +31451,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 213.36 0)
 			(hide yes)
 			(show_name no)
@@ -31541,7 +31541,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 279.4 464.82 0)
 			(hide yes)
 			(show_name no)
@@ -31625,7 +31625,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 480.06 360.68 0)
 			(hide yes)
 			(show_name no)
@@ -31712,7 +31712,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 474.98 353.06 0)
 			(hide yes)
 			(show_name no)
@@ -31799,7 +31799,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 711.2 256.54 0)
 			(hide yes)
 			(show_name no)
@@ -31886,7 +31886,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 63.5 396.24 0)
 			(hide yes)
 			(show_name no)
@@ -31973,7 +31973,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 518.16 0)
 			(hide yes)
 			(show_name no)
@@ -32060,7 +32060,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 421.64 322.58 0)
 			(hide yes)
 			(show_name no)
@@ -32144,7 +32144,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 480.06 254 0)
 			(hide yes)
 			(show_name no)
@@ -32232,7 +32232,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "PIN HEADER"
 			(at 152.4 274.32 0)
 			(hide yes)
 			(show_name no)
@@ -32322,7 +32322,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 279.4 406.4 0)
 			(hide yes)
 			(show_name no)
@@ -32406,7 +32406,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 711.2 226.06 0)
 			(hide yes)
 			(show_name no)
@@ -32490,7 +32490,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 652.78 289.56 0)
 			(hide yes)
 			(show_name no)
@@ -32574,7 +32574,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 193.04 403.86 0)
 			(hide yes)
 			(show_name no)
@@ -32661,7 +32661,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 175.26 157.48 0)
 			(hide yes)
 			(show_name no)
@@ -32746,7 +32746,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "PIN HEADER"
 			(at 152.4 137.16 0)
 			(hide yes)
 			(show_name no)
@@ -32838,7 +32838,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 139.7 0)
 			(hide yes)
 			(show_name no)
@@ -32928,7 +32928,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 213.36 464.82 0)
 			(hide yes)
 			(show_name no)
@@ -33013,7 +33013,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 210.82 0)
 			(hide yes)
 			(show_name no)
@@ -33103,7 +33103,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 828.04 271.78 0)
 			(hide yes)
 			(show_name no)
@@ -33189,7 +33189,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 213.36 0)
 			(hide yes)
 			(show_name no)
@@ -33279,7 +33279,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 208.28 341.63 0)
 			(hide yes)
 			(show_name no)
@@ -33368,7 +33368,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 355.6 0)
 			(hide yes)
 			(show_name no)
@@ -33458,7 +33458,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 421.64 0)
 			(hide yes)
 			(show_name no)
@@ -33668,7 +33668,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 480.06 147.32 0)
 			(hide yes)
 			(show_name no)
@@ -33755,7 +33755,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 38.1 381 0)
 			(hide yes)
 			(show_name no)
@@ -33839,7 +33839,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 284.48 204.47 0)
 			(hide yes)
 			(show_name no)
@@ -33926,7 +33926,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 711.2 368.3 0)
 			(hide yes)
 			(show_name no)
@@ -34011,7 +34011,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 403.86 0)
 			(hide yes)
 			(show_name no)
@@ -34100,7 +34100,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 391.16 0)
 			(hide yes)
 			(show_name no)
@@ -34190,7 +34190,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 474.98 246.38 0)
 			(hide yes)
 			(show_name no)
@@ -34277,7 +34277,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 297.18 403.86 0)
 			(hide yes)
 			(show_name no)
@@ -34364,7 +34364,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 363.22 0)
 			(hide yes)
 			(show_name no)
@@ -34449,7 +34449,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 370.84 0)
 			(hide yes)
 			(show_name no)
@@ -34538,7 +34538,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 393.7 0)
 			(hide yes)
 			(show_name no)
@@ -34628,7 +34628,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 600.71 278.13 0)
 			(hide yes)
 			(show_name no)
@@ -34715,7 +34715,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 614.68 259.08 0)
 			(hide yes)
 			(show_name no)
@@ -34802,7 +34802,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 480.06 0)
 			(hide yes)
 			(show_name no)
@@ -34886,7 +34886,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 406.4 0)
 			(hide yes)
 			(show_name no)
@@ -34970,7 +34970,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 38.1 480.06 0)
 			(hide yes)
 			(show_name no)
@@ -35057,7 +35057,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 167.64 180.34 0)
 			(hide yes)
 			(show_name no)
@@ -35300,7 +35300,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 167.64 378.46 0)
 			(hide yes)
 			(show_name no)
@@ -35389,7 +35389,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 251.46 0)
 			(hide yes)
 			(show_name no)
@@ -35479,7 +35479,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 668.02 403.86 0)
 			(hide yes)
 			(show_name no)
@@ -35563,7 +35563,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 711.2 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -35647,7 +35647,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 193.04 350.52 0)
 			(hide yes)
 			(show_name no)
@@ -35734,7 +35734,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 706.12 355.6 0)
 			(hide yes)
 			(show_name no)
@@ -35822,7 +35822,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 243.84 0)
 			(hide yes)
 			(show_name no)
@@ -35913,7 +35913,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "PIN HEADER"
 			(at 152.4 228.6 0)
 			(hide yes)
 			(show_name no)
@@ -36004,7 +36004,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 340.36 0)
 			(hide yes)
 			(show_name no)
@@ -36091,7 +36091,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 822.96 256.54 0)
 			(hide yes)
 			(show_name no)
@@ -36178,7 +36178,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 411.48 0)
 			(hide yes)
 			(show_name no)
@@ -36552,7 +36552,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 144.78 0)
 			(hide yes)
 			(show_name no)
@@ -36642,7 +36642,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 421.64 393.7 0)
 			(hide yes)
 			(show_name no)
@@ -36727,7 +36727,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 530.86 0)
 			(hide yes)
 			(show_name no)
@@ -36814,7 +36814,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 373.38 0)
 			(hide yes)
 			(show_name no)
@@ -36898,7 +36898,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 279.4 205.74 0)
 			(hide yes)
 			(show_name no)
@@ -36982,7 +36982,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 480.06 187.96 0)
 			(hide yes)
 			(show_name no)
@@ -37067,7 +37067,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 208.28 0)
 			(hide yes)
 			(show_name no)
@@ -37157,7 +37157,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 401.32 0)
 			(hide yes)
 			(show_name no)
@@ -37244,7 +37244,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 353.06 0)
 			(hide yes)
 			(show_name no)
@@ -37330,7 +37330,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 180.34 0)
 			(hide yes)
 			(show_name no)
@@ -37420,7 +37420,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 167.64 271.78 0)
 			(hide yes)
 			(show_name no)
@@ -37507,7 +37507,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 436.88 401.32 0)
 			(hide yes)
 			(show_name no)
@@ -37591,7 +37591,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 358.14 0)
 			(hide yes)
 			(show_name no)
@@ -37678,7 +37678,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 474.98 139.7 0)
 			(hide yes)
 			(show_name no)
@@ -37765,7 +37765,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 160.02 495.3 0)
 			(hide yes)
 			(show_name no)
@@ -37849,7 +37849,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 469.9 365.76 0)
 			(hide yes)
 			(show_name no)
@@ -37933,7 +37933,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 711.2 149.86 0)
 			(hide yes)
 			(show_name no)
@@ -38020,7 +38020,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 474.98 0)
 			(hide yes)
 			(show_name no)
@@ -38108,7 +38108,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 139.7 0)
 			(hide yes)
 			(show_name no)
@@ -38198,7 +38198,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 167.64 226.06 0)
 			(hide yes)
 			(show_name no)
@@ -38285,7 +38285,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 297.18 520.7 0)
 			(hide yes)
 			(show_name no)
@@ -38372,7 +38372,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 480.06 152.4 0)
 			(hide yes)
 			(show_name no)
@@ -38456,7 +38456,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 711.2 190.5 0)
 			(hide yes)
 			(show_name no)
@@ -38540,7 +38540,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 591.82 279.4 0)
 			(hide yes)
 			(show_name no)
@@ -38624,7 +38624,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 600.71 287.02 0)
 			(hide yes)
 			(show_name no)
@@ -38708,7 +38708,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 167.64 203.2 0)
 			(hide yes)
 			(show_name no)
@@ -38795,7 +38795,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 480.06 218.44 0)
 			(hide yes)
 			(show_name no)
@@ -38882,7 +38882,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 297.18 457.2 0)
 			(hide yes)
 			(show_name no)
@@ -38969,7 +38969,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 175.26 111.76 0)
 			(hide yes)
 			(show_name no)
@@ -39053,7 +39053,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 162.56 279.4 0)
 			(hide yes)
 			(show_name no)
@@ -39137,7 +39137,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 436.88 223.52 0)
 			(hide yes)
 			(show_name no)
@@ -39221,7 +39221,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 287.02 365.76 0)
 			(hide yes)
 			(show_name no)
@@ -39308,7 +39308,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 711.2 261.62 0)
 			(hide yes)
 			(show_name no)
@@ -39392,7 +39392,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 139.7 474.98 0)
 			(hide yes)
 			(show_name no)
@@ -39476,7 +39476,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 711.2 292.1 0)
 			(hide yes)
 			(show_name no)
@@ -39563,7 +39563,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 45.72 393.7 0)
 			(hide yes)
 			(show_name no)
@@ -39647,7 +39647,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 454.66 0)
 			(hide yes)
 			(show_name no)
@@ -39736,7 +39736,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 419.1 142.24 0)
 			(hide yes)
 			(show_name no)
@@ -39826,7 +39826,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 162.56 233.68 0)
 			(hide yes)
 			(show_name no)
@@ -39910,7 +39910,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 469.9 401.32 0)
 			(hide yes)
 			(show_name no)
@@ -39994,7 +39994,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 213.36 406.4 0)
 			(hide yes)
 			(show_name no)
@@ -40078,7 +40078,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 167.64 157.48 0)
 			(hide yes)
 			(show_name no)
@@ -40165,7 +40165,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 469.9 187.96 0)
 			(hide yes)
 			(show_name no)
@@ -40250,7 +40250,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 2 Pin"
 			(at 365.76 360.68 0)
 			(hide yes)
 			(show_name no)
@@ -40337,7 +40337,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 208.28 419.1 0)
 			(hide yes)
 			(show_name no)
@@ -40424,7 +40424,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 652.78 147.32 0)
 			(hide yes)
 			(show_name no)
@@ -40508,7 +40508,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 480.06 330.2 0)
 			(hide yes)
 			(show_name no)
@@ -40592,7 +40592,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 279.4 177.8 0)
 			(hide yes)
 			(show_name no)
@@ -40679,7 +40679,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 421.64 251.46 0)
 			(hide yes)
 			(show_name no)
@@ -40763,7 +40763,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 297.18 414.02 0)
 			(hide yes)
 			(show_name no)
@@ -40851,7 +40851,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "PIN HEADER"
 			(at 152.4 251.46 0)
 			(hide yes)
 			(show_name no)
@@ -40941,7 +40941,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 449.58 0)
 			(hide yes)
 			(show_name no)
@@ -41025,7 +41025,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 706.12 284.48 0)
 			(hide yes)
 			(show_name no)
@@ -41112,7 +41112,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 474.98 281.94 0)
 			(hide yes)
 			(show_name no)
@@ -41200,7 +41200,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" ".100\" (2.54mm) Center Header - 3 Pin"
 			(at 650.24 317.5 0)
 			(hide yes)
 			(show_name no)
@@ -41290,7 +41290,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 711.2 220.98 0)
 			(hide yes)
 			(show_name no)
@@ -41378,7 +41378,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "PIN HEADER"
 			(at 152.4 182.88 0)
 			(hide yes)
 			(show_name no)
@@ -41468,7 +41468,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RESISTOR, European symbol"
 			(at 193.04 520.7 0)
 			(hide yes)
 			(show_name no)
@@ -41555,7 +41555,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 480.06 396.24 0)
 			(hide yes)
 			(show_name no)
@@ -41642,7 +41642,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAPACITOR, European symbol"
 			(at 612.14 278.13 0)
 			(hide yes)
 			(show_name no)
@@ -41729,7 +41729,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 360.68 533.4 0)
 			(hide yes)
 			(show_name no)
@@ -41813,7 +41813,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 436.88 330.2 0)
 			(hide yes)
 			(show_name no)
@@ -41897,7 +41897,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SUPPLY SYMBOL"
 			(at 139.7 368.3 0)
 			(hide yes)
 			(show_name no)

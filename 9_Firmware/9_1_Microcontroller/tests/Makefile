@@ -57,7 +57,8 @@ TESTS_STANDALONE := test_bug12_pa_cal_loop_inverted \
                     test_gap3_iwdg_config \
                     test_gap3_temperature_max \
                     test_gap3_idq_periodic_reread \
-                    test_gap3_emergency_state_ordering
+                    test_gap3_emergency_state_ordering \
+                    test_bug19_scan_scheduler_contract
 
 # Tests that need platform_noos_stm32.o + mocks
 TESTS_WITH_PLATFORM := test_bug11_platform_spi_transmit_only
@@ -68,7 +69,7 @@ TESTS_WITH_SPI := test_bug18_spi_cs_init_high
 ALL_TESTS := $(TESTS_WITH_REAL) $(TESTS_MOCK_ONLY) $(TESTS_STANDALONE) $(TESTS_WITH_PLATFORM) $(TESTS_WITH_SPI)
 
 .PHONY: all build test clean \
-        $(addprefix test_,bug1 bug2 bug3 bug4 bug5 bug6 bug7 bug8 bug9 bug10 bug11 bug12 bug13 bug14 bug15 bug18) \
+        $(addprefix test_,bug1 bug2 bug3 bug4 bug5 bug6 bug7 bug8 bug9 bug10 bug11 bug12 bug13 bug14 bug15 bug18 bug19) \
         test_gap3_estop test_gap3_iwdg test_gap3_temp test_gap3_idq test_gap3_order
 
 all: build test
@@ -227,6 +228,9 @@ test_gap3_order: test_gap3_emergency_state_ordering
 
 test_bug18: test_bug18_spi_cs_init_high
 	./test_bug18_spi_cs_init_high
+
+test_bug19: test_bug19_scan_scheduler_contract
+	./test_bug19_scan_scheduler_contract
 
 # --- Clean ---
 

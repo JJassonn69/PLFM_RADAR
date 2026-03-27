@@ -242,12 +242,14 @@ ADS7830_HandleTypeDef hadc3;
 float Temperature_1 = 0.0f, Temperature_2 = 0.0f, Temperature_3 = 0.0f, Temperature_4 = 0.0f;
 float Temperature_5 = 0.0f, Temperature_6 = 0.0f, Temperature_7 = 0.0f, Temperature_8 = 0.0f;
 
-// Phase differences for 31 beam positions
+// Phase differences for 31 beam positions (centered broadside).
+// For d = lambda/2, |delta_phi| = 180*sin(theta) degrees, so +/-45 deg
+// steering corresponds to |delta_phi| <= 127.279 deg.
 const float phase_differences[31] = {
-    160.0f, 80.0f, 53.333f, 40.0f, 32.0f, 26.667f, 22.857f, 20.0f, 17.778f, 16.0f,
-    14.545f, 13.333f, 12.308f, 11.429f, 10.667f, 0.0f,
-    -10.667f, -11.429f, -12.308f, -13.333f, -14.545f, -16.0f, -17.778f, -20.0f,
-    -22.857f, -26.667f, -32.0f, -40.0f, -53.333f, -80.0f, -160.0f
+    127.279f, 63.639f, 42.426f, 31.820f, 25.456f, 21.213f, 18.189f, 15.910f, 14.142f, 12.728f,
+    11.571f, 10.606f, 9.792f, 9.095f, 8.486f, 0.0f,
+    -8.486f, -9.095f, -9.792f, -10.606f, -11.571f, -12.728f, -14.142f, -15.910f,
+    -18.189f, -21.213f, -25.456f, -31.820f, -42.426f, -63.639f, -127.279f
 };
 
 // Convenience HAL wrappers for AD9523 control pins (GPIOF as you said)
@@ -514,40 +516,26 @@ void runRadarPulseSequence() {
     DIAG("BF", "Enabling fast-switch mode for beam sweep");
     adarManager.setFastSwitchMode(true);
 
-    int m = 1; // Chirp counter
-    int n = 1; // Beam Elevation position counter
     int y = 1; // Beam Azimuth counter
 
     // Main beam steering sequence
-    for(int beam_pos = 0; beam_pos < 15; beam_pos++) {
-    	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_9);// Notify FPGA of elevation change
-    	DIAG("SYS", "Beam pos %d/15: elevation GPIO toggle, patterns matrix1/vector_0/matrix2", beam_pos);
-        // Pattern 1: matrix1 (positive steering angles)
-        adarManager.setCustomBeamPattern16(matrix1[beam_pos], ADAR1000Manager::BeamDirection::TX);
-        adarManager.setCustomBeamPattern16(matrix1[beam_pos], ADAR1000Manager::BeamDirection::RX);
+    for(int beam_pos = 0; beam_pos < n_max; beam_pos++) {
+     	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_9);// Notify FPGA of elevation change
+    	DIAG("SYS", "Beam pos %d/%d: elevation GPIO toggle", beam_pos + 1, n_max);
 
+        if (beam_pos < 15) {
+            adarManager.setCustomBeamPattern16(matrix1[beam_pos], ADAR1000Manager::BeamDirection::TX);
+            adarManager.setCustomBeamPattern16(matrix1[beam_pos], ADAR1000Manager::BeamDirection::RX);
+        } else if (beam_pos == 15) {
+            adarManager.setCustomBeamPattern16(vector_0, ADAR1000Manager::BeamDirection::TX);
+            adarManager.setCustomBeamPattern16(vector_0, ADAR1000Manager::BeamDirection::RX);
+        } else {
+            adarManager.setCustomBeamPattern16(matrix2[beam_pos - 16], ADAR1000Manager::BeamDirection::TX);
+            adarManager.setCustomBeamPattern16(matrix2[beam_pos - 16], ADAR1000Manager::BeamDirection::RX);
+        }
+
+        // One full 32-chirp frame per elevation beam position.
         executeChirpSequence(m_max/2, T1, PRI1, T2, PRI2);
-        m += m_max/2;
-
-        // Pattern 2: vector_0 (broadside)
-        adarManager.setCustomBeamPattern16(vector_0, ADAR1000Manager::BeamDirection::TX);
-        adarManager.setCustomBeamPattern16(vector_0, ADAR1000Manager::BeamDirection::RX);
-
-        executeChirpSequence(m_max/2, T1, PRI1, T2, PRI2);
-        m += m_max/2;
-
-        // Pattern 3: matrix2 (negative steering angles)
-        adarManager.setCustomBeamPattern16(matrix2[beam_pos], ADAR1000Manager::BeamDirection::TX);
-        adarManager.setCustomBeamPattern16(matrix2[beam_pos], ADAR1000Manager::BeamDirection::RX);
-
-        executeChirpSequence(m_max/2, T1, PRI1, T2, PRI2);
-        m += m_max/2;
-
-        // Reset chirp counter if needed
-        if(m > m_max) m = 1;
-
-        n++;
-        if(n > n_max) n = 1;
 
     }
 
