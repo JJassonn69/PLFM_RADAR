@@ -83,6 +83,14 @@ logs/
 
 # FPGA VVP simulation scripts (rebuilt by iverilog)
 9_Firmware/9_2_FPGA/tb_usb_test
+9_Firmware/9_2_FPGA/tb_cfar
+9_Firmware/9_2_FPGA/tb_cfar_phys
+9_Firmware/9_2_FPGA/tb_cfar_reset
+9_Firmware/9_2_FPGA/tb_e2e_phys
+9_Firmware/9_2_FPGA/tb_fullchain
+9_Firmware/9_2_FPGA/tb_playback_v9
+9_Firmware/9_2_FPGA/tb_usb
+9_Firmware/9_2_FPGA/tb_usb_check
 
 # Matched filter scratch variants
 9_Firmware/9_2_FPGA/matched_filter_multi_segment.v.bram_v3

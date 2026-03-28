@@ -19,7 +19,7 @@
  *   T10: Zero guard, zero train corner case
  *   T11: Reset during processing → clean recovery
  *   T12: Back-to-back frames → second frame processes correctly
- *   T13: detect_count accumulates across frames
+ *   T13: detect_count resets per-frame (v9c behavior)
  *   T14: cfar_busy asserts during processing, deasserts after
  */
 
@@ -110,7 +110,10 @@ cfar_ca #(
     .detect_threshold(detect_threshold),
     .detect_count(detect_count),
     .cfar_busy(cfar_busy),
-    .cfar_status(cfar_status)
+    .cfar_status(cfar_status),
+    .dbg_cells_processed(),
+    .dbg_cols_completed(),
+    .dbg_valid_count()
 );
 
 // ============================================================================
@@ -604,7 +607,7 @@ initial begin
     check(12, "T12: Back-to-back frame 2: target at (20,10) detected", find_detection(6'd20, 5'd10) == 1);
 
     // ================================================================
-    // T13: detect_count accumulates
+    // T13: detect_count resets per-frame (v9c behavior)
     // ================================================================
     test_num = 13;
     do_reset;
@@ -625,14 +628,17 @@ initial begin
         reg [15:0] count_after_frame1;
         count_after_frame1 = detect_count;
         $display("  [INFO] T13: detect_count after frame 1 = %0d", count_after_frame1);
+        check(13, "T13.1: frame 1 has detections", count_after_frame1 > 0);
 
-        // Frame 2 (same target)
+        // Frame 2 (same target) — detect_count resets per frame in v9c
         feed_frame(16'd1000);
         pulse_frame_complete;
         wait_cfar_done(20000);
         $display("  [INFO] T13: detect_count after frame 2 = %0d", detect_count);
 
-        check(13, "T13: detect_count increases after second frame", detect_count > count_after_frame1);
+        // v9c: detect_count resets each frame, so frame 2 count should
+        // be equal to frame 1 count (same data), NOT accumulated.
+        check(13, "T13.2: frame 2 has same detection count (per-frame reset)", detect_count == count_after_frame1);
     end
 
     // ================================================================

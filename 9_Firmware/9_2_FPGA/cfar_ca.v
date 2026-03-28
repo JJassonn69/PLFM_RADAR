@@ -33,12 +33,30 @@
  *   2'b11 = Reserved (falls back to CA-CFAR)
  *
  * Threshold computation:
- *   threshold = (alpha * noise_sum) >> ALPHA_FRAC_BITS
- *   Host sets alpha in Q4.4 fixed-point, pre-compensated for training cell count.
- *   Example: for T=8 cells per side (16 total), desired Pfa=1e-4:
- *     alpha_statistical ≈ 4.88
- *     alpha_fpga = alpha_statistical / 16 = 0.305 → Q4.4 ≈ 0x05
- *   Or host can set alpha per training cell if it accounts for count.
+ *   threshold = (alpha_q44 * noise_sum) >> 4
+ *
+ *   For CA-CFAR, noise_sum = sum of all training cells (leading + lagging).
+ *   With T training cells per side (2*T total), noise_sum ≈ 2T * avg_cell_mag.
+ *   So effective threshold ≈ alpha_q44 * avg_cell_magnitude.
+ *
+ *   Host sets alpha in Q4.4 fixed-point. The alpha value is PRE-COMPENSATED
+ *   for training cell count — the division by cell count is implicit in the
+ *   fact that noise_sum is a SUM (not average) and the >>4 only removes the
+ *   Q4.4 fractional bits.
+ *
+ *   IMPORTANT: alpha_q44 directly controls the threshold-to-average ratio:
+ *     alpha_q44 = 0x03 (0.1875) → threshold ≈ 3x average  (very sensitive)
+ *     alpha_q44 = 0x05 (0.3125) → threshold ≈ 5x average  (Pfa ~ 1e-4)
+ *     alpha_q44 = 0x08 (0.5000) → threshold ≈ 8x average  (moderate)
+ *     alpha_q44 = 0x10 (1.0000) → threshold ≈ 16x average (conservative)
+ *     alpha_q44 = 0x30 (3.0000) → threshold ≈ 48x average (too high!)
+ *
+ *   Formula to convert from statistical alpha to Q4.4 register value:
+ *     alpha_q44 = (alpha_statistical / (2*T)) * 16
+ *   Example: T=8, alpha_statistical=4.88 (Pfa~1e-4):
+ *     alpha_q44 = (4.88 / 16) * 16 = 4.88 → Q4.4 ≈ 0x05
+ *
+ *   Default: 0x05 (0.3125, ~5x average, suitable for most scenarios).
  *
  * Edge handling:
  *   At range boundaries where the full window doesn't fit, only available
@@ -96,7 +114,12 @@ module cfar_ca #(
     // ========== STATUS ==========
     output reg [15:0] detect_count,
     output wire       cfar_busy,
-    output reg [7:0]  cfar_status
+    output reg [7:0]  cfar_status,
+
+    // ========== DEBUG COUNTERS (v9c) ==========
+    output reg [15:0] dbg_cells_processed,  // Total CUT cells evaluated in Phase 2
+    output reg [7:0]  dbg_cols_completed,   // Doppler columns completed in Phase 2
+    output reg [15:0] dbg_valid_count       // Total detect_valid pulses emitted
 );
 
 // ============================================================================
@@ -118,12 +141,13 @@ localparam [3:0] ST_IDLE       = 4'd0,
                  ST_COL_LOAD   = 4'd2,
                  ST_CFAR_INIT  = 4'd3,
                  ST_CFAR_THR   = 4'd4,  // Register noise_sum (mode select + cross-multiply)
-                 ST_CFAR_MUL   = 4'd8,  // Compute alpha * noise_sum_reg in DSP
-                 ST_CFAR_CMP   = 4'd5,  // Compare + update window
-                 ST_COL_NEXT   = 4'd6,
-                 ST_DONE       = 4'd7;
+                 ST_CFAR_MUL   = 4'd5,  // Compute alpha * noise_sum_reg in DSP
+                 ST_CFAR_CMP   = 4'd6,  // Compare + update window
+                 ST_COL_NEXT   = 4'd7,
+                 ST_DONE       = 4'd8;
 
-reg [3:0] state;
+// Prevent Vivado from re-encoding FSM states (same fix as usb_data_interface.v)
+(* fsm_encoding = "none" *) reg [3:0] state;
 assign cfar_busy = (state != ST_IDLE);
 
 // ============================================================================
@@ -290,10 +314,13 @@ always @(posedge clk or negedge reset_n) begin
         adaptive_thr   <= 0;
         r_guard        <= 4'd2;
         r_train        <= 5'd8;
-        r_alpha        <= 8'h30;
+        r_alpha        <= 8'h05;
         r_mode         <= 2'b00;
         r_enable       <= 1'b0;
         r_simple_thr   <= 16'd10000;
+        dbg_cells_processed <= 16'd0;
+        dbg_cols_completed  <= 8'd0;
+        dbg_valid_count     <= 16'd0;
     end else begin
         // Defaults: clear one-shot outputs
         detect_valid <= 1'b0;
@@ -320,6 +347,11 @@ always @(posedge clk or negedge reset_n) begin
                 // don't accumulate across multiple playback runs.
                 detect_count <= 16'd0;
 
+                // Reset debug counters for new frame
+                dbg_cells_processed <= 16'd0;
+                dbg_cols_completed  <= 8'd0;
+                dbg_valid_count     <= 16'd0;
+
                 // Buffer first sample
                 mag_we    <= 1'b1;
                 mag_waddr <= {range_bin_in, doppler_bin_in};
@@ -333,6 +365,7 @@ always @(posedge clk or negedge reset_n) begin
                     detect_doppler   <= doppler_bin_in;
                     detect_magnitude <= cur_mag;
                     detect_threshold <= {1'b0, cfg_simple_threshold};
+                    dbg_valid_count <= dbg_valid_count + 1;
                     if (cur_mag > {1'b0, cfg_simple_threshold})
                         detect_count <= 16'd1;
                 end
@@ -359,6 +392,7 @@ always @(posedge clk or negedge reset_n) begin
                     detect_doppler   <= doppler_bin_in;
                     detect_magnitude <= cur_mag;
                     detect_threshold <= {1'b0, r_simple_thr};
+                    dbg_valid_count <= dbg_valid_count + 1;
                     if (cur_mag > {1'b0, r_simple_thr})
                         detect_count <= detect_count + 1;
                 end
@@ -478,6 +512,8 @@ always @(posedge clk or negedge reset_n) begin
             detect_range     <= cut_idx[ROW_BITS-1:0];
             detect_doppler   <= col_idx;
             detect_valid     <= 1'b1;
+            dbg_cells_processed <= dbg_cells_processed + 1;
+            dbg_valid_count <= dbg_valid_count + 1;
 
             // Compare: threshold computed this cycle from noise_product
             begin : threshold_compare
@@ -514,6 +550,7 @@ always @(posedge clk or negedge reset_n) begin
         // ST_COL_NEXT: Advance to next Doppler column or finish
         // ================================================================
         ST_COL_NEXT: begin
+            dbg_cols_completed <= dbg_cols_completed + 1;
             if (col_idx < NUM_DOPPLER_BINS - 1) begin
                 col_idx      <= col_idx + 1;
                 col_load_idx <= 0;

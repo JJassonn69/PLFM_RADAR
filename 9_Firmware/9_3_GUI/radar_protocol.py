@@ -5,11 +5,13 @@ AERIS-10 Radar Protocol Layer
 Pure-logic module for FT601 packet parsing and command building.
 No GUI dependencies — safe to import from tests and headless scripts.
 
-Matches usb_data_interface.v v7c packet format exactly.
+Matches usb_data_interface.v v9 packet format.
 
-USB Packet Protocol (v7c — all transfers use BE=1111, 4-byte aligned):
+USB Packet Protocol (v9 — all transfers use BE=1111, 4-byte aligned):
   TX (FPGA→Host):
-    Data packet (24 bytes): [0xAA word] [range 4×4B] [0x55 word]
+    Range packet  (24 bytes): [0xAA word] [range 4×4B] [0x55 word]
+    Doppler packet(16 bytes): [0xCC word] [coords+I] [Q,I] [0x55 word]   (v9+)
+    CFAR packet   (16 bytes): [0xDD word] [detect report] [thresh] [0x55] (v9+)
     Status packet (40 bytes): [0xBB word] [config 6×4B] [debug 2×4B] [0x55 word]
   RX (Host→FPGA):
     Command word:  {opcode[31:24], addr[23:16], value[15:0]}
@@ -40,6 +42,8 @@ log = logging.getLogger("radar_protocol")
 # ============================================================================
 
 HEADER_BYTE = 0xAA
+HEADER_DOPPLER = 0xCC    # v9: Doppler cell packet
+HEADER_CFAR = 0xDD       # v9: CFAR detection packet
 FOOTER_BYTE = 0x55
 STATUS_HEADER_BYTE = 0xBB
 
@@ -239,6 +243,95 @@ class RadarProtocol:
         return result
 
     @staticmethod
+    def parse_doppler_packet(raw: bytes) -> Optional[Dict[str, Any]]:
+        """
+        Parse a v9 Doppler cell packet (0xCC header, 16 bytes).
+
+        Word 0: {24'h000000, 0xCC}      header
+        Word 1: {range_bin[5:0], doppler_bin[4:0], sub_frame, 4'b0000, I[15:0]}
+        Word 2: {Q[15:0], I[15:0]}      (I duplicated for easy parsing)
+        Word 3: {24'h000000, 0x55}      footer
+
+        All words are little-endian on USB (DATA[7:0] first).
+        """
+        if len(raw) < 16:
+            return None
+
+        w0 = struct.unpack_from("<I", raw, 0)[0]
+        w1 = struct.unpack_from("<I", raw, 4)[0]
+        w2 = struct.unpack_from("<I", raw, 8)[0]
+        w3 = struct.unpack_from("<I", raw, 12)[0]
+
+        if (w0 & 0xFF) != HEADER_DOPPLER:
+            return None
+        if (w3 & 0xFF) != FOOTER_BYTE:
+            return None
+
+        # Word 1: {range_bin[31:26], doppler_bin[25:21], sub_frame[20],
+        #           4'b0000[19:16], I[15:0]}
+        doppler_i = _to_signed16(w1 & 0xFFFF)
+        sub_frame = (w1 >> 20) & 0x01
+        doppler_bin = (w1 >> 21) & 0x1F
+        range_bin = (w1 >> 26) & 0x3F
+
+        # Word 2: {Q[31:16], I[15:0]}
+        doppler_q = _to_signed16((w2 >> 16) & 0xFFFF)
+        # I in lower 16 bits is a duplicate — we already have it from w1
+
+        return {
+            "range_bin": range_bin,
+            "doppler_bin": doppler_bin,
+            "sub_frame": sub_frame,
+            "doppler_i": doppler_i,
+            "doppler_q": doppler_q,
+        }
+
+    @staticmethod
+    def parse_cfar_packet(raw: bytes) -> Optional[Dict[str, Any]]:
+        """
+        Parse a v9 CFAR detection packet (0xDD header, 16 bytes).
+        Only sent for cells where detect_flag=1.
+
+        Word 0: {24'h000000, 0xDD}      header
+        Word 1: {flag[31], range[30:25], doppler[24:20], 3'b000[19:17],
+                  magnitude[16:0]}
+        Word 2: {15'b0[31:17], threshold[16:0]}
+        Word 3: {24'h000000, 0x55}      footer
+
+        All words are little-endian on USB (DATA[7:0] first).
+        """
+        if len(raw) < 16:
+            return None
+
+        w0 = struct.unpack_from("<I", raw, 0)[0]
+        w1 = struct.unpack_from("<I", raw, 4)[0]
+        w2 = struct.unpack_from("<I", raw, 8)[0]
+        w3 = struct.unpack_from("<I", raw, 12)[0]
+
+        if (w0 & 0xFF) != HEADER_CFAR:
+            return None
+        if (w3 & 0xFF) != FOOTER_BYTE:
+            return None
+
+        # Word 1: {flag[31], range[30:25], doppler[24:20], 3'b000[19:17],
+        #           magnitude[16:0]}
+        magnitude = w1 & 0x1FFFF         # [16:0]
+        doppler = (w1 >> 20) & 0x1F      # [24:20]
+        range_bin = (w1 >> 25) & 0x3F    # [30:25]
+        detect_flag = (w1 >> 31) & 0x01  # [31]
+
+        # Word 2: {15'b0, threshold[16:0]}
+        threshold = w2 & 0x1FFFF
+
+        return {
+            "detect_flag": detect_flag,
+            "range_bin": range_bin,
+            "doppler_bin": doppler,
+            "magnitude": magnitude,
+            "threshold": threshold,
+        }
+
+    @staticmethod
     def parse_status_packet(raw: bytes) -> Optional[StatusResponse]:
         """
         Parse a v7c status response packet.
@@ -332,16 +425,22 @@ class RadarProtocol:
 
         return sr
 
-    # v7c packet sizes (all BE=1111, 4-byte aligned)
-    V7C_DATA_PACKET_SIZE = 24    # 6 x 4 bytes (range-only)
-    V7C_STATUS_PACKET_SIZE = 40  # 10 x 4 bytes
+    # Packet sizes (all BE=1111, 4-byte aligned)
+    V7C_DATA_PACKET_SIZE = 24    # 6 x 4 bytes (range-only, 0xAA)
+    V7C_STATUS_PACKET_SIZE = 40  # 10 x 4 bytes (status, 0xBB)
+    V9_DOPPLER_PACKET_SIZE = 16  # 4 x 4 bytes (Doppler cell, 0xCC)
+    V9_CFAR_PACKET_SIZE = 16     # 4 x 4 bytes (CFAR detection, 0xDD)
 
     @staticmethod
     def find_packet_boundaries(buf: bytes) -> List[Tuple[int, int, str]]:
         """
-        Scan buffer for v7c packet start markers (4-byte aligned words).
-        Data:   AA 00 00 00  (word 0 of 24-byte packet)
-        Status: BB 00 00 00  (word 0 of 40-byte packet)
+        Scan buffer for packet start markers (4-byte aligned words).
+
+        Supported packet types:
+          0xAA 00 00 00 → Range data   (24 bytes, v7c+)
+          0xBB 00 00 00 → Status       (40 bytes, v7c+)
+          0xCC 00 00 00 → Doppler cell (16 bytes, v9+)
+          0xDD 00 00 00 → CFAR detect  (16 bytes, v9+)
 
         Returns list of (start_idx, expected_end_idx, packet_type).
         Only returns packets where the footer word is also valid.
@@ -350,23 +449,31 @@ class RadarProtocol:
         i = 0
         buf_len = len(buf)
         while i + 3 < buf_len:
-            # Check for header word at current 4-byte-aligned position
-            if buf[i] == HEADER_BYTE and buf[i+1] == 0 and buf[i+2] == 0 and buf[i+3] == 0:
-                end = i + RadarProtocol.V7C_DATA_PACKET_SIZE
-                if end <= buf_len:
-                    # Verify footer word
-                    if buf[end-4] == FOOTER_BYTE and buf[end-3] == 0 and buf[end-2] == 0 and buf[end-1] == 0:
-                        packets.append((i, end, "data"))
-                        i = end
-                        continue
+            b0 = buf[i]
+            if buf[i+1] == 0 and buf[i+2] == 0 and buf[i+3] == 0:
+                # Determine packet type and size from header byte
+                if b0 == HEADER_BYTE:
+                    pkt_size = RadarProtocol.V7C_DATA_PACKET_SIZE
+                    pkt_type = "data"
+                elif b0 == STATUS_HEADER_BYTE:
+                    pkt_size = RadarProtocol.V7C_STATUS_PACKET_SIZE
+                    pkt_type = "status"
+                elif b0 == HEADER_DOPPLER:
+                    pkt_size = RadarProtocol.V9_DOPPLER_PACKET_SIZE
+                    pkt_type = "doppler"
+                elif b0 == HEADER_CFAR:
+                    pkt_size = RadarProtocol.V9_CFAR_PACKET_SIZE
+                    pkt_type = "cfar"
                 else:
-                    break  # Not enough data for full packet
-            elif buf[i] == STATUS_HEADER_BYTE and buf[i+1] == 0 and buf[i+2] == 0 and buf[i+3] == 0:
-                end = i + RadarProtocol.V7C_STATUS_PACKET_SIZE
+                    i += 1
+                    continue
+
+                end = i + pkt_size
                 if end <= buf_len:
                     # Verify footer word
-                    if buf[end-4] == FOOTER_BYTE and buf[end-3] == 0 and buf[end-2] == 0 and buf[end-1] == 0:
-                        packets.append((i, end, "status"))
+                    if (buf[end-4] == FOOTER_BYTE and buf[end-3] == 0
+                            and buf[end-2] == 0 and buf[end-1] == 0):
+                        packets.append((i, end, pkt_type))
                         i = end
                         continue
                 else:
@@ -1273,11 +1380,15 @@ class RadarAcquisition(threading.Thread):
     Background thread: reads from FT601, parses packets, assembles frames,
     and pushes complete frames to the display queue.
 
-    Supports two modes:
-    - v7c live mode (range-only): Each data packet = one range bin.
+    Supports three modes:
+    - range_only mode (stream_control=0x01): Each 0xAA packet = one range bin.
       Collects NUM_RANGE_BINS samples to form a frame (no Doppler from FPGA).
-    - Mock/replay mode (full): Each data packet = one (range, Doppler) cell.
-      Collects NUM_CELLS = NUM_RANGE_BINS * NUM_DOPPLER_BINS to form a frame.
+    - v9 full pipeline mode (stream_control=0x03 or 0x07): Independent
+      0xAA range, 0xCC Doppler, and 0xDD CFAR packets. Doppler and CFAR
+      packets carry range_bin/doppler_bin coordinates and are placed directly.
+      Frame is finalized when all expected Doppler packets (2048) arrive,
+      or on a timeout after the last range packet.
+    - Mock/replay mode (full): Legacy sequential cell mode.
     """
 
     def __init__(self, connection, frame_queue: queue.Queue,
@@ -1296,9 +1407,23 @@ class RadarAcquisition(threading.Thread):
         self._range_only = range_only
         # Buffer for incomplete data across reads
         self._residual = b""
+        # v9 full pipeline counters (for frame assembly from independent streams)
+        self._range_count = 0      # 0xAA packets received in current frame
+        self._doppler_count = 0    # 0xCC packets received in current frame
+        self._cfar_count = 0       # 0xDD packets received in current frame
+        self._got_doppler = False   # True once any 0xCC packet arrives
+        self._got_cfar = False      # True once any 0xDD packet arrives
+        # Chirp tracking for range-only profile (last chirp's data)
+        self._chirp_range_profile = np.zeros(NUM_RANGE_BINS, dtype=np.float64)
+        self._range_bin_idx = 0    # sequential range bin within chirp
 
     def stop(self):
         self._stop_event.set()
+
+    @property
+    def _v9_mode(self) -> bool:
+        """True if we're receiving v9 Doppler/CFAR packets (not mock/replay)."""
+        return self._got_doppler or self._got_cfar
 
     def run(self):
         log.info(f"Acquisition thread started "
@@ -1333,8 +1458,20 @@ class RadarAcquisition(threading.Thread):
                     if parsed is not None:
                         if self._range_only:
                             self._ingest_range_sample(parsed)
+                        elif self._v9_mode:
+                            self._ingest_v9_range(parsed)
                         else:
                             self._ingest_sample(parsed)
+                elif ptype == "doppler":
+                    parsed = RadarProtocol.parse_doppler_packet(raw[start:end])
+                    if parsed is not None:
+                        self._got_doppler = True
+                        self._ingest_v9_doppler(parsed)
+                elif ptype == "cfar":
+                    parsed = RadarProtocol.parse_cfar_packet(raw[start:end])
+                    if parsed is not None:
+                        self._got_cfar = True
+                        self._ingest_v9_cfar(parsed)
                 elif ptype == "status":
                     status = RadarProtocol.parse_status_packet(raw[start:end])
                     if status is not None:
@@ -1353,6 +1490,8 @@ class RadarAcquisition(threading.Thread):
                                 log.error(f"Status callback error: {e}")
 
         log.info("Acquisition thread stopped")
+
+    # -- Range-only mode (v7c/v8c, stream_control=0x01) --
 
     def _ingest_range_sample(self, sample: Dict):
         """
@@ -1382,6 +1521,8 @@ class RadarAcquisition(threading.Thread):
         if self._sample_idx >= NUM_RANGE_BINS:
             self._finalize_frame()
 
+    # -- Mock/replay sequential mode (legacy) --
+
     def _ingest_sample(self, sample: Dict):
         """Place sample into current frame and emit when complete (mock/replay mode)."""
         rbin = self._sample_idx // NUM_DOPPLER_BINS
@@ -1402,6 +1543,115 @@ class RadarAcquisition(threading.Thread):
 
         if self._sample_idx >= NUM_CELLS:
             self._finalize_frame()
+
+    # -- v9 full pipeline mode (independent 0xAA/0xCC/0xDD packets) --
+
+    def _ingest_v9_range(self, sample: Dict):
+        """
+        Ingest a v9 range packet (0xAA) in full pipeline mode.
+
+        Range packets arrive as 32 chirps × 64 bins = 2048 packets.
+        We track the last chirp's range profile for display, updating
+        the range profile on each bin. The range-Doppler heatmap is
+        populated from 0xCC Doppler packets instead.
+        """
+        rbin = self._range_bin_idx
+
+        if rbin < NUM_RANGE_BINS:
+            ri = sample["range_i"]
+            rq = sample["range_q"]
+            mag = abs(ri) + abs(rq)
+            self._chirp_range_profile[rbin] = mag
+
+        self._range_bin_idx += 1
+        self._range_count += 1
+
+        if self._range_bin_idx >= NUM_RANGE_BINS:
+            self._range_bin_idx = 0  # Reset for next chirp
+            # Copy current chirp's range profile (last chirp wins for display)
+            self._frame.range_profile[:] = self._chirp_range_profile
+
+    def _ingest_v9_doppler(self, sample: Dict):
+        """
+        Ingest a v9 Doppler packet (0xCC) in full pipeline mode.
+
+        Each packet carries its own range_bin/doppler_bin coordinates,
+        so we place it directly into the range-Doppler map.
+        Frame is finalized when we've received NUM_CELLS (2048) Doppler
+        packets, representing the complete 64×32 map.
+        """
+        rbin = sample["range_bin"]
+        dbin = sample["doppler_bin"]
+
+        if 0 <= rbin < NUM_RANGE_BINS and 0 <= dbin < NUM_DOPPLER_BINS:
+            di = sample["doppler_i"]
+            dq = sample["doppler_q"]
+            self._frame.range_doppler_i[rbin, dbin] = di
+            self._frame.range_doppler_q[rbin, dbin] = dq
+            mag = abs(int(di)) + abs(int(dq))
+            self._frame.magnitude[rbin, dbin] = mag
+
+        self._doppler_count += 1
+
+        if self._doppler_count >= NUM_CELLS:
+            # All Doppler cells received — finalize the frame
+            self._finalize_v9_frame()
+
+    def _ingest_v9_cfar(self, sample: Dict):
+        """
+        Ingest a v9 CFAR detection packet (0xDD) in full pipeline mode.
+
+        Each packet carries range_bin/doppler_bin coordinates and the
+        detection flag (always 1 since only detections are sent).
+        """
+        rbin = sample["range_bin"]
+        dbin = sample["doppler_bin"]
+
+        if 0 <= rbin < NUM_RANGE_BINS and 0 <= dbin < NUM_DOPPLER_BINS:
+            if sample["detect_flag"]:
+                self._frame.detections[rbin, dbin] = 1
+                self._frame.detection_count += 1
+
+        self._cfar_count += 1
+
+    def _finalize_v9_frame(self):
+        """
+        Finalize a v9 frame after all Doppler packets received.
+        The range profile comes from accumulated 0xAA packets (last chirp),
+        or from the magnitude map if range packets weren't streamed.
+        """
+        self._frame.timestamp = time.time()
+        self._frame.frame_number = self._frame_num
+
+        # If no range packets were received (doppler-only mode),
+        # derive range profile from the Doppler magnitude map
+        if self._range_count == 0:
+            self._frame.range_profile = np.sum(self._frame.magnitude, axis=1)
+
+        log.info(f"v9 frame {self._frame_num}: "
+                 f"range={self._range_count} doppler={self._doppler_count} "
+                 f"cfar={self._cfar_count} detections={self._frame.detection_count}")
+
+        # Push to display queue (drop old if backed up)
+        try:
+            self.frame_queue.put_nowait(self._frame)
+        except queue.Full:
+            try:
+                self.frame_queue.get_nowait()
+            except queue.Empty:
+                pass
+            self.frame_queue.put_nowait(self._frame)
+
+        if self.recorder and self.recorder.recording:
+            self.recorder.record_frame(self._frame)
+
+        self._frame_num += 1
+        self._frame = RadarFrame()
+        self._range_count = 0
+        self._doppler_count = 0
+        self._cfar_count = 0
+        self._range_bin_idx = 0
+        self._chirp_range_profile[:] = 0
 
     def _finalize_frame(self):
         """Complete frame: compute range profile, push to queue, record."""

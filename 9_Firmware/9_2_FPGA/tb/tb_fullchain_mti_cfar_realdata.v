@@ -243,7 +243,10 @@ cfar_ca cfar_inst (
     .detect_threshold(cfar_detect_threshold),
     .detect_count(cfar_detect_count),
     .cfar_busy(cfar_busy),
-    .cfar_status(cfar_status_w)
+    .cfar_status(cfar_status_w),
+    .dbg_cells_processed(),
+    .dbg_cols_completed(),
+    .dbg_valid_count()
 );
 
 // Internal DUT state (for debug)

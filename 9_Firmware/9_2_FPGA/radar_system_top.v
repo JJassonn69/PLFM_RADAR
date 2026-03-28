@@ -795,7 +795,7 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
         // CFAR defaults (disabled by default — backward-compatible)
         host_cfar_guard         <= 4'd2;      // 2 guard cells each side
         host_cfar_train         <= 5'd8;      // 8 training cells each side
-        host_cfar_alpha         <= 8'h30;     // alpha=3.0 (Q4.4)
+        host_cfar_alpha         <= 8'h05;     // alpha=0.3125 (Q4.4), ~5x avg (Pfa~1e-4)
         host_cfar_mode          <= 2'b00;     // CA-CFAR
         host_cfar_enable        <= 1'b0;      // Disabled (simple threshold)
         // Ground clutter removal defaults (disabled — backward-compatible)

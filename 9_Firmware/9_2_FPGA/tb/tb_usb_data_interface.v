@@ -134,7 +134,13 @@ module tb_usb_data_interface;
         // Self-test status readback
         .status_self_test_flags (status_self_test_flags),
         .status_self_test_detail(status_self_test_detail),
-        .status_self_test_busy  (status_self_test_busy)
+        .status_self_test_busy  (status_self_test_busy),
+
+        // CFAR debug counters (v9c)
+        .cfar_dbg_cells_processed(16'd0),
+        .cfar_dbg_cols_completed(8'd0),
+        .cfar_dbg_valid_count(16'd0),
+        .cfar_detect_count(16'd0)
     );
 
     // ── Test bookkeeping ───────────────────────────────────────

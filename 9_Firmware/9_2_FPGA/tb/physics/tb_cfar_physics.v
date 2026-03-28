@@ -110,7 +110,10 @@ cfar_ca dut (
     .detect_threshold(detect_threshold),
     .detect_count(detect_count),
     .cfar_busy(cfar_busy),
-    .cfar_status(cfar_status)
+    .cfar_status(cfar_status),
+    .dbg_cells_processed(),
+    .dbg_cols_completed(),
+    .dbg_valid_count()
 );
 
 // ==========================================================================

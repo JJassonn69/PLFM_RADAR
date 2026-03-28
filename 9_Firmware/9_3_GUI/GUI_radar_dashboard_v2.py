@@ -556,6 +556,12 @@ class RadarDashboardV2:
         self._vmax_alpha = 0.15
         self._pending_status: Optional[StatusResponse] = None
 
+        # Playback progress tracking (32 chirps = 32 frames per playback)
+        self._playback_total_frames = 32  # NUM_CHIRPS in BRAM
+        self._playback_frame_count = 0    # Frames received in current playback
+        self._playback_active = False
+        self._playback_idle_ticks = 0     # 100ms ticks with no new frames
+
         # New V2 state
         self._tracker = TargetTracker()
         self._current_gps = GPSData(latitude=41.9028, longitude=12.4964)
@@ -599,6 +605,10 @@ class RadarDashboardV2:
 
         self.lbl_frame = ttk.Label(top, text="Frame: 0", font=("Menlo", 10))
         self.lbl_frame.pack(side="left", padx=16)
+
+        self.lbl_playback = ttk.Label(top, text="Playback: Idle",
+                                       font=("Menlo", 10), foreground=FG)
+        self.lbl_playback.pack(side="left", padx=16)
 
         self.lbl_tracks = ttk.Label(top, text="Tracks: 0", font=("Menlo", 10))
         self.lbl_tracks.pack(side="left", padx=16)
@@ -685,6 +695,8 @@ class RadarDashboardV2:
             aspect="auto", cmap="inferno", origin="lower",
             extent=[vel_lo, vel_hi, 0, max_range], vmin=0, vmax=1000)
         self.ax_rd.set_title("Range-Doppler Map", color=FG, fontsize=12)
+        if self._range_only:
+            self.ax_rd.set_title("Range Profile (range-only mode)", color=FG, fontsize=12)
         self.ax_rd.set_xlabel("Velocity (m/s)", color=FG)
         self.ax_rd.set_ylabel("Range (m)", color=FG)
         self.ax_rd.tick_params(colors=FG)
@@ -795,7 +807,7 @@ class RadarDashboardV2:
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
         buttons = [
-            ("Trigger Chirp (0x02)", 0x02, 1),
+            ("Play Data (0x02)", 0x02, 1),
             ("Enable MTI (0x26)", 0x26, 1),
             ("Disable MTI (0x26)", 0x26, 0),
             ("Enable CFAR (0x25)", 0x25, 1),
@@ -960,9 +972,8 @@ class RadarDashboardV2:
     def _on_connect(self):
         if self.conn.is_open:
             # Disable streaming before disconnect
-            if self._range_only:
-                self._send_cmd(Opcode.STREAM_CONTROL, 0x00)
-                log.info("Sent stream_control=0x00 (disable streaming)")
+            self._send_cmd(Opcode.STREAM_CONTROL, 0x00)
+            log.info("Sent stream_control=0x00 (disable streaming)")
             if self._acq_thread is not None:
                 self._acq_thread.stop()
                 self._acq_thread.join(timeout=2)
@@ -1002,10 +1013,17 @@ class RadarDashboardV2:
                 status_callback=self._on_status_received,
                 range_only=self._range_only)
             self._acq_thread.start()
-            # In live mode, enable range-only streaming on the FPGA
+            # Enable streaming on the FPGA
             if self._range_only:
                 self._send_cmd(Opcode.STREAM_CONTROL, 0x01)
                 log.info("Sent stream_control=0x01 (range-only enable)")
+            else:
+                # v9 full pipeline: enable range + Doppler + CFAR streaming
+                # First enable CFAR on FPGA, then set stream_control=0x07
+                self._send_cmd(Opcode.CFAR_ENABLE, 1)
+                self._send_cmd(Opcode.STREAM_CONTROL, 0x07)
+                log.info("Sent cfar_enable=1, stream_control=0x07 "
+                         "(v9 full pipeline)")
             log.info("Connected and acquisition started")
         else:
             self.lbl_status.config(text="CONNECT FAILED", foreground=RED)
@@ -1028,6 +1046,14 @@ class RadarDashboardV2:
         cmd = RadarProtocol.build_command(opcode, value)
         ok = self.conn.write(cmd)
         log.info(f"CMD 0x{opcode:02X} val={value} ({'OK' if ok else 'FAIL'})")
+        # Reset playback progress on new trigger
+        if opcode == Opcode.TRIGGER and ok:
+            self._playback_frame_count = 0
+            self._playback_active = True
+            self._playback_idle_ticks = 0
+            self.lbl_playback.config(
+                text=f"Playback: 0/{self._playback_total_frames}",
+                foreground=YELLOW)
 
     def _send_validated_param(self, opcode: int, var: tk.StringVar):
         """Validate a numeric parameter entry, clamp to RTL range, and send."""
@@ -1264,18 +1290,43 @@ class RadarDashboardV2:
             self._pending_status = None
             self._update_self_test_labels(status)
 
-        frame = None
+        # Drain all queued frames — accumulate each into the waterfall
+        # but only render the last one's heatmap (for performance).
+        frames = []
         while True:
             try:
-                frame = self.frame_queue.get_nowait()
+                frames.append(self.frame_queue.get_nowait())
             except queue.Empty:
                 break
 
-        if frame is None:
+        if not frames:
+            # No new frames — check if playback just finished
+            if self._playback_active:
+                self._playback_idle_ticks += 1
+                if self._playback_idle_ticks >= 10:  # 1 second with no frames
+                    self._playback_active = False
+                    self.lbl_playback.config(
+                        text=f"Playback: Done ({self._playback_frame_count}/{self._playback_total_frames})",
+                        foreground=GREEN)
             return
 
+        # Accumulate ALL frames into waterfall so none are lost
+        for f in frames:
+            self._waterfall.append(f.range_profile.copy())
+
+        self._frame_count += len(frames)
+
+        # Playback progress tracking
+        if not self._playback_active:
+            # New playback started
+            self._playback_active = True
+            self._playback_frame_count = 0
+        self._playback_idle_ticks = 0
+        self._playback_frame_count += len(frames)
+
+        # Use the last frame for heatmap / label rendering
+        frame = frames[-1]
         self._current_frame = frame
-        self._frame_count += 1
 
         # FPS
         now = time.time()
@@ -1357,17 +1408,23 @@ class RadarDashboardV2:
             else:
                 self._track_scatter.set_offsets(np.empty((0, 2)))
 
-        # Waterfall (works in both modes)
-        self._waterfall.append(frame.range_profile.copy())
+        # Waterfall — already accumulated above, just render
         wf_arr = np.array(list(self._waterfall))
         wf_max = max(np.max(wf_arr), 1.0)
         self._wf_img.set_data(wf_arr)
         self._wf_img.set_clim(vmin=0, vmax=wf_max)
 
+        # Playback progress indicator
+        if self._playback_active:
+            pct = min(100, int(100 * self._playback_frame_count / self._playback_total_frames))
+            self.lbl_playback.config(
+                text=f"Playback: {self._playback_frame_count}/{self._playback_total_frames} ({pct}%)",
+                foreground=YELLOW if pct < 100 else GREEN)
+
         self._canvas.draw_idle()
 
-        # Update targets treeview (every 5th frame to reduce overhead)
-        if not self._range_only and frame.frame_number % 5 == 0:
+        # Update targets treeview (every frame in v9 mode, every 5th in legacy)
+        if not self._range_only:
             self._update_targets_tree()
 
     def _update_targets_tree(self):
@@ -1437,10 +1494,27 @@ def main():
                         help="FT601 device index (default: 0)")
     parser.add_argument("--moving-target", action="store_true",
                         help="Mock mode: simulate approaching target")
+    parser.add_argument("--v9", action="store_true",
+                        help="v9 full pipeline: stream_control=0x07 "
+                             "(range + Doppler + CFAR from FPGA)")
+    parser.add_argument("--range-only", action="store_true",
+                        help="Force range-only mode (stream_control=0x01) "
+                             "even with --live/--remote")
     args = parser.parse_args()
 
-    # Determine range-only mode: live, remote, and mock all use v7c range-only
-    range_only = not args.replay  # replay has full Doppler data
+    # Determine range-only mode:
+    # - --v9 flag: full pipeline (range_only=False) for live/remote
+    # - --range-only flag: force range-only mode
+    # - --replay: always full mode (has Doppler data)
+    # - default for live/remote/mock: range-only (v8c compatible)
+    if args.replay:
+        range_only = False
+    elif args.v9:
+        range_only = False
+    elif args.range_only:
+        range_only = True
+    else:
+        range_only = True  # safe default for live/remote/mock
 
     if args.replay:
         npy_dir = os.path.abspath(args.replay)
@@ -1480,7 +1554,8 @@ def main():
         root.destroy()
 
     root.protocol("WM_DELETE_WINDOW", on_closing)
-    log.info(f"Dashboard V2 started (mode={mode_str}, range_only={range_only})")
+    log.info(f"Dashboard V2 started (mode={mode_str}, range_only={range_only}"
+             f"{', v9_pipeline' if args.v9 else ''})")
 
     # Auto-connect in all modes (mock, live, replay)
     root.after(200, dashboard._on_connect)

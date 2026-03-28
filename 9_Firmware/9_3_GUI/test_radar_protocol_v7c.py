@@ -29,10 +29,13 @@ from radar_protocol import (
     SocketConnection,
     RadarAcquisition,
     HEADER_BYTE,
+    HEADER_DOPPLER,
+    HEADER_CFAR,
     FOOTER_BYTE,
     STATUS_HEADER_BYTE,
     NUM_RANGE_BINS,
     NUM_DOPPLER_BINS,
+    NUM_CELLS,
     Opcode,
     _to_signed16,
 )
@@ -95,6 +98,60 @@ def make_status_packet(
     struct.pack_into("<I", buf, 32, w8)
     # Word 9: 55 footer
     struct.pack_into("<I", buf, 36, 0x00000055)
+    return bytes(buf)
+
+
+def make_doppler_packet(range_bin: int, doppler_bin: int,
+                        doppler_i: int, doppler_q: int,
+                        sub_frame: int = 0) -> bytes:
+    """Build a synthetic v9 Doppler packet (16 bytes, 4 x LE words).
+
+    Word 0: {24'h000000, 0xCC}
+    Word 1: {range_bin[5:0], doppler_bin[4:0], sub_frame, 4'b0000, I[15:0]}
+    Word 2: {Q[15:0], I[15:0]}
+    Word 3: {24'h000000, 0x55}
+    """
+    buf = bytearray(16)
+    struct.pack_into("<I", buf, 0, 0x000000CC)
+
+    i_unsigned = doppler_i & 0xFFFF
+    q_unsigned = doppler_q & 0xFFFF
+    w1 = (i_unsigned
+          | ((sub_frame & 0x01) << 20)
+          | ((doppler_bin & 0x1F) << 21)
+          | ((range_bin & 0x3F) << 26))
+    struct.pack_into("<I", buf, 4, w1)
+
+    w2 = ((q_unsigned << 16) | i_unsigned) & 0xFFFFFFFF
+    struct.pack_into("<I", buf, 8, w2)
+
+    struct.pack_into("<I", buf, 12, 0x00000055)
+    return bytes(buf)
+
+
+def make_cfar_packet(range_bin: int, doppler_bin: int,
+                     magnitude: int, threshold: int,
+                     detect_flag: int = 1) -> bytes:
+    """Build a synthetic v9 CFAR detection packet (16 bytes, 4 x LE words).
+
+    Word 0: {24'h000000, 0xDD}
+    Word 1: {flag[31], range[30:25], doppler[24:20], 3'b000[19:17], magnitude[16:0]}
+    Word 2: {15'b0[31:17], threshold[16:0]}
+    Word 3: {24'h000000, 0x55}
+    """
+    buf = bytearray(16)
+    struct.pack_into("<I", buf, 0, 0x000000DD)
+
+    w1 = ((magnitude & 0x1FFFF)
+          | ((doppler_bin & 0x1F) << 20)
+          | ((range_bin & 0x3F) << 25)
+          | ((detect_flag & 0x01) << 31))
+    struct.pack_into("<I", buf, 4, w1)
+
+    w2 = threshold & 0x1FFFF
+    struct.pack_into("<I", buf, 8, w2)
+
+    struct.pack_into("<I", buf, 12, 0x00000055)
     return bytes(buf)
 
 
@@ -974,6 +1031,537 @@ class TestSocketConnection(unittest.TestCase):
         boundaries = RadarProtocol.find_packet_boundaries(data)
         self.assertEqual(len(boundaries), NUM_RANGE_BINS)
         conn.close()
+
+
+# ============================================================================
+# Test: Multi-frame waterfall accumulation (GUI display fix)
+# ============================================================================
+
+class TestMultiFrameWaterfall(unittest.TestCase):
+    """
+    Validates that when multiple RadarFrames are queued, all are accumulated
+    into the waterfall — not just the last one. This was the root cause of
+    the 'only one frame visible' bug in GUI_radar_dashboard_v2.py.
+
+    Tests the core logic without requiring a tkinter display.
+    """
+
+    def test_all_frames_reach_waterfall(self):
+        """All 32 frames from a BRAM playback appear in the waterfall."""
+        from collections import deque
+        WATERFALL_DEPTH = 128  # matches radar_protocol.py
+
+        waterfall = deque(maxlen=WATERFALL_DEPTH)
+        for _ in range(WATERFALL_DEPTH):
+            waterfall.append(np.zeros(NUM_RANGE_BINS))
+
+        frame_queue = queue.Queue(maxsize=64)
+
+        # Simulate 32 frames arriving (one per chirp in BRAM playback)
+        num_playback_frames = 32
+        for chirp in range(num_playback_frames):
+            frame = RadarFrame()
+            # Each chirp has a distinct range profile
+            frame.range_profile = np.full(NUM_RANGE_BINS, float(chirp + 1))
+            frame.frame_number = chirp
+            frame_queue.put_nowait(frame)
+
+        # Simulate the FIXED _update_display logic:
+        # Drain all frames, accumulate each into waterfall
+        frames = []
+        while True:
+            try:
+                frames.append(frame_queue.get_nowait())
+            except queue.Empty:
+                break
+
+        for f in frames:
+            waterfall.append(f.range_profile.copy())
+
+        # Verify all 32 frames were collected
+        self.assertEqual(len(frames), num_playback_frames)
+
+        # Verify the waterfall has the data from all 32 frames
+        # (last 32 entries should be the chirp data, rest zeros)
+        wf_arr = np.array(list(waterfall))
+        for i in range(num_playback_frames):
+            row_idx = WATERFALL_DEPTH - num_playback_frames + i
+            expected_val = float(i + 1)
+            self.assertAlmostEqual(
+                wf_arr[row_idx, 0], expected_val,
+                msg=f"Waterfall row {row_idx} (chirp {i}) should be {expected_val}")
+
+    def test_old_drain_loses_frames(self):
+        """Demonstrate that the OLD logic (keep only last) loses waterfall data."""
+        from collections import deque
+        WATERFALL_DEPTH = 128
+
+        waterfall = deque(maxlen=WATERFALL_DEPTH)
+        for _ in range(WATERFALL_DEPTH):
+            waterfall.append(np.zeros(NUM_RANGE_BINS))
+
+        frame_queue = queue.Queue(maxsize=64)
+
+        # Simulate 32 frames
+        for chirp in range(32):
+            frame = RadarFrame()
+            frame.range_profile = np.full(NUM_RANGE_BINS, float(chirp + 1))
+            frame_queue.put_nowait(frame)
+
+        # OLD logic: drain queue, keep only last frame
+        frame = None
+        while True:
+            try:
+                frame = frame_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        # Only append the last frame to waterfall
+        if frame is not None:
+            waterfall.append(frame.range_profile.copy())
+
+        # The waterfall should only have 1 non-zero row (the bug)
+        wf_arr = np.array(list(waterfall))
+        nonzero_rows = np.count_nonzero(np.sum(wf_arr, axis=1))
+        self.assertEqual(nonzero_rows, 1,
+                         "Old logic should only append 1 frame (the bug)")
+
+    def test_incremental_updates(self):
+        """Frames arriving across multiple update cycles all reach waterfall."""
+        from collections import deque
+        WATERFALL_DEPTH = 128
+
+        waterfall = deque(maxlen=WATERFALL_DEPTH)
+        for _ in range(WATERFALL_DEPTH):
+            waterfall.append(np.zeros(NUM_RANGE_BINS))
+
+        frame_queue = queue.Queue(maxsize=64)
+        total_frames_seen = 0
+
+        # Simulate 4 update cycles, each receiving 8 frames (32 total)
+        for cycle in range(4):
+            for i in range(8):
+                chirp = cycle * 8 + i
+                frame = RadarFrame()
+                frame.range_profile = np.full(NUM_RANGE_BINS, float(chirp + 1))
+                frame_queue.put_nowait(frame)
+
+            # Fixed drain logic
+            frames = []
+            while True:
+                try:
+                    frames.append(frame_queue.get_nowait())
+                except queue.Empty:
+                    break
+
+            for f in frames:
+                waterfall.append(f.range_profile.copy())
+            total_frames_seen += len(frames)
+
+        self.assertEqual(total_frames_seen, 32)
+
+        # Last 32 waterfall rows should have data
+        wf_arr = np.array(list(waterfall))
+        nonzero_rows = np.count_nonzero(np.sum(wf_arr, axis=1))
+        self.assertEqual(nonzero_rows, 32)
+
+
+# ============================================================================
+# v9: parse_doppler_packet()
+# ============================================================================
+
+class TestParseDopplerPacket(unittest.TestCase):
+    """Tests for v9 16-byte Doppler cell packet parsing."""
+
+    def test_basic_values(self):
+        pkt = make_doppler_packet(range_bin=10, doppler_bin=5,
+                                  doppler_i=1000, doppler_q=500)
+        result = RadarProtocol.parse_doppler_packet(pkt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["range_bin"], 10)
+        self.assertEqual(result["doppler_bin"], 5)
+        self.assertEqual(result["doppler_i"], 1000)
+        self.assertEqual(result["doppler_q"], 500)
+        self.assertEqual(result["sub_frame"], 0)
+
+    def test_negative_iq(self):
+        pkt = make_doppler_packet(range_bin=0, doppler_bin=0,
+                                  doppler_i=-100, doppler_q=-200)
+        result = RadarProtocol.parse_doppler_packet(pkt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["doppler_i"], -100)
+        self.assertEqual(result["doppler_q"], -200)
+
+    def test_max_bin_values(self):
+        pkt = make_doppler_packet(range_bin=63, doppler_bin=31,
+                                  doppler_i=32767, doppler_q=-32768,
+                                  sub_frame=1)
+        result = RadarProtocol.parse_doppler_packet(pkt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["range_bin"], 63)
+        self.assertEqual(result["doppler_bin"], 31)
+        self.assertEqual(result["doppler_i"], 32767)
+        self.assertEqual(result["doppler_q"], -32768)
+        self.assertEqual(result["sub_frame"], 1)
+
+    def test_zero_values(self):
+        pkt = make_doppler_packet(range_bin=0, doppler_bin=0,
+                                  doppler_i=0, doppler_q=0)
+        result = RadarProtocol.parse_doppler_packet(pkt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["doppler_i"], 0)
+        self.assertEqual(result["doppler_q"], 0)
+
+    def test_too_short(self):
+        result = RadarProtocol.parse_doppler_packet(b"\xCC\x00\x00\x00" + b"\x00" * 8)
+        self.assertIsNone(result)
+
+    def test_bad_header(self):
+        pkt = bytearray(make_doppler_packet(1, 1, 100, 200))
+        pkt[0] = 0xAA  # wrong header
+        result = RadarProtocol.parse_doppler_packet(bytes(pkt))
+        self.assertIsNone(result)
+
+    def test_bad_footer(self):
+        pkt = bytearray(make_doppler_packet(1, 1, 100, 200))
+        pkt[12] = 0xCC  # corrupt footer
+        result = RadarProtocol.parse_doppler_packet(bytes(pkt))
+        self.assertIsNone(result)
+
+
+# ============================================================================
+# v9: parse_cfar_packet()
+# ============================================================================
+
+class TestParseCfarPacket(unittest.TestCase):
+    """Tests for v9 16-byte CFAR detection packet parsing."""
+
+    def test_basic_detection(self):
+        pkt = make_cfar_packet(range_bin=20, doppler_bin=10,
+                               magnitude=5000, threshold=3000,
+                               detect_flag=1)
+        result = RadarProtocol.parse_cfar_packet(pkt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["detect_flag"], 1)
+        self.assertEqual(result["range_bin"], 20)
+        self.assertEqual(result["doppler_bin"], 10)
+        self.assertEqual(result["magnitude"], 5000)
+        self.assertEqual(result["threshold"], 3000)
+
+    def test_max_values(self):
+        # 17-bit magnitude max = 131071
+        pkt = make_cfar_packet(range_bin=63, doppler_bin=31,
+                               magnitude=131071, threshold=131071,
+                               detect_flag=1)
+        result = RadarProtocol.parse_cfar_packet(pkt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["range_bin"], 63)
+        self.assertEqual(result["doppler_bin"], 31)
+        self.assertEqual(result["magnitude"], 131071)
+        self.assertEqual(result["threshold"], 131071)
+
+    def test_zero_magnitude(self):
+        pkt = make_cfar_packet(range_bin=0, doppler_bin=0,
+                               magnitude=0, threshold=0,
+                               detect_flag=1)
+        result = RadarProtocol.parse_cfar_packet(pkt)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["magnitude"], 0)
+        self.assertEqual(result["threshold"], 0)
+
+    def test_too_short(self):
+        result = RadarProtocol.parse_cfar_packet(b"\xDD\x00\x00\x00" + b"\x00" * 8)
+        self.assertIsNone(result)
+
+    def test_bad_header(self):
+        pkt = bytearray(make_cfar_packet(5, 5, 1000, 500))
+        pkt[0] = 0xBB  # wrong header
+        result = RadarProtocol.parse_cfar_packet(bytes(pkt))
+        self.assertIsNone(result)
+
+    def test_bad_footer(self):
+        pkt = bytearray(make_cfar_packet(5, 5, 1000, 500))
+        pkt[12] = 0xAA  # corrupt footer
+        result = RadarProtocol.parse_cfar_packet(bytes(pkt))
+        self.assertIsNone(result)
+
+
+# ============================================================================
+# v9: find_packet_boundaries() with mixed packet types
+# ============================================================================
+
+class TestFindPacketBoundariesV9(unittest.TestCase):
+    """Tests for scanning buffers with all v9 packet types."""
+
+    def test_single_doppler_packet(self):
+        pkt = make_doppler_packet(5, 3, 100, 200)
+        result = RadarProtocol.find_packet_boundaries(pkt)
+        self.assertEqual(len(result), 1)
+        start, end, ptype = result[0]
+        self.assertEqual(start, 0)
+        self.assertEqual(end, 16)
+        self.assertEqual(ptype, "doppler")
+
+    def test_single_cfar_packet(self):
+        pkt = make_cfar_packet(10, 8, 5000, 3000)
+        result = RadarProtocol.find_packet_boundaries(pkt)
+        self.assertEqual(len(result), 1)
+        start, end, ptype = result[0]
+        self.assertEqual(start, 0)
+        self.assertEqual(end, 16)
+        self.assertEqual(ptype, "cfar")
+
+    def test_mixed_all_types(self):
+        """Buffer with range + doppler + cfar + status packets."""
+        buf = (make_data_packet(100, 200)                      # 24 bytes
+               + make_doppler_packet(5, 3, 100, 200)           # 16 bytes
+               + make_cfar_packet(10, 8, 5000, 3000)           # 16 bytes
+               + make_status_packet(threshold=42))             # 40 bytes
+        result = RadarProtocol.find_packet_boundaries(buf)
+        self.assertEqual(len(result), 4)
+        self.assertEqual(result[0][2], "data")
+        self.assertEqual(result[1][2], "doppler")
+        self.assertEqual(result[2][2], "cfar")
+        self.assertEqual(result[3][2], "status")
+
+    def test_consecutive_doppler_packets(self):
+        buf = b""
+        for i in range(10):
+            buf += make_doppler_packet(i, i % 32, i * 100, i * 50)
+        result = RadarProtocol.find_packet_boundaries(buf)
+        self.assertEqual(len(result), 10)
+        for start, end, ptype in result:
+            self.assertEqual(ptype, "doppler")
+            self.assertEqual(end - start, 16)
+
+    def test_range_then_doppler_burst(self):
+        """Typical v9 pattern: range packets first, then Doppler burst."""
+        buf = b""
+        # 64 range packets (1 chirp)
+        for rbin in range(NUM_RANGE_BINS):
+            buf += make_data_packet(rbin * 10, rbin * 5)
+        # 64 Doppler packets
+        for rbin in range(NUM_RANGE_BINS):
+            buf += make_doppler_packet(rbin, 0, 100, 50)
+        result = RadarProtocol.find_packet_boundaries(buf)
+        data_count = sum(1 for _, _, t in result if t == "data")
+        doppler_count = sum(1 for _, _, t in result if t == "doppler")
+        self.assertEqual(data_count, NUM_RANGE_BINS)
+        self.assertEqual(doppler_count, NUM_RANGE_BINS)
+
+    def test_garbage_between_doppler_packets(self):
+        pkt1 = make_doppler_packet(0, 0, 100, 200)
+        garbage = bytes([0x12, 0x34, 0x56, 0x78])
+        pkt2 = make_doppler_packet(1, 1, 300, 400)
+        buf = pkt1 + garbage + pkt2
+        result = RadarProtocol.find_packet_boundaries(buf)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0][2], "doppler")
+        self.assertEqual(result[1][2], "doppler")
+
+    def test_incomplete_doppler_packet(self):
+        """Buffer has CC header but not enough bytes."""
+        pkt = make_doppler_packet(0, 0, 100, 200)[:12]  # truncated
+        result = RadarProtocol.find_packet_boundaries(pkt)
+        self.assertEqual(result, [])
+
+    def test_v9_packet_size_constants(self):
+        self.assertEqual(RadarProtocol.V9_DOPPLER_PACKET_SIZE, 16)
+        self.assertEqual(RadarProtocol.V9_CFAR_PACKET_SIZE, 16)
+
+
+# ============================================================================
+# v9: RadarAcquisition full pipeline frame assembly
+# ============================================================================
+
+class TestRadarAcquisitionV9(unittest.TestCase):
+    """Tests for v9 full pipeline mode frame assembly."""
+
+    def _build_v9_frame_data(self, include_range=True, include_cfar=True):
+        """Build a complete v9 frame's worth of raw bytes.
+
+        Returns raw bytes containing:
+          - 2048 range packets (32 chirps x 64 bins) if include_range
+          - 2048 Doppler packets (64 range x 32 doppler)
+          - Some CFAR detection packets if include_cfar
+              (interleaved before the last Doppler packet so they
+               arrive before frame finalization)
+        """
+        buf = bytearray()
+
+        # Range packets (32 chirps x 64 bins)
+        if include_range:
+            for chirp in range(32):
+                for rbin in range(NUM_RANGE_BINS):
+                    ri = (chirp * 100 + rbin) & 0x7FFF
+                    rq = (chirp * 50 + rbin) & 0x7FFF
+                    buf += make_data_packet(ri, rq)
+
+        # CFAR detections (placed before Doppler packets so they arrive
+        # before the frame is finalized by the 2048th Doppler packet)
+        cfar_detections = []
+        if include_cfar:
+            cfar_detections = [(10, 5, 8000, 3000), (20, 15, 6000, 2500),
+                               (30, 25, 9000, 4000)]
+            for rbin, dbin, mag, thr in cfar_detections:
+                buf += make_cfar_packet(rbin, dbin, mag, thr)
+
+        # Doppler packets (64 range bins x 32 doppler bins)
+        for rbin in range(NUM_RANGE_BINS):
+            for dbin in range(NUM_DOPPLER_BINS):
+                di = (rbin * 10 + dbin) & 0x7FFF
+                dq = (rbin * 5 + dbin) & 0x7FFF
+                buf += make_doppler_packet(rbin, dbin, di, dq)
+
+        return bytes(buf)
+
+    def test_v9_frame_assembly_with_all_types(self):
+        """Feed range + doppler + cfar packets, verify frame assembly."""
+        raw = self._build_v9_frame_data()
+        fq = queue.Queue(maxsize=10)
+        acq = RadarAcquisition(None, fq, range_only=False)
+
+        # Parse and ingest all packets
+        packets = RadarProtocol.find_packet_boundaries(raw)
+
+        data_count = 0
+        doppler_count = 0
+        cfar_count = 0
+        for start, end, ptype in packets:
+            if ptype == "data":
+                parsed = RadarProtocol.parse_data_packet(raw[start:end])
+                if parsed:
+                    acq._got_doppler = True  # force v9 mode
+                    acq._ingest_v9_range(parsed)
+                    data_count += 1
+            elif ptype == "doppler":
+                parsed = RadarProtocol.parse_doppler_packet(raw[start:end])
+                if parsed:
+                    acq._got_doppler = True
+                    acq._ingest_v9_doppler(parsed)
+                    doppler_count += 1
+            elif ptype == "cfar":
+                parsed = RadarProtocol.parse_cfar_packet(raw[start:end])
+                if parsed:
+                    acq._got_cfar = True
+                    acq._ingest_v9_cfar(parsed)
+                    cfar_count += 1
+
+        self.assertEqual(data_count, 2048)    # 32 chirps x 64 bins
+        self.assertEqual(doppler_count, 2048)  # 64 x 32
+        self.assertEqual(cfar_count, 3)
+
+        # Frame should have been finalized (doppler_count hit 2048)
+        self.assertFalse(fq.empty(), "Frame should have been pushed to queue")
+        frame = fq.get_nowait()
+        self.assertIsInstance(frame, RadarFrame)
+
+        # Check Doppler data was placed correctly
+        # rbin=10, dbin=5: di = 10*10 + 5 = 105, dq = 10*5 + 5 = 55
+        self.assertEqual(frame.range_doppler_i[10, 5], 105)
+        self.assertEqual(frame.range_doppler_q[10, 5], 55)
+
+        # Check magnitude
+        expected_mag = abs(105) + abs(55)
+        self.assertEqual(frame.magnitude[10, 5], expected_mag)
+
+        # Check CFAR detections
+        self.assertEqual(frame.detections[10, 5], 1)
+        self.assertEqual(frame.detections[20, 15], 1)
+        self.assertEqual(frame.detections[30, 25], 1)
+        self.assertEqual(frame.detection_count, 3)
+
+    def test_v9_doppler_only_mode(self):
+        """Doppler-only (no range packets) still produces a frame."""
+        raw = self._build_v9_frame_data(include_range=False, include_cfar=False)
+        fq = queue.Queue(maxsize=10)
+        acq = RadarAcquisition(None, fq, range_only=False)
+        acq._got_doppler = True
+
+        packets = RadarProtocol.find_packet_boundaries(raw)
+        for start, end, ptype in packets:
+            if ptype == "doppler":
+                parsed = RadarProtocol.parse_doppler_packet(raw[start:end])
+                if parsed:
+                    acq._ingest_v9_doppler(parsed)
+
+        self.assertFalse(fq.empty())
+        frame = fq.get_nowait()
+
+        # Range profile should be derived from magnitude (sum across Doppler)
+        self.assertGreater(np.sum(frame.range_profile), 0)
+        # No CFAR detections
+        self.assertEqual(frame.detection_count, 0)
+
+    def test_v9_range_profile_from_last_chirp(self):
+        """Range profile comes from last chirp's 0xAA data."""
+        fq = queue.Queue(maxsize=10)
+        acq = RadarAcquisition(None, fq, range_only=False)
+        acq._got_doppler = True
+
+        # Feed 32 chirps of range data with distinct values
+        for chirp in range(32):
+            for rbin in range(NUM_RANGE_BINS):
+                ri = chirp * 100 + rbin
+                rq = chirp * 50 + rbin
+                parsed = {"range_i": ri, "range_q": rq, "range_value": 0}
+                acq._ingest_v9_range(parsed)
+
+        # Now feed all Doppler packets to trigger frame finalization
+        for rbin in range(NUM_RANGE_BINS):
+            for dbin in range(NUM_DOPPLER_BINS):
+                parsed = {"range_bin": rbin, "doppler_bin": dbin,
+                          "doppler_i": 0, "doppler_q": 0, "sub_frame": 0}
+                acq._ingest_v9_doppler(parsed)
+
+        frame = fq.get_nowait()
+        # Last chirp (chirp=31): ri = 31*100 + rbin, rq = 31*50 + rbin
+        # Magnitude = |ri| + |rq| = (3100 + rbin) + (1550 + rbin) = 4650 + 2*rbin
+        for rbin in range(NUM_RANGE_BINS):
+            expected_mag = abs(31 * 100 + rbin) + abs(31 * 50 + rbin)
+            self.assertAlmostEqual(frame.range_profile[rbin], expected_mag,
+                                   msg=f"Range profile mismatch at bin {rbin}")
+
+    def test_v9_frame_counter_increments(self):
+        """Multiple v9 frames should have incrementing frame numbers."""
+        fq = queue.Queue(maxsize=10)
+        acq = RadarAcquisition(None, fq, range_only=False)
+        acq._got_doppler = True
+
+        for frame_idx in range(3):
+            for rbin in range(NUM_RANGE_BINS):
+                for dbin in range(NUM_DOPPLER_BINS):
+                    parsed = {"range_bin": rbin, "doppler_bin": dbin,
+                              "doppler_i": 0, "doppler_q": 0, "sub_frame": 0}
+                    acq._ingest_v9_doppler(parsed)
+
+        frames = []
+        while not fq.empty():
+            frames.append(fq.get_nowait())
+        self.assertEqual(len(frames), 3)
+        for i in range(len(frames)):
+            self.assertEqual(frames[i].frame_number, i)
+
+
+# ============================================================================
+# v9: Packet constants
+# ============================================================================
+
+class TestV9PacketConstants(unittest.TestCase):
+
+    def test_doppler_header(self):
+        self.assertEqual(HEADER_DOPPLER, 0xCC)
+
+    def test_cfar_header(self):
+        self.assertEqual(HEADER_CFAR, 0xDD)
+
+    def test_doppler_packet_size(self):
+        pkt = make_doppler_packet(0, 0, 0, 0)
+        self.assertEqual(len(pkt), RadarProtocol.V9_DOPPLER_PACKET_SIZE)
+
+    def test_cfar_packet_size(self):
+        pkt = make_cfar_packet(0, 0, 0, 0)
+        self.assertEqual(len(pkt), RadarProtocol.V9_CFAR_PACKET_SIZE)
 
 
 if __name__ == "__main__":

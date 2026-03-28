@@ -2,36 +2,34 @@
 //
 // radar_system_top_te0713_umft601x_playback.v — AERIS-10 Unified Playback + USB Top
 //
-// Merges the BRAM playback DSP pipeline (from radar_system_top_te0713_playback.v)
-// with the FT601 USB streaming interface (from radar_system_top_te0713_umft601x_dev.v).
+// v9 — Full DSP pipeline with Doppler + CFAR streaming over USB
+//
+// Changes from v8c:
+//   - Doppler FIFO (2048 entries × 44 bits) buffers full range-Doppler map
+//   - CFAR FIFO (2048 entries × 46 bits) buffers detection reports
+//   - Three independent pop FSMs (range, doppler, cfar)
+//   - USB interface gets rich Doppler data (range_bin, doppler_bin, sub_frame, I, Q)
+//   - USB interface gets rich CFAR data (flag, range, doppler, magnitude, threshold)
+//   - New packet types: 0xCC (Doppler), 0xDD (CFAR) alongside 0xAA (range)
+//   - CFAR FIFO only stores actual detections (flag=1) to save bandwidth
 //
 // Data flow:
 //   BRAM (real ADI CN0566 3x5 array data)
 //     → Range Bin Decimator (1024→64, peak)
 //     → MTI Canceller (2-pulse, configurable)
-//     → Doppler Processor (2×16-pt FFT)
+//     → Doppler Processor (2×16-pt FFT)  ─→ Doppler FIFO ─→ USB (0xCC packets)
 //     → DC Notch (configurable)
-//     → CFAR Detector (CA/GO/SO, configurable)
-//     → FT601 USB 3.0 Streaming → Host GUI
+//     → CFAR Detector (CA/GO/SO)         ─→ CFAR FIFO ──→ USB (0xDD packets)
+//   Range data from decimator             ─→ Range FIFO ──→ USB (0xAA packets)
 //
 // Clock: Everything runs on ft601_clk_in (100 MHz from FT601 chip).
-//        No STARTUPE2 needed — the DSP chain was designed for ~65 MHz
-//        and runs fine at 100 MHz with better timing margin.
 //
 // Control: All configuration via USB commands (host register map):
-//   0x02: Playback trigger (pulse to start/restart BRAM playback)
+//   0x02: Playback trigger
 //   0x03: Detection threshold
-//   0x04: Stream control [2:0] (range/doppler/cfar enables)
-//   0x21: CFAR guard cells
-//   0x22: CFAR training cells
-//   0x23: CFAR alpha (Q4.4)
-//   0x24: CFAR mode (0=CA, 1=GO, 2=SO)
-//   0x25: CFAR enable
-//   0x26: MTI enable
-//   0x27: DC notch width
+//   0x04: Stream control [2:0] (bit0=range, bit1=doppler, bit2=cfar)
+//   0x21-0x27: CFAR/MTI/DC notch configuration
 //   0xFF: Status readback
-//
-// v8 — First unified playback + USB build
 //
 
 module radar_system_top_te0713_umft601x_playback (
@@ -77,7 +75,7 @@ reg        playback_trigger_reg = 1'b0;
 reg [15:0] detect_threshold_reg = 16'd500;
 reg [3:0]  cfar_guard_reg = 4'd2;
 reg [4:0]  cfar_train_reg = 5'd8;
-reg [7:0]  cfar_alpha_reg = 8'h30;       // Q4.4 = 3.0
+reg [7:0]  cfar_alpha_reg = 8'h05;       // Q4.4 = 0.3125 (~5x avg, Pfa~1e-4)
 reg [1:0]  cfar_mode_reg = 2'd0;         // CA-CFAR
 reg        cfar_enable_reg = 1'b0;
 reg        mti_enable_reg = 1'b0;
@@ -114,60 +112,107 @@ reg  [7:0]  self_test_detail_latched = 8'd0;
 // =========================================================================
 // DSP data signals — feed into USB data interface
 // =========================================================================
+// Range data (from range FIFO pop FSM)
 reg [31:0] range_profile_usb = 32'd0;
 reg        range_valid_usb = 1'b0;
+
+// v9: Doppler data (from Doppler FIFO pop FSM)
 reg [15:0] doppler_real_usb = 16'd0;
 reg [15:0] doppler_imag_usb = 16'd0;
 reg        doppler_valid_usb = 1'b0;
+reg [5:0]  doppler_range_bin_usb = 6'd0;
+reg [4:0]  doppler_doppler_bin_usb = 5'd0;
+reg        doppler_sub_frame_usb = 1'b0;
+
+// v9: CFAR data (from CFAR FIFO pop FSM)
 reg        cfar_detection_usb = 1'b0;
 reg        cfar_valid_usb = 1'b0;
+reg [5:0]  cfar_range_usb = 6'd0;
+reg [4:0]  cfar_doppler_usb = 5'd0;
+reg [16:0] cfar_mag_usb = 17'd0;
+reg [16:0] cfar_thr_usb = 17'd0;
 
 // v8b: write_idle from USB interface — HIGH when FSM can accept new data
 wire usb_write_idle;
 
 // =========================================================================
-// v8b: Range Data FIFO — buffers decimated range bins between DSP and USB
+// RANGE DATA FIFO (v8b: 2048 entries × 32 bits = 8 KB BRAM)
 // =========================================================================
-// The decimator outputs one range bin every 16 input clocks. The USB write
-// FSM needs ~7 cycles per 24-byte range-only packet (header + 4 data +
-// footer + WAIT_ACK), but FT601 TXE backpressure can stall it for hundreds
-// of cycles. Without buffering, range_valid pulses are lost while the USB
-// FSM is busy — this caused only 2/2048 packets to be received in v8.
-//
-// This FIFO is 2048 entries of 32 bits (8 KB BRAM). Worst case: 32 chirps
-// × 64 bins = 2048 entries for a full playback. BRAM budget allows this.
-//
-// Push: on decim_valid_out (DSP produces data)
-// Pop:  when FIFO non-empty AND usb_write_idle (USB ready for next packet)
-//
-localparam FIFO_DEPTH = 2048;
-localparam FIFO_ADDR_W = 11;  // log2(2048)
+localparam RANGE_FIFO_DEPTH = 2048;
+localparam RANGE_FIFO_AW = 11;  // log2(2048)
 
-reg [31:0] range_fifo [0:FIFO_DEPTH-1];
-reg [FIFO_ADDR_W:0] fifo_wr_ptr = 0;  // Extra bit for full/empty detection
-reg [FIFO_ADDR_W:0] fifo_rd_ptr = 0;
+reg [31:0] range_fifo [0:RANGE_FIFO_DEPTH-1];
+reg [RANGE_FIFO_AW:0] range_fifo_wr = 0;
+reg [RANGE_FIFO_AW:0] range_fifo_rd = 0;
 
-wire fifo_empty = (fifo_wr_ptr == fifo_rd_ptr);
-wire fifo_full  = (fifo_wr_ptr[FIFO_ADDR_W] != fifo_rd_ptr[FIFO_ADDR_W]) &&
-                  (fifo_wr_ptr[FIFO_ADDR_W-1:0] == fifo_rd_ptr[FIFO_ADDR_W-1:0]);
-wire [31:0] fifo_rd_data = range_fifo[fifo_rd_ptr[FIFO_ADDR_W-1:0]];
+wire range_fifo_empty = (range_fifo_wr == range_fifo_rd);
+wire range_fifo_full  = (range_fifo_wr[RANGE_FIFO_AW] != range_fifo_rd[RANGE_FIFO_AW]) &&
+                        (range_fifo_wr[RANGE_FIFO_AW-1:0] == range_fifo_rd[RANGE_FIFO_AW-1:0]);
+wire [31:0] range_fifo_dout = range_fifo[range_fifo_rd[RANGE_FIFO_AW-1:0]];
 
-// Debug: FIFO overflow counter (visible in range_mode field of status)
-reg [15:0] fifo_overflow_count = 16'd0;
+reg [15:0] range_overflow_count = 16'd0;
 
-// v8b: FIFO pop handshake FSM
-// We can't just pop whenever write_idle is HIGH, because the USB FSM
-// takes 2+ cycles to see the range_valid edge (CDC sync chain) and
-// leave IDLE. During that window, we'd pop again and corrupt data.
-// Instead, we use a 3-state handshake:
-//   POP_IDLE → pop one entry, pulse range_valid_usb
-//   POP_WAIT → wait for write_idle to go LOW (FSM accepted data)
-//   POP_DONE → wait for write_idle to go HIGH (FSM finished packet)
+// v9: Range pop FSM (same handshake as v8b but now one of three independent pop FSMs)
 localparam [1:0] POP_IDLE = 2'd0,
                  POP_WAIT = 2'd1,
                  POP_DONE = 2'd2;
-reg [1:0] pop_state = POP_IDLE;
-reg [15:0] pop_timeout = 16'd0;  // Safety timeout for POP_WAIT
+reg [1:0] range_pop_state = POP_IDLE;
+reg [15:0] range_pop_timeout = 16'd0;
+
+// =========================================================================
+// v9: DOPPLER DATA FIFO (2048 entries × 44 bits)
+// =========================================================================
+// Stores the full range-Doppler map output from the Doppler processor.
+// Each entry: {sub_frame[0], doppler_bin[4:0], range_bin[5:0], Q[15:0], I[15:0]}
+// = 1 + 5 + 6 + 16 + 16 = 44 bits. We use 48-bit entries for clean BRAM mapping.
+//
+localparam DOPPLER_FIFO_DEPTH = 2048;
+localparam DOPPLER_FIFO_AW = 11;
+localparam DOPPLER_FIFO_W = 48;  // Rounded up from 44 for BRAM alignment
+
+reg [DOPPLER_FIFO_W-1:0] doppler_fifo [0:DOPPLER_FIFO_DEPTH-1];
+reg [DOPPLER_FIFO_AW:0] doppler_fifo_wr = 0;
+reg [DOPPLER_FIFO_AW:0] doppler_fifo_rd = 0;
+
+wire doppler_fifo_empty = (doppler_fifo_wr == doppler_fifo_rd);
+wire doppler_fifo_full  = (doppler_fifo_wr[DOPPLER_FIFO_AW] != doppler_fifo_rd[DOPPLER_FIFO_AW]) &&
+                          (doppler_fifo_wr[DOPPLER_FIFO_AW-1:0] == doppler_fifo_rd[DOPPLER_FIFO_AW-1:0]);
+wire [DOPPLER_FIFO_W-1:0] doppler_fifo_dout = doppler_fifo[doppler_fifo_rd[DOPPLER_FIFO_AW-1:0]];
+
+reg [15:0] doppler_overflow_count = 16'd0;
+
+// Doppler pop FSM
+reg [1:0] doppler_pop_state = POP_IDLE;
+reg [15:0] doppler_pop_timeout = 16'd0;
+
+// =========================================================================
+// v9: CFAR DETECTION FIFO (2048 entries × 46 bits)
+// =========================================================================
+// Only stores actual detections (detect_flag=1) to save bandwidth.
+// Each entry: {detect_flag[0], range[5:0], doppler[4:0], magnitude[16:0], threshold[16:0]}
+// = 1 + 6 + 5 + 17 + 17 = 46 bits. Use 48-bit entries.
+//
+// v9a: Increased from 128 to 2048 to prevent overflow — CFAR produces ~1300
+// detections per frame with real radar data, which overflowed the 128-entry FIFO.
+//
+localparam CFAR_FIFO_DEPTH = 2048;
+localparam CFAR_FIFO_AW = 11;
+localparam CFAR_FIFO_W = 48;
+
+reg [CFAR_FIFO_W-1:0] cfar_fifo [0:CFAR_FIFO_DEPTH-1];
+reg [CFAR_FIFO_AW:0] cfar_fifo_wr = 0;
+reg [CFAR_FIFO_AW:0] cfar_fifo_rd = 0;
+
+wire cfar_fifo_empty = (cfar_fifo_wr == cfar_fifo_rd);
+wire cfar_fifo_full  = (cfar_fifo_wr[CFAR_FIFO_AW] != cfar_fifo_rd[CFAR_FIFO_AW]) &&
+                       (cfar_fifo_wr[CFAR_FIFO_AW-1:0] == cfar_fifo_rd[CFAR_FIFO_AW-1:0]);
+wire [CFAR_FIFO_W-1:0] cfar_fifo_dout = cfar_fifo[cfar_fifo_rd[CFAR_FIFO_AW-1:0]];
+
+reg [15:0] cfar_overflow_count = 16'd0;
+
+// CFAR pop FSM
+reg [1:0] cfar_pop_state = POP_IDLE;
+reg [15:0] cfar_pop_timeout = 16'd0;
 
 // =========================================================================
 // POR, heartbeat, and command decode
@@ -182,7 +227,7 @@ always @(posedge ft601_clk_in) begin
         detect_threshold_reg <= 16'd500;
         cfar_guard_reg <= 4'd2;
         cfar_train_reg <= 5'd8;
-        cfar_alpha_reg <= 8'h30;
+        cfar_alpha_reg <= 8'h05;
         cfar_mode_reg <= 2'd0;
         cfar_enable_reg <= 1'b0;
         mti_enable_reg <= 1'b0;
@@ -207,19 +252,19 @@ always @(posedge ft601_clk_in) begin
         // Host command decode (full register map)
         if (cmd_valid) begin
             case (cmd_opcode)
-                8'h02: playback_trigger_reg <= 1'b1;          // Trigger playback
-                8'h03: detect_threshold_reg <= cmd_value;      // Detection threshold
-                8'h04: stream_control_reg   <= cmd_value[2:0]; // Stream control
-                8'h21: cfar_guard_reg       <= cmd_value[3:0]; // CFAR guard cells
-                8'h22: cfar_train_reg       <= cmd_value[4:0]; // CFAR training cells
-                8'h23: cfar_alpha_reg       <= cmd_value[7:0]; // CFAR alpha
-                8'h24: cfar_mode_reg        <= cmd_value[1:0]; // CFAR mode
-                8'h25: cfar_enable_reg      <= cmd_value[0];   // CFAR enable
-                8'h26: mti_enable_reg       <= cmd_value[0];   // MTI enable
-                8'h27: dc_notch_width_reg   <= cmd_value[2:0]; // DC notch width
-                8'h30: self_test_trigger    <= 1'b1;           // Self-test trigger
-                8'h31: status_request_reg   <= 1'b1;           // Status readback
-                8'hFF: status_request_reg   <= 1'b1;           // Status readback
+                8'h02: playback_trigger_reg <= 1'b1;
+                8'h03: detect_threshold_reg <= cmd_value;
+                8'h04: stream_control_reg   <= cmd_value[2:0];
+                8'h21: cfar_guard_reg       <= cmd_value[3:0];
+                8'h22: cfar_train_reg       <= cmd_value[4:0];
+                8'h23: cfar_alpha_reg       <= cmd_value[7:0];
+                8'h24: cfar_mode_reg        <= cmd_value[1:0];
+                8'h25: cfar_enable_reg      <= cmd_value[0];
+                8'h26: mti_enable_reg       <= cmd_value[0];
+                8'h27: dc_notch_width_reg   <= cmd_value[2:0];
+                8'h30: self_test_trigger    <= 1'b1;
+                8'h31: status_request_reg   <= 1'b1;
+                8'hFF: status_request_reg   <= 1'b1;
                 default: ;
             endcase
         end
@@ -373,6 +418,9 @@ wire [16:0] cfar_detect_threshold;
 wire [15:0] cfar_detect_count;
 wire        cfar_busy_w;
 wire [7:0]  cfar_status_w;
+wire [15:0] cfar_dbg_cells;
+wire [7:0]  cfar_dbg_cols;
+wire [15:0] cfar_dbg_valid;
 
 cfar_ca #(
     .NUM_RANGE_BINS(64),
@@ -407,119 +455,266 @@ cfar_ca #(
     // Status
     .detect_count(cfar_detect_count),
     .cfar_busy(cfar_busy_w),
-    .cfar_status(cfar_status_w)
+    .cfar_status(cfar_status_w),
+
+    // Debug counters (v9c)
+    .dbg_cells_processed(cfar_dbg_cells),
+    .dbg_cols_completed(cfar_dbg_cols),
+    .dbg_valid_count(cfar_dbg_valid)
 );
 
 // =========================================================================
-// DSP → USB Data Bridge (v8b: FIFO-buffered range data)
+// DSP → USB Data Bridge (v9: Three independent FIFO + pop FSM channels)
 // =========================================================================
-// Range profile: The decimator produces 64 bins per chirp, each as a
-// {Q, I} pair. We push into a FIFO on decim_valid_out, and pop when the
-// USB write FSM signals it's ready (write_idle). This prevents lost
-// range_valid pulses when the USB FSM is busy with a previous packet.
 //
-// For Doppler and CFAR: unchanged — these arrive at frame boundaries
-// (much slower rate) and don't suffer from the throughput bottleneck.
+// FIFO push logic:
+//   Range:   push on decim_valid_out (64 per chirp, 2048 per frame)
+//   Doppler: push on doppler_valid (2048 per frame, burst after 32 chirps)
+//   CFAR:    push on cfar_detect_valid && cfar_detect_flag (sparse, ~10-50 per frame)
+//
+// FIFO pop logic:
+//   Each pop FSM waits for its FIFO non-empty AND usb_write_idle, then:
+//     POP_IDLE: pop entry, pulse *_valid_usb, go to POP_WAIT
+//     POP_WAIT: wait for write_idle=0 (USB FSM accepted), safety timeout
+//     POP_DONE: wait for write_idle=1 (USB FSM finished packet)
+//
+// Priority between the three is handled by the USB FSM's IDLE state arbiter:
+//   Status > Range > Doppler > CFAR
+// So we gate each pop on usb_write_idle (which is only HIGH when ALL three
+// pending flags in the USB FSM are clear and it's truly idle).
 //
 always @(posedge ft601_clk_in) begin
     if (!sys_reset_n) begin
-        fifo_wr_ptr <= 0;
-        fifo_rd_ptr <= 0;
+        // Range FIFO
+        range_fifo_wr <= 0;
+        range_fifo_rd <= 0;
         range_profile_usb <= 32'd0;
         range_valid_usb <= 1'b0;
+        range_overflow_count <= 16'd0;
+        range_pop_state <= POP_IDLE;
+        range_pop_timeout <= 16'd0;
+
+        // Doppler FIFO
+        doppler_fifo_wr <= 0;
+        doppler_fifo_rd <= 0;
         doppler_real_usb <= 16'd0;
         doppler_imag_usb <= 16'd0;
         doppler_valid_usb <= 1'b0;
+        doppler_range_bin_usb <= 6'd0;
+        doppler_doppler_bin_usb <= 5'd0;
+        doppler_sub_frame_usb <= 1'b0;
+        doppler_overflow_count <= 16'd0;
+        doppler_pop_state <= POP_IDLE;
+        doppler_pop_timeout <= 16'd0;
+
+        // CFAR FIFO
+        cfar_fifo_wr <= 0;
+        cfar_fifo_rd <= 0;
         cfar_detection_usb <= 1'b0;
         cfar_valid_usb <= 1'b0;
-        fifo_overflow_count <= 16'd0;
-        pop_state <= POP_IDLE;
-        pop_timeout <= 16'd0;
+        cfar_range_usb <= 6'd0;
+        cfar_doppler_usb <= 5'd0;
+        cfar_mag_usb <= 17'd0;
+        cfar_thr_usb <= 17'd0;
+        cfar_overflow_count <= 16'd0;
+        cfar_pop_state <= POP_IDLE;
+        cfar_pop_timeout <= 16'd0;
     end else begin
         // Default: clear valid strobes
         range_valid_usb <= 1'b0;
         doppler_valid_usb <= 1'b0;
         cfar_valid_usb <= 1'b0;
 
-        // --- FIFO Write: push decimated range data ---
+        // =============================================================
+        // RANGE FIFO PUSH: on decimated range data
+        // =============================================================
         if (decim_valid_out) begin
-            if (!fifo_full) begin
-                range_fifo[fifo_wr_ptr[FIFO_ADDR_W-1:0]] <= {decim_q_out, decim_i_out};
-                fifo_wr_ptr <= fifo_wr_ptr + 1;
+            if (!range_fifo_full) begin
+                range_fifo[range_fifo_wr[RANGE_FIFO_AW-1:0]] <= {decim_q_out, decim_i_out};
+                range_fifo_wr <= range_fifo_wr + 1;
             end else begin
-                fifo_overflow_count <= fifo_overflow_count + 1;
+                range_overflow_count <= range_overflow_count + 1;
             end
         end
 
-        // --- FIFO Read: handshake-based pop (one packet at a time) ---
-        case (pop_state)
+        // =============================================================
+        // DOPPLER FIFO PUSH: on Doppler FFT output valid
+        // =============================================================
+        if (doppler_valid) begin
+            if (!doppler_fifo_full) begin
+                // Pack: {4'b0, sub_frame, doppler_bin[4:0], range_bin[5:0], Q[15:0], I[15:0]}
+                doppler_fifo[doppler_fifo_wr[DOPPLER_FIFO_AW-1:0]] <=
+                    {4'b0000,
+                     doppler_sub_frame,
+                     doppler_bin,
+                     doppler_range_bin,
+                     doppler_output[31:16],  // Q
+                     doppler_output[15:0]};  // I
+                doppler_fifo_wr <= doppler_fifo_wr + 1;
+            end else begin
+                doppler_overflow_count <= doppler_overflow_count + 1;
+            end
+        end
+
+        // =============================================================
+        // CFAR FIFO PUSH: only for actual detections (flag=1)
+        // =============================================================
+        if (cfar_detect_valid && cfar_detect_flag) begin
+            if (!cfar_fifo_full) begin
+                // Pack: {2'b0, flag, range[5:0], doppler[4:0], magnitude[16:0], threshold[16:0]}
+                cfar_fifo[cfar_fifo_wr[CFAR_FIFO_AW-1:0]] <=
+                    {2'b00,
+                     cfar_detect_flag,
+                     cfar_detect_range,
+                     cfar_detect_doppler,
+                     cfar_detect_magnitude,
+                     cfar_detect_threshold};
+                cfar_fifo_wr <= cfar_fifo_wr + 1;
+            end else begin
+                cfar_overflow_count <= cfar_overflow_count + 1;
+            end
+        end
+
+        // =============================================================
+        // RANGE POP FSM
+        // =============================================================
+        case (range_pop_state)
             POP_IDLE: begin
-                // Pop when FIFO has data and USB FSM is ready
-                if (!fifo_empty && usb_write_idle) begin
-                    range_profile_usb <= fifo_rd_data;
+                if (!range_fifo_empty && usb_write_idle) begin
+                    range_profile_usb <= range_fifo_dout;
                     range_valid_usb <= 1'b1;
-                    fifo_rd_ptr <= fifo_rd_ptr + 1;
-                    pop_state <= POP_WAIT;
-                    pop_timeout <= 16'd0;
+                    range_fifo_rd <= range_fifo_rd + 1;
+                    range_pop_state <= POP_WAIT;
+                    range_pop_timeout <= 16'd0;
                 end
             end
 
             POP_WAIT: begin
-                // Wait for USB FSM to leave IDLE (accepted our data).
-                // The range_valid_usb pulse takes 2 cycles through the
-                // CDC sync chain before the FSM sees it and transitions
-                // out of IDLE. We wait for write_idle to go LOW.
-                pop_timeout <= pop_timeout + 1;
+                range_pop_timeout <= range_pop_timeout + 1;
                 if (!usb_write_idle) begin
-                    // FSM accepted data — wait for it to finish
-                    pop_state <= POP_DONE;
-                end else if (pop_timeout >= 16'd100) begin
-                    // Safety: if write_idle stays HIGH for 100 cycles,
-                    // the FSM probably ignored our pulse (stream disabled).
-                    // Return to POP_IDLE to try again or drain FIFO.
-                    pop_state <= POP_IDLE;
+                    range_pop_state <= POP_DONE;
+                end else if (range_pop_timeout >= 16'd100) begin
+                    range_pop_state <= POP_IDLE;
                 end
             end
 
             POP_DONE: begin
-                // Wait for USB FSM to return to IDLE (packet complete)
                 if (usb_write_idle) begin
-                    pop_state <= POP_IDLE;
+                    range_pop_state <= POP_IDLE;
                 end
             end
 
-            default: pop_state <= POP_IDLE;
+            default: range_pop_state <= POP_IDLE;
         endcase
 
-        // Doppler data → USB (unchanged, frame-rate)
-        if (doppler_valid) begin
-            doppler_real_usb <= doppler_output[15:0];   // I
-            doppler_imag_usb <= doppler_output[31:16];  // Q
-            doppler_valid_usb <= 1'b1;
-        end
+        // =============================================================
+        // DOPPLER POP FSM
+        // Only pops when range FIFO is empty (range has priority)
+        // =============================================================
+        case (doppler_pop_state)
+            POP_IDLE: begin
+                if (!doppler_fifo_empty && usb_write_idle && range_fifo_empty) begin
+                    // Unpack FIFO entry
+                    doppler_real_usb       <= doppler_fifo_dout[15:0];   // I
+                    doppler_imag_usb       <= doppler_fifo_dout[31:16];  // Q
+                    doppler_range_bin_usb  <= doppler_fifo_dout[37:32];  // range_bin
+                    doppler_doppler_bin_usb <= doppler_fifo_dout[42:38]; // doppler_bin
+                    doppler_sub_frame_usb  <= doppler_fifo_dout[43];     // sub_frame
+                    doppler_valid_usb      <= 1'b1;
+                    doppler_fifo_rd <= doppler_fifo_rd + 1;
+                    doppler_pop_state <= POP_WAIT;
+                    doppler_pop_timeout <= 16'd0;
+                end
+            end
 
-        // CFAR detections → USB (unchanged, frame-rate)
-        if (cfar_detect_valid) begin
-            cfar_detection_usb <= cfar_detect_flag;
-            cfar_valid_usb <= 1'b1;
-        end
+            POP_WAIT: begin
+                doppler_pop_timeout <= doppler_pop_timeout + 1;
+                if (!usb_write_idle) begin
+                    doppler_pop_state <= POP_DONE;
+                end else if (doppler_pop_timeout >= 16'd100) begin
+                    doppler_pop_state <= POP_IDLE;
+                end
+            end
+
+            POP_DONE: begin
+                if (usb_write_idle) begin
+                    doppler_pop_state <= POP_IDLE;
+                end
+            end
+
+            default: doppler_pop_state <= POP_IDLE;
+        endcase
+
+        // =============================================================
+        // CFAR POP FSM
+        // Only pops when both range and Doppler FIFOs are empty
+        // =============================================================
+        case (cfar_pop_state)
+            POP_IDLE: begin
+                if (!cfar_fifo_empty && usb_write_idle &&
+                    range_fifo_empty && doppler_fifo_empty) begin
+                    // Unpack FIFO entry
+                    cfar_thr_usb     <= cfar_fifo_dout[16:0];   // threshold
+                    cfar_mag_usb     <= cfar_fifo_dout[33:17];  // magnitude
+                    cfar_doppler_usb <= cfar_fifo_dout[38:34];  // doppler
+                    cfar_range_usb   <= cfar_fifo_dout[44:39];  // range
+                    cfar_detection_usb <= cfar_fifo_dout[45];   // flag
+                    cfar_valid_usb   <= 1'b1;
+                    cfar_fifo_rd <= cfar_fifo_rd + 1;
+                    cfar_pop_state <= POP_WAIT;
+                    cfar_pop_timeout <= 16'd0;
+                end
+            end
+
+            POP_WAIT: begin
+                cfar_pop_timeout <= cfar_pop_timeout + 1;
+                if (!usb_write_idle) begin
+                    cfar_pop_state <= POP_DONE;
+                end else if (cfar_pop_timeout >= 16'd100) begin
+                    cfar_pop_state <= POP_IDLE;
+                end
+            end
+
+            POP_DONE: begin
+                if (usb_write_idle) begin
+                    cfar_pop_state <= POP_IDLE;
+                end
+            end
+
+            default: cfar_pop_state <= POP_IDLE;
+        endcase
     end
 end
 
 // =========================================================================
-// USB Data Interface (FT601 245 Sync FIFO)
+// USB Data Interface (FT601 245 Sync FIFO) — v9
 // =========================================================================
 usb_data_interface usb_inst (
     .clk(ft601_clk_in),
     .reset_n(sys_reset_n),
     .ft601_reset_n(sys_reset_n),
+
+    // Range data
     .range_profile(range_profile_usb),
     .range_valid(range_valid_usb),
+
+    // Doppler data (v9: expanded)
     .doppler_real(doppler_real_usb),
     .doppler_imag(doppler_imag_usb),
     .doppler_valid(doppler_valid_usb),
+    .doppler_range_bin(doppler_range_bin_usb),
+    .doppler_doppler_bin(doppler_doppler_bin_usb),
+    .doppler_sub_frame(doppler_sub_frame_usb),
+
+    // CFAR data (v9: expanded)
     .cfar_detection(cfar_detection_usb),
     .cfar_valid(cfar_valid_usb),
+    .cfar_detect_range(cfar_range_usb),
+    .cfar_detect_doppler(cfar_doppler_usb),
+    .cfar_detect_mag(cfar_mag_usb),
+    .cfar_detect_thr(cfar_thr_usb),
+
+    // FT601 physical interface
     .ft601_data(ft601_data),
     .ft601_be(ft601_be),
     .ft601_txe_n(ft601_txe_n_unused),
@@ -534,12 +729,18 @@ usb_data_interface usb_inst (
     .ft601_swb(2'b00),
     .ft601_clk_out(ft601_clk_out_unused),
     .ft601_clk_in(ft601_clk_in),
+
+    // Command interface
     .cmd_data(cmd_data),
     .cmd_valid(cmd_valid),
     .cmd_opcode(cmd_opcode),
     .cmd_addr(cmd_addr),
     .cmd_value(cmd_value),
+
+    // Stream control
     .stream_control(stream_control_reg),
+
+    // Status readback
     .status_request(status_request_reg),
     .status_cfar_threshold(detect_threshold_reg),
     .status_stream_ctrl(stream_control_reg),
@@ -554,10 +755,19 @@ usb_data_interface usb_inst (
     .status_self_test_flags(self_test_flags_latched),
     .status_self_test_detail(self_test_detail_latched),
     .status_self_test_busy(self_test_busy),
+
+    // Debug
     .dbg_wr_strobes(dbg_wr_strobes),
     .dbg_txe_blocks(dbg_txe_blocks),
     .dbg_pkt_starts(dbg_pkt_starts),
     .dbg_pkt_completions(dbg_pkt_completions),
+
+    // CFAR debug counters (v9c)
+    .cfar_dbg_cells_processed(cfar_dbg_cells),
+    .cfar_dbg_cols_completed(cfar_dbg_cols),
+    .cfar_dbg_valid_count(cfar_dbg_valid),
+    .cfar_detect_count(cfar_detect_count),
+
     .write_idle(usb_write_idle)
 );
 
