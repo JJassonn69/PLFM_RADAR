@@ -1451,7 +1451,11 @@ class TestRadarAcquisitionV9(unittest.TestCase):
         self.assertEqual(doppler_count, 2048)  # 64 x 32
         self.assertEqual(cfar_count, 3)
 
-        # Frame should have been finalized (doppler_count hit 2048)
+        # Deferred finalization: in run() loop, this happens on the next
+        # iteration when no more CFAR packets arrive. Simulate that here.
+        self.assertTrue(acq._doppler_complete)
+        acq._finalize_v9_frame()
+
         self.assertFalse(fq.empty(), "Frame should have been pushed to queue")
         frame = fq.get_nowait()
         self.assertIsInstance(frame, RadarFrame)
@@ -1485,6 +1489,10 @@ class TestRadarAcquisitionV9(unittest.TestCase):
                 if parsed:
                     acq._ingest_v9_doppler(parsed)
 
+        # Deferred finalization: simulate run() loop triggering finalization
+        self.assertTrue(acq._doppler_complete)
+        acq._finalize_v9_frame()
+
         self.assertFalse(fq.empty())
         frame = fq.get_nowait()
 
@@ -1514,6 +1522,10 @@ class TestRadarAcquisitionV9(unittest.TestCase):
                           "doppler_i": 0, "doppler_q": 0, "sub_frame": 0}
                 acq._ingest_v9_doppler(parsed)
 
+        # Deferred finalization: simulate run() loop triggering finalization
+        self.assertTrue(acq._doppler_complete)
+        acq._finalize_v9_frame()
+
         frame = fq.get_nowait()
         # Last chirp (chirp=31): ri = 31*100 + rbin, rq = 31*50 + rbin
         # Magnitude = |ri| + |rq| = (3100 + rbin) + (1550 + rbin) = 4650 + 2*rbin
@@ -1534,6 +1546,9 @@ class TestRadarAcquisitionV9(unittest.TestCase):
                     parsed = {"range_bin": rbin, "doppler_bin": dbin,
                               "doppler_i": 0, "doppler_q": 0, "sub_frame": 0}
                     acq._ingest_v9_doppler(parsed)
+            # Deferred finalization: simulate run() loop triggering finalization
+            self.assertTrue(acq._doppler_complete)
+            acq._finalize_v9_frame()
 
         frames = []
         while not fq.empty():

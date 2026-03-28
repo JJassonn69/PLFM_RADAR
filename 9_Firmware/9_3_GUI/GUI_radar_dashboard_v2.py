@@ -556,11 +556,17 @@ class RadarDashboardV2:
         self._vmax_alpha = 0.15
         self._pending_status: Optional[StatusResponse] = None
 
-        # Playback progress tracking (32 chirps = 32 frames per playback)
-        self._playback_total_frames = 32  # NUM_CHIRPS in BRAM
+        # Playback progress tracking
+        # v9 full pipeline: 32 chirps → 1 frame (Doppler FFT aggregates all chirps)
+        # range-only mode: each chirp → 1 frame (32 frames per trigger)
+        self._playback_total_frames = 1 if not range_only else 32
         self._playback_frame_count = 0    # Frames received in current playback
         self._playback_active = False
         self._playback_idle_ticks = 0     # 100ms ticks with no new frames
+
+        # Continuous playback mode: auto-retrigger after each frame completes
+        self._continuous_mode = False
+        self._continuous_frame_total = 0  # total frames across all retriggers
 
         # New V2 state
         self._tracker = TargetTracker()
@@ -818,6 +824,12 @@ class RadarDashboardV2:
             ttk.Button(left, text=text,
                        command=lambda o=op, v=val: self._send_cmd(o, v)
                        ).pack(fill="x", pady=3)
+
+        ttk.Separator(left, orient="horizontal").pack(fill="x", pady=6)
+        self.btn_continuous = ttk.Button(
+            left, text="Continuous Play",
+            command=self._toggle_continuous, style="Accent.TButton")
+        self.btn_continuous.pack(fill="x", pady=3)
 
         ttk.Separator(left, orient="horizontal").pack(fill="x", pady=6)
         ttk.Label(left, text="FPGA Self-Test", font=("Menlo", 10, "bold")).pack(
@@ -1098,6 +1110,27 @@ class RadarDashboardV2:
         except ValueError:
             log.error("Invalid custom command values")
 
+    def _toggle_continuous(self):
+        """Toggle continuous playback mode on/off."""
+        if self._continuous_mode:
+            # Stop continuous mode
+            self._continuous_mode = False
+            self.btn_continuous.config(text="Continuous Play",
+                                       style="Accent.TButton")
+            log.info("Continuous playback stopped")
+        else:
+            # Start continuous mode
+            if not self.conn.is_open:
+                log.warning("Cannot start continuous: not connected")
+                return
+            self._continuous_mode = True
+            self._continuous_frame_total = 0
+            self.btn_continuous.config(text="Stop Continuous",
+                                       style="TButton")
+            log.info("Continuous playback started")
+            # Fire the first trigger
+            self._send_cmd(Opcode.TRIGGER, 1)
+
     def _on_status_received(self, status: StatusResponse):
         self._pending_status = status
 
@@ -1308,6 +1341,15 @@ class RadarDashboardV2:
                     self.lbl_playback.config(
                         text=f"Playback: Done ({self._playback_frame_count}/{self._playback_total_frames})",
                         foreground=GREEN)
+                    # Continuous mode: auto-retrigger after frame completes
+                    if self._continuous_mode:
+                        self._continuous_frame_total += self._playback_frame_count
+                        self.lbl_playback.config(
+                            text=f"Continuous: {self._continuous_frame_total} frames",
+                            foreground=ACCENT)
+                        # Small delay (handled by next update tick) then retrigger
+                        self.root.after(50, lambda: self._send_cmd(Opcode.TRIGGER, 1)
+                                        if self._continuous_mode else None)
             return
 
         # Accumulate ALL frames into waterfall so none are lost

@@ -1411,8 +1411,18 @@ class RadarAcquisition(threading.Thread):
         self._range_count = 0      # 0xAA packets received in current frame
         self._doppler_count = 0    # 0xCC packets received in current frame
         self._cfar_count = 0       # 0xDD packets received in current frame
-        self._got_doppler = False   # True once any 0xCC packet arrives
+        # When range_only=False (--v9 flag), assume v9 mode from the start.
+        # This prevents the first USB batch (which may only contain 0xAA range
+        # packets before any 0xCC Doppler arrive) from being misrouted to the
+        # legacy _ingest_sample() handler, which would produce a bogus frame 0.
+        self._got_doppler = not range_only  # True in v9 mode from the start
         self._got_cfar = False      # True once any 0xDD packet arrives
+        # v9 deferred finalization: CFAR packets arrive after Doppler due to
+        # FPGA priority arbiter (Range P1 > Doppler P2 > CFAR P3). We delay
+        # frame finalization after all Doppler packets to collect CFAR.
+        self._doppler_complete = False  # True when doppler_count >= NUM_CELLS
+        self._doppler_complete_ts = 0.0  # time.time() when Doppler finished
+        self._V9_CFAR_TIMEOUT = 0.2     # seconds to wait for CFAR after Doppler
         # Chirp tracking for range-only profile (last chirp's data)
         self._chirp_range_profile = np.zeros(NUM_RANGE_BINS, dtype=np.float64)
         self._range_bin_idx = 0    # sequential range bin within chirp
@@ -1431,6 +1441,11 @@ class RadarAcquisition(threading.Thread):
         while not self._stop_event.is_set():
             raw = self.conn.read(16384)
             if raw is None or len(raw) == 0:
+                # No data — check if v9 frame needs deferred finalization
+                if self._doppler_complete:
+                    elapsed = time.time() - self._doppler_complete_ts
+                    if elapsed >= self._V9_CFAR_TIMEOUT:
+                        self._finalize_v9_frame()
                 time.sleep(0.01)
                 continue
 
@@ -1452,6 +1467,20 @@ class RadarAcquisition(threading.Thread):
                 keep = min(len(raw), RadarProtocol.V7C_STATUS_PACKET_SIZE - 1)
                 self._residual = raw[-keep:]
 
+            cfar_in_batch = 0
+
+            # Pre-scan: detect v9 mode from packet types in this batch.
+            # This ensures _v9_mode is True before routing 0xAA range packets,
+            # even if Doppler/CFAR packets appear later in the same USB read.
+            if not self._v9_mode:
+                for _, _, ptype in packets:
+                    if ptype == "doppler":
+                        self._got_doppler = True
+                        break
+                    elif ptype == "cfar":
+                        self._got_cfar = True
+                        break
+
             for start, end, ptype in packets:
                 if ptype == "data":
                     parsed = RadarProtocol.parse_data_packet(raw[start:end])
@@ -1472,6 +1501,7 @@ class RadarAcquisition(threading.Thread):
                     if parsed is not None:
                         self._got_cfar = True
                         self._ingest_v9_cfar(parsed)
+                        cfar_in_batch += 1
                 elif ptype == "status":
                     status = RadarProtocol.parse_status_packet(raw[start:end])
                     if status is not None:
@@ -1488,6 +1518,13 @@ class RadarAcquisition(threading.Thread):
                                 self._status_callback(status)
                             except Exception as e:
                                 log.error(f"Status callback error: {e}")
+
+            # v9 deferred finalization: after processing a batch, check if
+            # Doppler is complete and no more CFAR packets arrived in this read.
+            # This catches the common case where all CFAR packets arrive in
+            # the same or next USB read after the last Doppler packet.
+            if self._doppler_complete and cfar_in_batch == 0:
+                self._finalize_v9_frame()
 
         log.info("Acquisition thread stopped")
 
@@ -1577,8 +1614,10 @@ class RadarAcquisition(threading.Thread):
 
         Each packet carries its own range_bin/doppler_bin coordinates,
         so we place it directly into the range-Doppler map.
-        Frame is finalized when we've received NUM_CELLS (2048) Doppler
-        packets, representing the complete 64×32 map.
+        When all NUM_CELLS (2048) Doppler packets arrive, we set
+        _doppler_complete to defer frame finalization — this allows
+        CFAR packets (lower priority in FPGA arbiter) to arrive before
+        the frame is sealed.
         """
         rbin = sample["range_bin"]
         dbin = sample["doppler_bin"]
@@ -1593,9 +1632,10 @@ class RadarAcquisition(threading.Thread):
 
         self._doppler_count += 1
 
-        if self._doppler_count >= NUM_CELLS:
-            # All Doppler cells received — finalize the frame
-            self._finalize_v9_frame()
+        if self._doppler_count >= NUM_CELLS and not self._doppler_complete:
+            # Mark Doppler as complete — defer finalization to collect CFAR
+            self._doppler_complete = True
+            self._doppler_complete_ts = time.time()
 
     def _ingest_v9_cfar(self, sample: Dict):
         """
@@ -1616,10 +1656,14 @@ class RadarAcquisition(threading.Thread):
 
     def _finalize_v9_frame(self):
         """
-        Finalize a v9 frame after all Doppler packets received.
+        Finalize a v9 frame after all Doppler packets received AND CFAR
+        packets have been collected (deferred finalization).
         The range profile comes from accumulated 0xAA packets (last chirp),
         or from the magnitude map if range packets weren't streamed.
         """
+        self._doppler_complete = False
+        self._doppler_complete_ts = 0.0
+
         self._frame.timestamp = time.time()
         self._frame.frame_number = self._frame_num
 
