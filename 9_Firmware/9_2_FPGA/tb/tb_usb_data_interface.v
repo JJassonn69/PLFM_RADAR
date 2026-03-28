@@ -1,33 +1,59 @@
 `timescale 1ns / 1ps
 
+// ============================================================================
+// tb_usb_data_interface.v — v9 Rewrite
+//
+// Isolation testbench for usb_data_interface.v (v9d architecture).
+// Tests the USB FSM module directly without the full radar system wrapper.
+//
+// v9 architecture: Independent packet types (range/doppler/cfar), each with
+// its own header->data->footer path. 4-bit write FSM states. Priority arbiter:
+// Status > Range > Doppler > CFAR.
+//
+// Compile: iverilog -DSIMULATION -o tb_usb -Wall tb/tb_usb_data_interface.v usb_data_interface.v
+// Run:     vvp tb_usb
+// ============================================================================
 module tb_usb_data_interface;
 
     // ── Parameters ─────────────────────────────────────────────
     localparam CLK_PERIOD     = 10.0;  // 100 MHz main clock
-    localparam FT_CLK_PERIOD  = 10.0;  // 100 MHz FT601 clock (asynchronous)
+    localparam FT_CLK_PERIOD  = 10.0;  // 100 MHz FT601 clock
 
-    // State definitions (mirror the DUT)
-    localparam [2:0] S_IDLE           = 3'd0,
-                     S_SEND_HEADER    = 3'd1,
-                     S_SEND_RANGE     = 3'd2,
-                     S_SEND_DOPPLER   = 3'd3,
-                     S_SEND_DETECT    = 3'd4,
-                     S_SEND_FOOTER    = 3'd5,
-                     S_WAIT_ACK       = 3'd6,
-                     S_SEND_STATUS    = 3'd7;  // Gap 2: status readback
+    // v9 Write FSM state definitions (4-bit, mirror the DUT)
+    localparam [3:0] S_IDLE             = 4'd0,
+                     S_SEND_RANGE_HDR   = 4'd1,
+                     S_SEND_RANGE_DATA  = 4'd2,
+                     S_SEND_DOPPLER_HDR = 4'd3,
+                     S_SEND_DOPPLER_DATA= 4'd4,
+                     S_SEND_CFAR_HDR    = 4'd5,
+                     S_SEND_CFAR_DATA   = 4'd6,
+                     S_SEND_FOOTER      = 4'd7,
+                     S_WAIT_ACK         = 4'd8,
+                     S_SEND_STATUS      = 4'd9;
 
     // ── Signals ────────────────────────────────────────────────
     reg         clk;
     reg         reset_n;
 
-    // Radar data inputs
+    // Radar data inputs — Range
     reg  [31:0] range_profile;
     reg         range_valid;
+
+    // Radar data inputs — Doppler (v9: with metadata)
     reg  [15:0] doppler_real;
     reg  [15:0] doppler_imag;
     reg         doppler_valid;
+    reg  [5:0]  doppler_range_bin;
+    reg  [4:0]  doppler_doppler_bin;
+    reg         doppler_sub_frame;
+
+    // Radar data inputs — CFAR (v9: full detection report)
     reg         cfar_detection;
     reg         cfar_valid;
+    reg  [5:0]  cfar_detect_range;
+    reg  [4:0]  cfar_detect_doppler;
+    reg  [16:0] cfar_detect_mag;
+    reg  [16:0] cfar_detect_thr;
 
     // FT601 interface
     wire [31:0] ft601_data;
@@ -53,14 +79,14 @@ module tb_usb_data_interface;
     reg        host_data_drive_en;
     assign ft601_data = host_data_drive_en ? host_data_drive : 32'hzzzz_zzzz;
 
-    // DUT command outputs (Gap 4: USB Read Path)
+    // DUT command outputs (read path)
     wire [31:0] cmd_data;
     wire        cmd_valid;
     wire [7:0]  cmd_opcode;
     wire [7:0]  cmd_addr;
     wire [15:0] cmd_value;
 
-    // Gap 2: Stream control + status readback inputs
+    // Stream control + status readback inputs
     reg  [2:0]  stream_control;
     reg         status_request;
     reg  [15:0] status_cfar_threshold;
@@ -79,7 +105,25 @@ module tb_usb_data_interface;
     reg  [7:0]  status_self_test_detail;
     reg         status_self_test_busy;
 
-    // ── Clock generators (asynchronous) ────────────────────────
+    // CFAR debug counters (v9c)
+    reg  [15:0] cfar_dbg_cells_processed;
+    reg  [7:0]  cfar_dbg_cols_completed;
+    reg  [15:0] cfar_dbg_valid_count;
+    reg  [15:0] cfar_detect_count;
+
+    // Debug outputs
+    wire [15:0] dbg_wr_strobes;
+    wire [15:0] dbg_txe_blocks;
+    wire [15:0] dbg_pkt_starts;
+    wire [15:0] dbg_pkt_completions;
+
+    // v9d pending flag exports
+    wire        range_pending_out;
+    wire        doppler_pending_out;
+    wire        cfar_pending_out;
+    wire        write_idle;
+
+    // ── Clock generators ───────────────────────────────────────
     always #(CLK_PERIOD / 2) clk = ~clk;
     always #(FT_CLK_PERIOD / 2) ft601_clk_in = ~ft601_clk_in;
 
@@ -87,14 +131,29 @@ module tb_usb_data_interface;
     usb_data_interface uut (
         .clk              (clk),
         .reset_n          (reset_n),
-        .ft601_reset_n    (reset_n),     // In TB, share same reset for both domains
+        .ft601_reset_n    (reset_n),
+
+        // Range
         .range_profile    (range_profile),
         .range_valid      (range_valid),
+
+        // Doppler (v9: with metadata)
         .doppler_real     (doppler_real),
         .doppler_imag     (doppler_imag),
         .doppler_valid    (doppler_valid),
+        .doppler_range_bin     (doppler_range_bin),
+        .doppler_doppler_bin   (doppler_doppler_bin),
+        .doppler_sub_frame     (doppler_sub_frame),
+
+        // CFAR (v9: full detection report)
         .cfar_detection   (cfar_detection),
         .cfar_valid       (cfar_valid),
+        .cfar_detect_range   (cfar_detect_range),
+        .cfar_detect_doppler (cfar_detect_doppler),
+        .cfar_detect_mag     (cfar_detect_mag),
+        .cfar_detect_thr     (cfar_detect_thr),
+
+        // FT601 interface
         .ft601_data       (ft601_data),
         .ft601_be         (ft601_be),
         .ft601_txe_n      (ft601_txe_n),
@@ -109,15 +168,15 @@ module tb_usb_data_interface;
         .ft601_swb        (ft601_swb),
         .ft601_clk_out    (ft601_clk_out),
         .ft601_clk_in     (ft601_clk_in),
-        
-        // Host command outputs (Gap 4: USB Read Path)
+
+        // Host command outputs
         .cmd_data         (cmd_data),
         .cmd_valid        (cmd_valid),
         .cmd_opcode       (cmd_opcode),
         .cmd_addr         (cmd_addr),
         .cmd_value        (cmd_value),
 
-        // Gap 2: Stream control + status readback
+        // Stream control + status readback
         .stream_control        (stream_control),
         .status_request        (status_request),
         .status_cfar_threshold (status_cfar_threshold),
@@ -137,10 +196,22 @@ module tb_usb_data_interface;
         .status_self_test_busy  (status_self_test_busy),
 
         // CFAR debug counters (v9c)
-        .cfar_dbg_cells_processed(16'd0),
-        .cfar_dbg_cols_completed(8'd0),
-        .cfar_dbg_valid_count(16'd0),
-        .cfar_detect_count(16'd0)
+        .cfar_dbg_cells_processed(cfar_dbg_cells_processed),
+        .cfar_dbg_cols_completed (cfar_dbg_cols_completed),
+        .cfar_dbg_valid_count    (cfar_dbg_valid_count),
+        .cfar_detect_count       (cfar_detect_count),
+
+        // Debug outputs
+        .dbg_wr_strobes     (dbg_wr_strobes),
+        .dbg_txe_blocks     (dbg_txe_blocks),
+        .dbg_pkt_starts     (dbg_pkt_starts),
+        .dbg_pkt_completions(dbg_pkt_completions),
+
+        // v9d exports
+        .write_idle         (write_idle),
+        .range_pending_out  (range_pending_out),
+        .doppler_pending_out(doppler_pending_out),
+        .cfar_pending_out   (cfar_pending_out)
     );
 
     // ── Test bookkeeping ───────────────────────────────────────
@@ -148,6 +219,42 @@ module tb_usb_data_interface;
     integer fail_count;
     integer test_num;
     integer csv_file;
+
+    // ══════════════════════════════════════════════════════════
+    // CONTINUOUS WRITE MONITOR
+    //
+    // Records every word written to the FT601 bus (wr_n=0 &&
+    // data_oe=1) into a circular buffer. The test stimulus uses
+    // mon_reset to clear and mon_count to read back.
+    // ══════════════════════════════════════════════════════════
+    reg [31:0] mon_buf [0:63];   // up to 64 words per test
+    integer    mon_count;
+    reg        mon_active;       // enable/disable monitoring
+
+    always @(posedge ft601_clk_in) begin
+        if (mon_active && ft601_wr_n === 1'b0 && uut.ft601_data_oe === 1'b1) begin
+            if (mon_count < 64) begin
+                mon_buf[mon_count] = ft601_data;
+                mon_count = mon_count + 1;
+            end
+        end
+    end
+
+    task mon_reset;
+        integer i;
+        begin
+            mon_count = 0;
+            for (i = 0; i < 64; i = i + 1)
+                mon_buf[i] = 32'hDEAD_DEAD;
+            mon_active = 1;
+        end
+    endtask
+
+    task mon_stop;
+        begin
+            mon_active = 0;
+        end
+    endtask
 
     // ── Check task (512-bit label) ─────────────────────────────
     task check;
@@ -167,24 +274,51 @@ module tb_usb_data_interface;
         end
     endtask
 
+    // ── Check with value display (for debugging failures) ──────
+    task check_val;
+        input cond;
+        input [511:0] label;
+        input [31:0] actual;
+        input [31:0] expected;
+        begin
+            test_num = test_num + 1;
+            if (cond) begin
+                $display("[PASS] Test %0d: %0s", test_num, label);
+                pass_count = pass_count + 1;
+                $fwrite(csv_file, "%0d,PASS,%0s\n", test_num, label);
+            end else begin
+                $display("[FAIL] Test %0d: %0s (got=0x%08h, exp=0x%08h)", test_num, label, actual, expected);
+                fail_count = fail_count + 1;
+                $fwrite(csv_file, "%0d,FAIL,%0s\n", test_num, label);
+            end
+        end
+    endtask
+
     // ── Helper: apply reset ────────────────────────────────────
     task apply_reset;
         begin
-            reset_n          = 0;
-            range_profile    = 32'h0;
-            range_valid      = 0;
-            doppler_real     = 16'h0;
-            doppler_imag     = 16'h0;
-            doppler_valid    = 0;
-            cfar_detection   = 0;
-            cfar_valid       = 0;
-            ft601_txe        = 0;   // TX FIFO ready (active low)
-            ft601_rxf        = 1;
-            ft601_srb        = 2'b00;
-            ft601_swb        = 2'b00;
-            host_data_drive  = 32'h0;
-            host_data_drive_en = 0;
-            // Gap 2: Stream control defaults (all streams enabled)
+            mon_active           = 0;
+            reset_n              = 0;
+            range_profile        = 32'h0;
+            range_valid          = 0;
+            doppler_real         = 16'h0;
+            doppler_imag         = 16'h0;
+            doppler_valid        = 0;
+            doppler_range_bin    = 6'd0;
+            doppler_doppler_bin  = 5'd0;
+            doppler_sub_frame    = 1'b0;
+            cfar_detection       = 0;
+            cfar_valid           = 0;
+            cfar_detect_range    = 6'd0;
+            cfar_detect_doppler  = 5'd0;
+            cfar_detect_mag      = 17'd0;
+            cfar_detect_thr      = 17'd0;
+            ft601_txe            = 0;
+            ft601_rxf            = 1;
+            ft601_srb            = 2'b00;
+            ft601_swb            = 2'b00;
+            host_data_drive      = 32'h0;
+            host_data_drive_en   = 0;
             stream_control        = 3'b111;
             status_request        = 0;
             status_cfar_threshold = 16'd10000;
@@ -200,18 +334,20 @@ module tb_usb_data_interface;
             status_self_test_flags  = 5'b00000;
             status_self_test_detail = 8'd0;
             status_self_test_busy   = 1'b0;
+            cfar_dbg_cells_processed = 16'd0;
+            cfar_dbg_cols_completed  = 8'd0;
+            cfar_dbg_valid_count     = 16'd0;
+            cfar_detect_count        = 16'd0;
             repeat (6) @(posedge ft601_clk_in);
             reset_n = 1;
-            // Wait enough cycles for stream_control CDC to propagate
-            // (DUT resets stream_ctrl_sync to 3'b001; TB sets stream_control=3'b111
-            // which needs 2-stage sync + 1 cycle = 4+ ft601_clk cycles)
-            repeat (6) @(posedge ft601_clk_in);
+            // Wait for stream_control CDC (2-stage sync) + startup lockout (255 cycles)
+            repeat (260) @(posedge ft601_clk_in);
         end
     endtask
 
-    // ── Helper: wait for DUT to reach a specific state ─────────
+    // ── Helper: wait for DUT to reach a specific write FSM state ─
     task wait_for_state;
-        input [2:0] target;
+        input [3:0] target;
         input integer max_cyc;
         integer cnt;
         begin
@@ -223,82 +359,87 @@ module tb_usb_data_interface;
         end
     endtask
 
-    // ── Helper: assert range_valid in clk domain, wait for CDC ──
-    task assert_range_valid;
+    // ── Helper: wait for FSM to return to IDLE ─────────────────
+    task wait_idle;
+        input integer max_cyc;
+        begin
+            wait_for_state(S_IDLE, max_cyc);
+        end
+    endtask
+
+    // ── Helper: wait for a packet to fully complete ────────────
+    // First waits for the FSM to LEAVE IDLE (proving it started),
+    // then waits for it to RETURN to IDLE (proving it finished).
+    // This avoids the NBA race where wait_idle returns immediately
+    // because the FSM hasn't left IDLE yet.
+    task wait_packet_done;
+        input integer max_cyc;
+        integer cnt;
+        begin
+            // Phase 1: Wait for FSM to leave IDLE
+            cnt = 0;
+            while (uut.current_state === S_IDLE && cnt < max_cyc) begin
+                @(posedge ft601_clk_in);
+                cnt = cnt + 1;
+            end
+            // Phase 2: Wait for FSM to return to IDLE
+            wait_for_state(S_IDLE, max_cyc);
+        end
+    endtask
+
+    // ── Helper: pulse range_valid for one ft601_clk cycle ──────
+    task pulse_range_valid;
         input [31:0] data;
         begin
-            @(posedge clk);
+            @(posedge ft601_clk_in);
             range_profile = data;
             range_valid   = 1;
-            repeat (3) @(posedge ft601_clk_in);
-            @(posedge clk);
+            @(posedge ft601_clk_in);
             range_valid = 0;
-            repeat (3) @(posedge ft601_clk_in);
         end
     endtask
 
-    // Pulse doppler_valid once (produces ONE rising-edge in ft601 domain)
-    task pulse_doppler_once;
+    // ── Helper: pulse doppler_valid for one ft601_clk cycle ────
+    task pulse_doppler_valid;
         input [15:0] dr;
         input [15:0] di;
+        input [5:0]  rbin;
+        input [4:0]  dbin;
+        input        sub;
         begin
-            @(posedge clk);
-            doppler_real  = dr;
-            doppler_imag  = di;
-            doppler_valid = 1;
-            repeat (3) @(posedge ft601_clk_in);
-            @(posedge clk);
+            @(posedge ft601_clk_in);
+            doppler_real        = dr;
+            doppler_imag        = di;
+            doppler_range_bin   = rbin;
+            doppler_doppler_bin = dbin;
+            doppler_sub_frame   = sub;
+            doppler_valid       = 1;
+            @(posedge ft601_clk_in);
             doppler_valid = 0;
-            repeat (3) @(posedge ft601_clk_in);
         end
     endtask
 
-    // Pulse cfar_valid once
-    task pulse_cfar_once;
-        input det;
+    // ── Helper: pulse cfar_valid for one ft601_clk cycle ───────
+    task pulse_cfar_valid;
+        input        det;
+        input [5:0]  rbin;
+        input [4:0]  dbin;
+        input [16:0] mag;
+        input [16:0] thr;
         begin
-            @(posedge clk);
-            cfar_detection = det;
-            cfar_valid     = 1;
-            repeat (3) @(posedge ft601_clk_in);
-            @(posedge clk);
+            @(posedge ft601_clk_in);
+            cfar_detection      = det;
+            cfar_detect_range   = rbin;
+            cfar_detect_doppler = dbin;
+            cfar_detect_mag     = mag;
+            cfar_detect_thr     = thr;
+            cfar_valid          = 1;
+            @(posedge ft601_clk_in);
             cfar_valid = 0;
-            repeat (3) @(posedge ft601_clk_in);
         end
     endtask
 
-    // Set data_pending flags directly via hierarchical access.
-    // This is the standard TB technique for internal state setup —
-    // bypasses the CDC path for immediate, reliable flag setting.
-    // Call BEFORE assert_range_valid in tests that need SEND_DOPPLER/DETECT.
-    task preload_pending_data;
-        begin
-            @(posedge ft601_clk_in);
-            uut.doppler_data_pending = 1'b1;
-            uut.cfar_data_pending    = 1'b1;
-            @(posedge ft601_clk_in);
-        end
-    endtask
-
-    // Set only doppler pending (no cfar)
-    task preload_doppler_pending;
-        begin
-            @(posedge ft601_clk_in);
-            uut.doppler_data_pending = 1'b1;
-            @(posedge ft601_clk_in);
-        end
-    endtask
-
-    // Set only cfar pending (no doppler)
-    task preload_cfar_pending;
-        begin
-            @(posedge ft601_clk_in);
-            uut.cfar_data_pending = 1'b1;
-            @(posedge ft601_clk_in);
-        end
-    endtask
-
-    // ── Helper: wait for read FSM to reach a specific state ───
+    // ── Helper: wait for read FSM state ────────────────────────
     task wait_for_read_state;
         input [2:0] target;
         input integer max_cyc;
@@ -312,60 +453,32 @@ module tb_usb_data_interface;
         end
     endtask
 
-    // ── Helper: send a single host command word via the read path ──
-    // Simulates the FT601 host presenting a 32-bit command word.
-    // Protocol: Assert RXF=0 (data available), wait for OE_N=0,
-    // drive data bus, wait for RD_N=0, then release.
+    // ── Helper: send a host command via the read path ──────────
+    // Word layout matching RTL decode (usb_data_interface.v:425-429):
+    //   cmd_opcode = rx_data_captured[7:0]
+    //   cmd_addr   = rx_data_captured[15:8]
+    //   cmd_value  = {rx_data_captured[23:16], rx_data_captured[31:24]}
     task send_host_command;
-        input [31:0] cmd_word;
+        input [7:0]  opcode;
+        input [7:0]  addr;
+        input [15:0] value;
+        reg [31:0] cmd_word;
         begin
-            // Signal host has data
+            cmd_word = {value[7:0], value[15:8], addr, opcode};
             ft601_rxf = 0;
-            // Wait for FPGA to assert OE_N (bus turnaround)
-            wait_for_read_state(3'd1, 20); // RD_OE_ASSERT = 3'd1
+            wait_for_read_state(3'd1, 20); // RD_OE_ASSERT
             @(posedge ft601_clk_in); #1;
-            // Drive data bus (FT601 drives in real hardware)
             host_data_drive = cmd_word;
             host_data_drive_en = 1;
-            // Wait for FPGA to assert RD_N=0 (RD_READING state)
-            wait_for_read_state(3'd2, 20); // RD_READING = 3'd2
+            wait_for_read_state(3'd2, 20); // RD_READING
             @(posedge ft601_clk_in); #1;
-            // Data has been sampled. FPGA deasserts RD then OE.
-            // Wait for RD_PROCESS or back to RD_IDLE
-            wait_for_read_state(3'd4, 20); // RD_PROCESS = 3'd4
-            // Release bus and deassert RXF early so ft601_rxf_r is
-            // updated by the time the read FSM returns to RD_IDLE
-            // (1-cycle input pipeline latency).
+            wait_for_read_state(3'd4, 20); // RD_PROCESS
             host_data_drive_en = 0;
             host_data_drive = 32'h0;
             ft601_rxf = 1;
             @(posedge ft601_clk_in); #1;
-            // Wait for read FSM to return to idle
-            wait_for_read_state(3'd0, 20); // RD_IDLE = 3'd0
-            // Extra cycle to ensure ft601_rxf_r has settled to 1
+            wait_for_read_state(3'd0, 20); // RD_IDLE
             @(posedge ft601_clk_in); #1;
-        end
-    endtask
-
-    // Drive a complete packet through the FSM by sequentially providing
-    // range, doppler (4x), and cfar valid pulses.
-    task drive_full_packet;
-        input [31:0] rng;
-        input [15:0] dr;
-        input [15:0] di;
-        input        det;
-        begin
-            // Pre-load pending flags so FSM enters doppler/cfar states
-            preload_pending_data;
-            assert_range_valid(rng);
-            wait_for_state(S_SEND_DOPPLER, 100);
-            pulse_doppler_once(dr, di);
-            pulse_doppler_once(dr, di);
-            pulse_doppler_once(dr, di);
-            pulse_doppler_once(dr, di);
-            wait_for_state(S_SEND_DETECT, 100);
-            pulse_cfar_once(det);
-            wait_for_state(S_IDLE, 100);
         end
     endtask
 
@@ -379,6 +492,8 @@ module tb_usb_data_interface;
         pass_count   = 0;
         fail_count   = 0;
         test_num     = 0;
+        mon_active   = 0;
+        mon_count    = 0;
         host_data_drive    = 32'h0;
         host_data_drive_en = 0;
 
@@ -386,7 +501,7 @@ module tb_usb_data_interface;
         $fwrite(csv_file, "test_num,pass_fail,label\n");
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 1: Reset behaviour
+        // TEST GROUP 1: Reset Behaviour
         // ════════════════════════════════════════════════════════
         $display("\n--- Test Group 1: Reset Behaviour ---");
         apply_reset;
@@ -405,345 +520,479 @@ module tb_usb_data_interface;
               "ft601_oe_n=1 after reset");
         check(ft601_siwu_n === 1'b1,
               "ft601_siwu_n=1 after reset");
-
-        // ════════════════════════════════════════════════════════
-        // TEST GROUP 2: Range data packet
-        //
-        // Use backpressure to freeze the FSM at specific states
-        // so we can reliably sample outputs.
-        // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 2: Range Data Packet ---");
-        apply_reset;
-
-        // Stall at SEND_HEADER so we can verify first range word later
-        ft601_txe = 1;
-        preload_pending_data;
-        assert_range_valid(32'hDEAD_BEEF);
-        wait_for_state(S_SEND_HEADER, 50);
-        repeat (2) @(posedge ft601_clk_in); #1;
-        check(uut.current_state === S_SEND_HEADER,
-              "Stalled in SEND_HEADER (backpressure)");
-
-        // Release: FSM drives header then moves to SEND_RANGE_DATA
-        ft601_txe = 0;
-        // +1 cycle for input pipeline register (ft601_txe_r)
-        @(posedge ft601_clk_in); #1;
-        // Now the FSM registered the header output and will transition
-        // At the NEXT posedge the state becomes SEND_RANGE_DATA
-        @(posedge ft601_clk_in); #1;
-        @(posedge ft601_clk_in); #1;
-
-        check(uut.current_state === S_SEND_RANGE,
-              "Entered SEND_RANGE_DATA after header");
-
-        // The first range word should be on the data bus (byte_counter=0 just
-        // drove range_profile_cap, byte_counter incremented to 1)
-        check(uut.ft601_data_out === 32'hDEAD_BEEF || uut.byte_counter <= 8'd1,
-              "Range data word 0 driven (range_profile_cap)");
-
-        check(ft601_wr_n === 1'b0,
-              "Write strobe active during range data");
-
-        check(ft601_be === 4'b1111,
-              "Byte enable=1111 for range data");
-
-        // Wait for all 4 range words to complete
-        wait_for_state(S_SEND_DOPPLER, 50);
-        #1;
-        check(uut.current_state === S_SEND_DOPPLER,
-              "Advanced to SEND_DOPPLER_DATA after 4 range words");
-
-        // ════════════════════════════════════════════════════════
-        // TEST GROUP 3: Header verification (stall to observe)
-        // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 3: Header Verification ---");
-        apply_reset;
-        ft601_txe = 1;  // Stall at SEND_HEADER
-
-        @(posedge clk);
-        range_profile = 32'hCAFE_BABE;
-        range_valid   = 1;
-        repeat (4) @(posedge ft601_clk_in);
-        @(posedge clk);
-        range_valid = 0;
-        repeat (3) @(posedge ft601_clk_in);
-
-        wait_for_state(S_SEND_HEADER, 50);
-        repeat (2) @(posedge ft601_clk_in); #1;
-
-        check(uut.current_state === S_SEND_HEADER,
-              "Stalled in SEND_HEADER with backpressure");
-
-        // Release backpressure - header will be latched at next posedge
-        // +1 cycle for input pipeline register (ft601_txe_r)
-        ft601_txe = 0;
-        @(posedge ft601_clk_in); #1;
-        @(posedge ft601_clk_in); #1;
-
-        check(uut.ft601_data_out[7:0] === 8'hAA,
-              "Header byte 0xAA on data bus");
-        check(ft601_be === 4'b0001,
-              "Byte enable=0001 for header (lower byte only)");
-        check(ft601_wr_n === 1'b0,
-              "Write strobe active during header");
-        check(uut.ft601_data_oe === 1'b1,
-              "Data bus output enabled during header");
-
-        // ════════════════════════════════════════════════════════
-        // TEST GROUP 4: Doppler data verification
-        // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 4: Doppler Data Verification ---");
-        apply_reset;
-        ft601_txe = 0;
-
-        // Preload only doppler pending (not cfar) so the FSM sends
-        // doppler data. After doppler, SEND_DETECT sees cfar_data_pending=0
-        // and skips to SEND_FOOTER, then WAIT_ACK, then IDLE.
-        preload_doppler_pending;
-        assert_range_valid(32'h0000_0001);
-        wait_for_state(S_SEND_DOPPLER, 100);
-        #1;
-        check(uut.current_state === S_SEND_DOPPLER,
-              "Reached SEND_DOPPLER_DATA");
-
-        // Provide doppler data via valid pulse (updates captured values)
-        @(posedge clk);
-        doppler_real  = 16'hAAAA;
-        doppler_imag  = 16'h5555;
-        doppler_valid = 1;
-        repeat (3) @(posedge ft601_clk_in);
-        @(posedge clk);
-        doppler_valid = 0;
-        repeat (4) @(posedge ft601_clk_in); #1;
-
-        check(uut.doppler_real_cap === 16'hAAAA,
-              "doppler_real captured correctly");
-        check(uut.doppler_imag_cap === 16'h5555,
-              "doppler_imag captured correctly");
-
-        // The FSM has doppler_data_pending set and sends 4 bytes, then
-        // transitions past SEND_DETECT (cfar_data_pending=0) to IDLE.
-        wait_for_state(S_IDLE, 100);
-        #1;
-        check(uut.current_state === S_IDLE,
-              "Doppler done, packet completed");
-
-        // ════════════════════════════════════════════════════════
-        // TEST GROUP 5: CFAR detection data
-        // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 5: CFAR Detection Data ---");
-        // Start a new packet with both doppler and cfar pending to verify
-        // cfar data is properly sent in SEND_DETECTION_DATA.
-        apply_reset;
-        ft601_txe = 0;
-        preload_pending_data;
-        assert_range_valid(32'h0000_0002);
-        // FSM races through: HEADER -> RANGE -> DOPPLER -> DETECT -> FOOTER -> IDLE
-        // All pending flags consumed proves SEND_DETECT was entered.
-        wait_for_state(S_IDLE, 200);
-        #1;
+        check(uut.range_data_pending === 1'b0,
+              "range_data_pending=0 after reset");
+        check(uut.doppler_data_pending === 1'b0,
+              "doppler_data_pending=0 after reset");
         check(uut.cfar_data_pending === 1'b0,
-              "Starting in SEND_DETECTION_DATA");
+              "cfar_data_pending=0 after reset");
 
-        // Verify the full packet completed with cfar data consumed
-        check(uut.current_state === S_IDLE &&
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 2: Range Packet (0xAA)
+        //
+        // v9: Range triggers its own independent packet:
+        //   [0xAA hdr] [data] [data<<8] [data<<16] [data<<24] [0x55 footer]
+        //   = 6 words total
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 2: Range Packet ---");
+        apply_reset;
+        ft601_txe = 0;
+        mon_reset;
+
+        pulse_range_valid(32'hDEAD_BEEF);
+        wait_packet_done(200);
+        repeat (2) @(posedge ft601_clk_in);
+        mon_stop;
+
+        check_val(mon_count == 6, "Range packet: 6 words captured",
+                  mon_count, 6);
+        check_val(mon_buf[0] === {24'h000000, 8'hAA},
+                  "Range packet: word 0 = header 0xAA",
+                  mon_buf[0], {24'h000000, 8'hAA});
+        check_val(mon_buf[1] === 32'hDEAD_BEEF,
+                  "Range packet: word 1 = range_profile_cap",
+                  mon_buf[1], 32'hDEAD_BEEF);
+        check_val(mon_buf[2] === {24'hADBEEF, 8'h00},
+                  "Range packet: word 2 = data<<8",
+                  mon_buf[2], {24'hADBEEF, 8'h00});
+        check_val(mon_buf[3] === {16'hBEEF, 16'h0000},
+                  "Range packet: word 3 = data<<16",
+                  mon_buf[3], {16'hBEEF, 16'h0000});
+        check_val(mon_buf[4] === {8'hEF, 24'h000000},
+                  "Range packet: word 4 = data<<24",
+                  mon_buf[4], {8'hEF, 24'h000000});
+        check_val(mon_buf[5] === {24'h000000, 8'h55},
+                  "Range packet: word 5 = footer 0x55",
+                  mon_buf[5], {24'h000000, 8'h55});
+
+        check(uut.current_state === S_IDLE,
+              "Range packet: FSM back in IDLE");
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 3: Doppler Packet (0xCC)
+        //
+        // v9: Independent Doppler packet:
+        //   [0xCC hdr] [metadata+I] [Q+I] [0x55 footer] = 4 words
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 3: Doppler Packet ---");
+        apply_reset;
+        ft601_txe = 0;
+        mon_reset;
+
+        pulse_doppler_valid(16'h1234, 16'h5678, 6'd42, 5'd15, 1'b1);
+        wait_packet_done(200);
+        repeat (2) @(posedge ft601_clk_in);
+        mon_stop;
+
+        check_val(mon_count == 4, "Doppler packet: 4 words captured",
+                  mon_count, 4);
+        check_val(mon_buf[0] === {24'h000000, 8'hCC},
+                  "Doppler packet: word 0 = header 0xCC",
+                  mon_buf[0], {24'h000000, 8'hCC});
+
+        // Word 1: {range_bin[5:0], doppler_bin[4:0], sub_frame, 4'b0000, I[15:0]}
+        // range_bin=42=6'b101010, doppler_bin=15=5'b01111, sub_frame=1
+        begin : doppler_word1_check
+            reg [31:0] exp_w1;
+            exp_w1 = {6'd42, 5'd15, 1'b1, 4'b0000, 16'h1234};
+            check_val(mon_buf[1] === exp_w1,
+                      "Doppler packet: word 1 = metadata+I",
+                      mon_buf[1], exp_w1);
+        end
+
+        // Word 2: {Q[15:0], I[15:0]}
+        check_val(mon_buf[2] === {16'h5678, 16'h1234},
+                  "Doppler packet: word 2 = {Q, I}",
+                  mon_buf[2], {16'h5678, 16'h1234});
+        check_val(mon_buf[3] === {24'h000000, 8'h55},
+                  "Doppler packet: word 3 = footer 0x55",
+                  mon_buf[3], {24'h000000, 8'h55});
+
+        check(uut.current_state === S_IDLE,
+              "Doppler packet: FSM back in IDLE");
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 4: CFAR Detection Packet (0xDD)
+        //
+        // v9: Independent CFAR packet:
+        //   [0xDD hdr] [flag+range+doppler+mag] [threshold] [0x55] = 4 words
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 4: CFAR Detection Packet ---");
+        apply_reset;
+        ft601_txe = 0;
+        mon_reset;
+
+        pulse_cfar_valid(1'b1, 6'd33, 5'd10, 17'd98765, 17'd54321);
+        wait_packet_done(200);
+        repeat (2) @(posedge ft601_clk_in);
+        mon_stop;
+
+        check_val(mon_count == 4, "CFAR packet: 4 words captured",
+                  mon_count, 4);
+        check_val(mon_buf[0] === {24'h000000, 8'hDD},
+                  "CFAR packet: word 0 = header 0xDD",
+                  mon_buf[0], {24'h000000, 8'hDD});
+
+        // Word 1: {flag, range[5:0], doppler[4:0], 3'b000, mag[16:0]}
+        begin : cfar_word1_check
+            reg [31:0] exp_w1;
+            exp_w1 = {1'b1, 6'd33, 5'd10, 3'b000, 17'd98765};
+            check_val(mon_buf[1] === exp_w1,
+                      "CFAR packet: word 1 = {flag,range,doppler,mag}",
+                      mon_buf[1], exp_w1);
+        end
+
+        // Word 2: {15'b0, threshold[16:0]}
+        check_val(mon_buf[2] === {15'b0, 17'd54321},
+                  "CFAR packet: word 2 = threshold",
+                  mon_buf[2], {15'b0, 17'd54321});
+        check_val(mon_buf[3] === {24'h000000, 8'h55},
+                  "CFAR packet: word 3 = footer 0x55",
+                  mon_buf[3], {24'h000000, 8'h55});
+
+        check(uut.current_state === S_IDLE,
+              "CFAR packet: FSM back in IDLE");
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 5: Priority Arbiter
+        //
+        // When multiple data types are pending simultaneously,
+        // the FSM should service them in priority order:
+        // Range > Doppler > CFAR.
+        //
+        // Strategy: assert all three valid simultaneously, then
+        // monitor which headers appear in order.
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 5: Priority Arbiter ---");
+        apply_reset;
+        ft601_txe = 0;
+        mon_reset;
+
+        // Assert all three valid simultaneously
+        @(posedge ft601_clk_in);
+        range_profile       = 32'hAAAA_1111;
+        range_valid         = 1;
+        doppler_real        = 16'hBBBB;
+        doppler_imag        = 16'hCCCC;
+        doppler_range_bin   = 6'd1;
+        doppler_doppler_bin = 5'd2;
+        doppler_sub_frame   = 1'b0;
+        doppler_valid       = 1;
+        cfar_detection      = 1'b1;
+        cfar_detect_range   = 6'd3;
+        cfar_detect_doppler = 5'd4;
+        cfar_detect_mag     = 17'd1000;
+        cfar_detect_thr     = 17'd500;
+        cfar_valid          = 1;
+        @(posedge ft601_clk_in);
+        range_valid   = 0;
+        doppler_valid = 0;
+        cfar_valid    = 0;
+
+        // Wait for all three packets to complete
+        // Range(6) + Doppler(4) + CFAR(4) = 14 words + WAIT_ACK gaps
+        // Use wait_packet_done for first, then wait for subsequent IDLE returns
+        wait_packet_done(100);  // After range packet
+        repeat (2) @(posedge ft601_clk_in);
+        wait_packet_done(100);  // After doppler packet
+        repeat (2) @(posedge ft601_clk_in);
+        wait_packet_done(100);  // After cfar packet
+        repeat (2) @(posedge ft601_clk_in);
+        mon_stop;
+
+        // Should have captured 14 words total: 6(range) + 4(doppler) + 4(cfar)
+        check_val(mon_count == 14, "Priority: 14 total words (6+4+4)",
+                  mon_count, 14);
+
+        // First packet header should be range (0xAA)
+        check_val(mon_buf[0] === {24'h0, 8'hAA},
+                  "Priority: first header = 0xAA (range)",
+                  mon_buf[0], {24'h0, 8'hAA});
+        // Second packet header at index 6 should be doppler (0xCC)
+        check_val(mon_buf[6] === {24'h0, 8'hCC},
+                  "Priority: second header = 0xCC (doppler)",
+                  mon_buf[6], {24'h0, 8'hCC});
+        // Third packet header at index 10 should be cfar (0xDD)
+        check_val(mon_buf[10] === {24'h0, 8'hDD},
+                  "Priority: third header = 0xDD (cfar)",
+                  mon_buf[10], {24'h0, 8'hDD});
+
+        check(uut.current_state === S_IDLE,
+              "Priority: FSM back in IDLE");
+        check(uut.range_data_pending === 1'b0 &&
               uut.doppler_data_pending === 1'b0 &&
               uut.cfar_data_pending === 1'b0,
-              "CFAR detection sent, FSM advanced past SEND_DETECTION_DATA");
+              "Priority: all pending flags cleared");
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 6: Footer check
+        // TEST GROUP 6: Disabled-Stream Discard (v9d)
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 6: Disabled-Stream Discard ---");
+
+        // 6a: Disable doppler stream, pulse doppler_valid
+        apply_reset;
+        ft601_txe = 0;
+        stream_control = 3'b101;  // range + cfar only
+        repeat (6) @(posedge ft601_clk_in);
+
+        pulse_doppler_valid(16'hAAAA, 16'h5555, 6'd0, 5'd0, 1'b0);
+        repeat (5) @(posedge ft601_clk_in); #1;
+        check(uut.doppler_data_pending === 1'b0,
+              "Discard: doppler pending cleared when stream disabled");
+
+        // 6b: Disable range stream, pulse range_valid
+        apply_reset;
+        ft601_txe = 0;
+        stream_control = 3'b110;
+        repeat (6) @(posedge ft601_clk_in);
+
+        pulse_range_valid(32'h1234_5678);
+        repeat (5) @(posedge ft601_clk_in); #1;
+        check(uut.range_data_pending === 1'b0,
+              "Discard: range pending cleared when stream disabled");
+
+        // 6c: Disable cfar stream, pulse cfar_valid
+        apply_reset;
+        ft601_txe = 0;
+        stream_control = 3'b011;
+        repeat (6) @(posedge ft601_clk_in);
+
+        pulse_cfar_valid(1'b1, 6'd5, 5'd3, 17'd100, 17'd50);
+        repeat (5) @(posedge ft601_clk_in); #1;
+        check(uut.cfar_data_pending === 1'b0,
+              "Discard: cfar pending cleared when stream disabled");
+
+        // 6d: Disable all streams — no packets should be sent
+        apply_reset;
+        ft601_txe = 0;
+        stream_control = 3'b000;
+        repeat (6) @(posedge ft601_clk_in);
+
+        pulse_range_valid(32'hDEAD_DEAD);
+        repeat (10) @(posedge ft601_clk_in); #1;
+        check(uut.current_state === S_IDLE,
+              "Discard: FSM stays IDLE when all streams disabled");
+        check(uut.range_data_pending === 1'b0,
+              "Discard: range pending discarded when all disabled");
+
+        // 6e: Disable doppler, enable range+cfar: pulse all three.
+        // Should get range + cfar packets, no doppler.
+        apply_reset;
+        ft601_txe = 0;
+        stream_control = 3'b101;
+        repeat (6) @(posedge ft601_clk_in);
+        mon_reset;
+
+        @(posedge ft601_clk_in);
+        range_profile       = 32'hFACE_FEED;
+        range_valid         = 1;
+        doppler_real        = 16'h1111;
+        doppler_imag        = 16'h2222;
+        doppler_valid       = 1;
+        cfar_detection      = 1'b1;
+        cfar_detect_range   = 6'd10;
+        cfar_detect_doppler = 5'd5;
+        cfar_detect_mag     = 17'd2000;
+        cfar_detect_thr     = 17'd1000;
+        cfar_valid          = 1;
+        @(posedge ft601_clk_in);
+        range_valid   = 0;
+        doppler_valid = 0;
+        cfar_valid    = 0;
+
+        // Wait for packets to complete
+        wait_packet_done(200);
+        repeat (2) @(posedge ft601_clk_in);
+        wait_packet_done(200);
+        repeat (2) @(posedge ft601_clk_in);
+        mon_stop;
+
+        // Should get 10 words: range(6) + cfar(4), no doppler
+        check_val(mon_count == 10, "Discard mix: 10 words (6+4, no doppler)",
+                  mon_count, 10);
+        check_val(mon_buf[0] === {24'h0, 8'hAA},
+                  "Discard mix: first header = 0xAA (range)",
+                  mon_buf[0], {24'h0, 8'hAA});
+        check_val(mon_buf[6] === {24'h0, 8'hDD},
+                  "Discard mix: second header = 0xDD (cfar, doppler skipped)",
+                  mon_buf[6], {24'h0, 8'hDD});
+        check(uut.doppler_data_pending === 1'b0,
+              "Discard mix: doppler pending was discarded");
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 7: Pending Flag Exports (v9d)
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 7: Pending Flag Exports ---");
+        apply_reset;
+        ft601_txe = 1;  // Backpressure to stall at HDR state
+
+        // Pulse range_valid — pending goes high, then IDLE consumes
+        // it and transitions to SEND_RANGE_HDR, but stalls there
+        // because ft601_txe_r=1. The pending flag is cleared in IDLE
+        // transition, so we must check BEFORE the IDLE arbiter fires.
         //
-        // Strategy: drive packet with ft601_txe=0 all the way through.
-        // The SEND_FOOTER state is only active for 1 cycle, but we can
-        // poll the state machine at each ft601_clk_in edge to observe
-        // it. We use a monitor-style approach: run the packet and
-        // capture what ft601_data_out contains when we see SEND_FOOTER.
-        // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 6: Footer Check ---");
-        apply_reset;
-        ft601_txe = 0;
-
-        // Drive packet through range data
-        preload_pending_data;
-        assert_range_valid(32'hFACE_FEED);
-        wait_for_state(S_SEND_DOPPLER, 100);
-        // Feed doppler data (need 4 pulses)
-        pulse_doppler_once(16'h1111, 16'h2222);
-        pulse_doppler_once(16'h1111, 16'h2222);
-        pulse_doppler_once(16'h1111, 16'h2222);
-        pulse_doppler_once(16'h1111, 16'h2222);
-        wait_for_state(S_SEND_DETECT, 100);
-        // Feed cfar data, but keep ft601_txe=0 so it flows through
-        pulse_cfar_once(1'b1);
-
-        // Now the FSM should pass through SEND_FOOTER quickly.
-        // Use wait_for_state to reach SEND_FOOTER, or it may already
-        // be at WAIT_ACK/IDLE. Let's catch WAIT_ACK or IDLE.
-        // The footer values are latched into registers, so we can
-        // verify them even after the state transitions.
-        // Key verification: the FOOTER constant (0x55) must have been
-        // driven. We check this by looking at the constant definition.
-        // Since we can't easily freeze the FSM at SEND_FOOTER without
-        // also stalling SEND_DETECTION_DATA (both check ft601_txe),
-        // we verify the footer indirectly:
-        // 1. The packet completed (reached IDLE/WAIT_ACK)
-        // 2. ft601_data_out last held 0x55 during SEND_FOOTER
-
-        wait_for_state(S_IDLE, 100);
+        // Actually, the pending flag is cleared INSIDE the IDLE case
+        // (RTL line 477: range_data_pending <= 1'b0 when going to
+        // SEND_RANGE_HDR). So by the time we check, it's already 0.
+        //
+        // Better test: check that the EXPORT wire matches internal reg.
+        // We can verify by hierarchical access.
+        @(posedge ft601_clk_in);
+        range_profile = 32'hABCD_EF01;
+        range_valid   = 1;
+        @(posedge ft601_clk_in);
+        range_valid = 0;
+        // At this point, range_data_pending was just set. On the NEXT
+        // posedge, IDLE will consume it. Check immediately.
         #1;
-        // If we reached IDLE, the full sequence ran including footer
-        check(uut.current_state === S_IDLE,
-              "Full packet incl. footer completed, back in IDLE");
+        check(range_pending_out === uut.range_data_pending,
+              "Pending export: range_pending_out matches internal flag");
 
-        // The registered ft601_data_out should still hold 0x55 from
-        // SEND_FOOTER (WAIT_ACK and IDLE don't overwrite ft601_data_out).
-        // Actually, looking at the DUT: WAIT_ACK only sets wr_n=1 and
-        // data_oe=0, it doesn't change ft601_data_out. So it retains 0x55.
-        check(uut.ft601_data_out[7:0] === 8'h55,
-              "ft601_data_out retains footer 0x55 after packet");
+        // Verify the export goes to 0 after consumption
+        wait_for_state(S_SEND_RANGE_HDR, 10);
+        repeat (2) @(posedge ft601_clk_in); #1;
+        check(range_pending_out === 1'b0,
+              "Pending export: range_pending_out=0 after IDLE consumes");
 
-        // Verify WAIT_ACK behavior by doing another packet and catching it
-        apply_reset;
+        // Release backpressure, let packet complete
         ft601_txe = 0;
-        preload_pending_data;
-        assert_range_valid(32'h1234_5678);
-        wait_for_state(S_SEND_DOPPLER, 100);
-        pulse_doppler_once(16'hABCD, 16'hEF01);
-        pulse_doppler_once(16'hABCD, 16'hEF01);
-        pulse_doppler_once(16'hABCD, 16'hEF01);
-        pulse_doppler_once(16'hABCD, 16'hEF01);
-        wait_for_state(S_SEND_DETECT, 100);
-        pulse_cfar_once(1'b0);
-        // WAIT_ACK lasts exactly 1 ft601_clk_in cycle then goes IDLE.
-        // Poll for IDLE (which means WAIT_ACK already happened).
-        wait_for_state(S_IDLE, 100);
-        #1;
-        check(uut.current_state === S_IDLE,
-              "Returned to IDLE after WAIT_ACK");
-        check(ft601_wr_n === 1'b1,
-              "ft601_wr_n deasserted in IDLE (was deasserted in WAIT_ACK)");
-        check(uut.ft601_data_oe === 1'b0,
-              "Data bus released in IDLE (was released in WAIT_ACK)");
+        wait_idle(200);
 
-        // ════════════════════════════════════════════════════════
-        // TEST GROUP 7: Full packet sequence (end-to-end)
-        // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 7: Full Packet Sequence ---");
-        apply_reset;
-        ft601_txe = 0;
-
-        drive_full_packet(32'hCAFE_BABE, 16'h1234, 16'h5678, 1'b1);
-
-        check(uut.current_state === S_IDLE,
-              "Full packet completed, back in IDLE");
-
-        // ════════════════════════════════════════════════════════
-        // TEST GROUP 8: FIFO backpressure
-        // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 8: FIFO Backpressure ---");
-        apply_reset;
+        // Same test for doppler
         ft601_txe = 1;
+        @(posedge ft601_clk_in);
+        doppler_valid = 1;
+        @(posedge ft601_clk_in);
+        doppler_valid = 0;
+        #1;
+        check(doppler_pending_out === uut.doppler_data_pending,
+              "Pending export: doppler_pending_out matches internal flag");
 
-        assert_range_valid(32'hBBBB_CCCC);
+        ft601_txe = 0;
+        wait_idle(200);
 
-        wait_for_state(S_SEND_HEADER, 50);
+        // Same test for cfar
+        ft601_txe = 1;
+        @(posedge ft601_clk_in);
+        cfar_valid = 1;
+        cfar_detection = 1'b1;
+        @(posedge ft601_clk_in);
+        cfar_valid = 0;
+        #1;
+        check(cfar_pending_out === uut.cfar_data_pending,
+              "Pending export: cfar_pending_out matches internal flag");
+
+        ft601_txe = 0;
+        wait_idle(200);
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 8: Backpressure (ft601_txe stall)
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 8: Backpressure ---");
+        apply_reset;
+        ft601_txe = 1;  // FIFO full
+
+        pulse_range_valid(32'hBBBB_CCCC);
+
+        wait_for_state(S_SEND_RANGE_HDR, 50);
         repeat (10) @(posedge ft601_clk_in); #1;
 
-        check(uut.current_state === S_SEND_HEADER,
-              "Stalled in SEND_HEADER when ft601_txe=1 (FIFO full)");
+        check(uut.current_state === S_SEND_RANGE_HDR,
+              "Backpressure: stalled in SEND_RANGE_HDR when ft601_txe=1");
         check(ft601_wr_n === 1'b1,
-              "ft601_wr_n not asserted during backpressure stall");
+              "Backpressure: ft601_wr_n=1 during stall");
 
         ft601_txe = 0;
-        repeat (3) @(posedge ft601_clk_in); #1;  // +1 cycle for ft601_txe_r pipeline
+        repeat (3) @(posedge ft601_clk_in); #1;
 
-        check(uut.current_state !== S_SEND_HEADER,
-              "Resumed from SEND_HEADER after backpressure released");
+        check(uut.current_state !== S_SEND_RANGE_HDR,
+              "Backpressure: resumed from SEND_RANGE_HDR after release");
+
+        wait_idle(200);
+        #1;
+        check(uut.current_state === S_IDLE,
+              "Backpressure: packet completed after resume");
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 9: Clock divider
+        // TEST GROUP 9: Clock Forwarding
         // ════════════════════════════════════════════════════════
         $display("\n--- Test Group 9: Clock Forwarding ---");
         apply_reset;
-        // Let the system run for a few clocks to stabilize after reset
         repeat (2) @(posedge ft601_clk_in);
 
-        // After ODDR change, ft601_clk_out is a forwarded copy of
-        // ft601_clk_in (in simulation: direct assign passthrough).
-        // Verify that ft601_clk_out tracks ft601_clk_in over 20 edges.
         begin : clk_fwd_block
             integer match_count;
             match_count = 0;
-
             repeat (20) begin
                 @(posedge ft601_clk_in); #1;
                 if (ft601_clk_out === 1'b1)
                     match_count = match_count + 1;
             end
-
             check(match_count === 20,
                   "ft601_clk_out follows ft601_clk_in (forwarded clock)");
         end
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 10: Bus release in IDLE and WAIT_ACK
+        // TEST GROUP 10: Bus Release (IDLE and WAIT_ACK)
         // ════════════════════════════════════════════════════════
         $display("\n--- Test Group 10: Bus Release ---");
         apply_reset;
         #1;
 
         check(uut.ft601_data_oe === 1'b0,
-              "ft601_data_oe=0 in IDLE (bus released)");
+              "Bus release: ft601_data_oe=0 in IDLE");
         check(ft601_data === 32'h0000_0000,
-              "ft601_data reads 0 in IDLE (pulldown active)");
+              "Bus release: ft601_data=0 in IDLE (pulldown)");
 
-        // Drive a full packet and check WAIT_ACK
         ft601_txe = 0;
-        preload_pending_data;
-        assert_range_valid(32'h1111_2222);
-        wait_for_state(S_SEND_DOPPLER, 100);
-        pulse_doppler_once(16'h3333, 16'h4444);
-        pulse_doppler_once(16'h3333, 16'h4444);
-        pulse_doppler_once(16'h3333, 16'h4444);
-        pulse_doppler_once(16'h3333, 16'h4444);
-        wait_for_state(S_SEND_DETECT, 100);
-        pulse_cfar_once(1'b0);
-        wait_for_state(S_WAIT_ACK, 50);
+        pulse_range_valid(32'h1111_2222);
+        wait_for_state(S_WAIT_ACK, 200);
         #1;
-
         check(uut.ft601_data_oe === 1'b0,
-              "ft601_data_oe=0 in WAIT_ACK (bus released)");
+              "Bus release: ft601_data_oe=0 in WAIT_ACK");
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 11: Multiple consecutive packets
+        // TEST GROUP 11: Multiple Consecutive Packets
         // ════════════════════════════════════════════════════════
         $display("\n--- Test Group 11: Multiple Consecutive Packets ---");
         apply_reset;
         ft601_txe = 0;
 
-        drive_full_packet(32'hAAAA_BBBB, 16'h1111, 16'h2222, 1'b1);
+        pulse_range_valid(32'hAAAA_BBBB);
+        wait_packet_done(200);
+        #1;
         check(uut.current_state === S_IDLE,
-              "Packet 1 complete, back in IDLE");
+              "Multi-packet: range 1 complete");
 
         repeat (4) @(posedge ft601_clk_in);
 
-        drive_full_packet(32'hCCCC_DDDD, 16'h5555, 16'h6666, 1'b0);
+        pulse_range_valid(32'hCCCC_DDDD);
+        wait_packet_done(200);
+        #1;
         check(uut.current_state === S_IDLE,
-              "Packet 2 complete, back in IDLE");
-
+              "Multi-packet: range 2 complete");
         check(uut.range_profile_cap === 32'hCCCC_DDDD,
-              "Packet 2 range data captured correctly");
+              "Multi-packet: range 2 data captured correctly");
+
+        pulse_doppler_valid(16'h1111, 16'h2222, 6'd5, 5'd10, 1'b0);
+        wait_packet_done(200);
+        #1;
+        check(uut.current_state === S_IDLE,
+              "Multi-packet: doppler complete");
+
+        pulse_cfar_valid(1'b1, 6'd7, 5'd3, 17'd500, 17'd250);
+        wait_packet_done(200);
+        #1;
+        check(uut.current_state === S_IDLE,
+              "Multi-packet: cfar complete");
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 12: Read Path - Single Command (Gap 4)
+        // TEST GROUP 12: Read Path - Single Command
         // ════════════════════════════════════════════════════════
         $display("\n--- Test Group 12: Read Path - Single Command ---");
         apply_reset;
-        // Write FSM is IDLE, so read FSM can activate
 
-        // Send "Set radar mode" command: opcode=0x01, addr=0x00, value=0x0002
-        send_host_command({8'h01, 8'h00, 16'h0002});
+        send_host_command(8'h01, 8'h00, 16'h0002);
 
         check(cmd_opcode === 8'h01,
               "Read path: cmd_opcode=0x01 (set mode)");
@@ -751,159 +1000,82 @@ module tb_usb_data_interface;
               "Read path: cmd_addr=0x00");
         check(cmd_value === 16'h0002,
               "Read path: cmd_value=0x0002 (single-chirp mode)");
-        check(cmd_data === {8'h01, 8'h00, 16'h0002},
-              "Read path: cmd_data matches full command word");
-
-        // Verify read FSM returned to idle
         check(uut.read_state === 3'd0,
-              "Read FSM returned to RD_IDLE after command");
+              "Read path: FSM returned to RD_IDLE");
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 13: Read Path - Multiple Commands (Gap 4)
+        // TEST GROUP 13: Read Path - Multiple Commands
         // ════════════════════════════════════════════════════════
         $display("\n--- Test Group 13: Read Path - Multiple Commands ---");
         apply_reset;
 
-        // Command 1: Set radar mode to auto-scan (0x01)
-        send_host_command({8'h01, 8'h00, 16'h0001});
+        send_host_command(8'h01, 8'h00, 16'h0001);
         check(cmd_opcode === 8'h01,
               "Multi-cmd 1: opcode=0x01 (set mode)");
         check(cmd_value === 16'h0001,
               "Multi-cmd 1: value=0x0001 (auto-scan)");
 
-        // Command 2: Single chirp trigger (0x02)
-        send_host_command({8'h02, 8'h00, 16'h0000});
+        send_host_command(8'h02, 8'h00, 16'h0000);
         check(cmd_opcode === 8'h02,
               "Multi-cmd 2: opcode=0x02 (trigger)");
 
-        // Command 3: Set CFAR threshold (0x03)
-        send_host_command({8'h03, 8'h00, 16'h1234});
+        send_host_command(8'h03, 8'h00, 16'h1234);
         check(cmd_opcode === 8'h03,
               "Multi-cmd 3: opcode=0x03 (CFAR threshold)");
         check(cmd_value === 16'h1234,
               "Multi-cmd 3: value=0x1234");
 
-        // Command 4: Set stream control (0x04)
-        send_host_command({8'h04, 8'h00, 16'h0005});
+        send_host_command(8'h04, 8'h00, 16'h0005);
         check(cmd_opcode === 8'h04,
               "Multi-cmd 4: opcode=0x04 (stream control)");
         check(cmd_value === 16'h0005,
               "Multi-cmd 4: value=0x0005 (range+cfar)");
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 14: Read/Write Interleave (Gap 4)
-        // Verifies no bus contention: read FSM only operates when
-        // write FSM is IDLE.
+        // TEST GROUP 14: Read/Write Interleave
         // ════════════════════════════════════════════════════════
         $display("\n--- Test Group 14: Read/Write Interleave ---");
         apply_reset;
-        ft601_txe = 1;  // Backpressure: stall write FSM at SEND_HEADER
+        ft601_txe = 1;  // Backpressure stall
 
-        // Start a write packet — FSM reaches SEND_HEADER and stalls
-        preload_pending_data;
-        assert_range_valid(32'hFACE_FEED);
-        wait_for_state(S_SEND_HEADER, 50);
+        pulse_range_valid(32'hFACE_FEED);
+        wait_for_state(S_SEND_RANGE_HDR, 50);
         repeat (2) @(posedge ft601_clk_in); #1;
 
-        // While write FSM is stalled in SEND_HEADER, assert RXF=0 (host has data)
-        // Read FSM should NOT activate (read_state stays RD_IDLE)
-        // because the write FSM is not IDLE.
         ft601_rxf = 0;
-        // Wait for ft601_rxf_r pipeline (1 cycle) + 2 reaction cycles
         repeat (3) @(posedge ft601_clk_in); #1;
 
         check(uut.read_state === 3'd0,
-              "Read FSM stays in RD_IDLE while write FSM active");
+              "Interleave: Read FSM stays in RD_IDLE while write active");
 
-        // Deassert RXF, release backpressure, complete the write packet
         ft601_rxf = 1;
         ft601_txe = 0;
-        // Wait for ft601_txe_r pipeline to register the release
-        repeat (2) @(posedge ft601_clk_in); #1;
-        wait_for_state(S_SEND_DOPPLER, 100);
-        pulse_doppler_once(16'hAAAA, 16'hBBBB);
-        pulse_doppler_once(16'hAAAA, 16'hBBBB);
-        pulse_doppler_once(16'hAAAA, 16'hBBBB);
-        pulse_doppler_once(16'hAAAA, 16'hBBBB);
-        wait_for_state(S_SEND_DETECT, 100);
-        pulse_cfar_once(1'b1);
-        wait_for_state(S_IDLE, 100);
+        wait_idle(200);
         @(posedge ft601_clk_in); #1;
 
         check(uut.current_state === S_IDLE,
-              "Write packet completed, FSM in IDLE");
+              "Interleave: write packet completed");
 
-        // Now send a read command — should work fine after write completes
-        send_host_command({8'h01, 8'h00, 16'h0002});
+        send_host_command(8'h01, 8'h00, 16'h0002);
         check(cmd_opcode === 8'h01,
-              "Read after write: cmd_opcode=0x01");
+              "Interleave: read after write cmd_opcode=0x01");
         check(cmd_value === 16'h0002,
-              "Read after write: cmd_value=0x0002");
+              "Interleave: read after write cmd_value=0x0002");
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 15: Stream Control Gating (Gap 2)
-        // Verify that disabling individual streams causes the write
-        // FSM to skip those data phases.
+        // TEST GROUP 15: Status Readback (v9c: 10-word format)
+        //
+        // [0xBB] [word0..word7] [0x55] = 10 words
+        //
+        // NOTE: status_request uses EDGE detection, not level.
+        // The RTL does: status_req_edge = status_request && !status_req_prev
+        // Since both clk and ft601_clk_in are the same in this TB,
+        // we pulse status_request for 1 ft601_clk cycle.
         // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 15: Stream Control Gating (Gap 2) ---");
-
-        // 15a: Disable doppler stream (stream_control = 3'b101 = range + cfar only)
+        $display("\n--- Test Group 15: Status Readback ---");
         apply_reset;
         ft601_txe = 0;
-        stream_control = 3'b101;  // range + cfar, no doppler
-        // Wait for CDC propagation (2-stage sync)
-        repeat (6) @(posedge ft601_clk_in);
-
-        // Preload cfar pending so the FSM enters the SEND_DETECT data path
-        // (without it, SEND_DETECT skips immediately on !cfar_data_pending).
-        preload_cfar_pending;
-        // Drive range valid — triggers write FSM
-        assert_range_valid(32'hAA11_BB22);
-        // FSM: IDLE -> SEND_HEADER -> SEND_RANGE (doppler disabled) -> SEND_DETECT -> FOOTER
-        // The FSM races through SEND_DETECT in 1 cycle (cfar_data_pending is consumed).
-        // Verify the packet completed correctly (doppler was skipped).
-        wait_for_state(S_IDLE, 200);
-        #1;
-        // Reaching IDLE proves: HEADER -> RANGE -> (skip DOPPLER) -> DETECT -> FOOTER -> ACK -> IDLE.
-        // cfar_data_pending consumed confirms SEND_DETECT was entered.
-        check(uut.current_state === S_IDLE && uut.cfar_data_pending === 1'b0,
-              "Stream gate: reached SEND_DETECT (range sent, doppler skipped)");
-
-        check(uut.current_state === S_IDLE,
-              "Stream gate: packet completed without doppler");
-
-        // 15b: Disable all streams (stream_control = 3'b000)
-        // With no streams enabled, a range_valid pulse should NOT trigger the write FSM.
-        apply_reset;
-        ft601_txe = 0;
-        stream_control = 3'b000;
-        repeat (6) @(posedge ft601_clk_in);
-
-        // Assert range_valid — FSM should stay in IDLE
-        @(posedge clk);
-        range_profile = 32'hDEAD_DEAD;
-        range_valid   = 1;
-        repeat (3) @(posedge ft601_clk_in);
-        @(posedge clk);
-        range_valid = 0;
-        // Wait a few more cycles for any CDC propagation
-        repeat (10) @(posedge ft601_clk_in); #1;
-
-        check(uut.current_state === S_IDLE,
-              "Stream gate: FSM stays IDLE when all streams disabled");
-
-        // 15c: Restore all streams
-        stream_control = 3'b111;
-        repeat (6) @(posedge ft601_clk_in);
-
-        // ════════════════════════════════════════════════════════
-        // TEST GROUP 16: Status Readback (Gap 2)
-        // Verify that pulsing status_request triggers an 8-word
-        // status response via the SEND_STATUS state.
-        // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 16: Status Readback (Gap 2) ---");
-        apply_reset;
-        ft601_txe = 0;
+        mon_reset;
 
         // Set known status input values
         status_cfar_threshold  = 16'hABCD;
@@ -915,163 +1087,371 @@ module tb_usb_data_interface;
         status_short_chirp     = 16'd50;
         status_short_listen    = 16'd17450;
         status_chirps_per_elev = 6'd32;
-        status_range_mode      = 2'b10;  // Long-range for status test
-        // Self-test status: all 5 tests passed, detail=0xA5, not busy
+        status_range_mode      = 2'b10;
         status_self_test_flags  = 5'b11111;
         status_self_test_detail = 8'hA5;
         status_self_test_busy   = 1'b0;
+        cfar_dbg_cells_processed = 16'd1024;
+        cfar_dbg_cols_completed  = 8'd32;
+        cfar_dbg_valid_count     = 16'd2048;
+        cfar_detect_count        = 16'd112;
 
-        // Pulse status_request (1 cycle in clk domain — toggles status_req_toggle_100m)
-        @(posedge clk);
+        // Let inputs settle for 1 cycle before pulse
+        @(posedge ft601_clk_in);
+
+        // Pulse status_request: set BETWEEN edges so the DUT samples
+        // req=0 on one posedge (captured to prev) then req=1 on the
+        // next posedge, producing the rising edge the RTL expects.
+        #2; // mid-cycle — after posedge has sampled req=0
         status_request = 1;
-        @(posedge clk);
+        @(posedge ft601_clk_in); // DUT sees req=1, prev=0 → edge!
+        @(posedge ft601_clk_in); // DUT latches prev=1
+        #2;
         status_request = 0;
 
-        // Wait for toggle CDC propagation to ft601_clk domain
-        // (2-stage sync + edge detect = ~3-4 ft601_clk cycles)
-        repeat (8) @(posedge ft601_clk_in); #1;
+        // Wait for status packet to complete
+        wait_for_state(S_SEND_STATUS, 30);
+        wait_idle(200);
+        repeat (2) @(posedge ft601_clk_in);
+        mon_stop;
 
-        // The write FSM should enter SEND_STATUS
-        // Give it time to start (IDLE sees status_req_ft601)
-        wait_for_state(S_SEND_STATUS, 20);
-        #1;
-        check(uut.current_state === S_SEND_STATUS,
-              "Status readback: FSM entered SEND_STATUS");
+        check_val(mon_count == 10, "Status readback: 10 words captured",
+                  mon_count, 10);
+        check_val(mon_buf[0] === {24'h000000, 8'hBB},
+                  "Status readback: word 0 = header 0xBB",
+                  mon_buf[0], {24'h000000, 8'hBB});
 
-        // The SEND_STATUS state sends 8 words (idx 0-7):
-        // idx 0: 0xBB header, idx 1-6: status_words[0-5], idx 7: 0x55 footer
-        // After idx 7 it transitions to WAIT_ACK -> IDLE.
-        // Since ft601_txe=0, all 8 words should stream without stall.
-        wait_for_state(S_IDLE, 100);
-        #1;
+        // status_words[0] = {0xFF, 3'b000, mode[1:0], 5'b00000, stream_ctrl[2:0], threshold[15:0]}
+        begin : status_w0_check
+            reg [31:0] exp_w0;
+            exp_w0 = {8'hFF, 3'b000, 2'b01, 5'b00000, 3'b101, 16'hABCD};
+            check_val(mon_buf[1] === exp_w0,
+                      "Status readback: word 1 = status_words[0]",
+                      mon_buf[1], exp_w0);
+        end
+
+        check_val(mon_buf[2] === {16'd3000, 16'd13700},
+                  "Status readback: word 2 = {long_chirp, long_listen}",
+                  mon_buf[2], {16'd3000, 16'd13700});
+        check_val(mon_buf[3] === {16'd17540, 16'd50},
+                  "Status readback: word 3 = {guard, short_chirp}",
+                  mon_buf[3], {16'd17540, 16'd50});
+        check_val(mon_buf[4] === {16'd17450, 10'd0, 6'd32},
+                  "Status readback: word 4 = {short_listen, 0, chirps_per_elev}",
+                  mon_buf[4], {16'd17450, 10'd0, 6'd32});
+        check_val(mon_buf[5] === {30'd0, 2'b10},
+                  "Status readback: word 5 = range_mode=2'b10",
+                  mon_buf[5], {30'd0, 2'b10});
+
+        begin : status_w5_check
+            reg [31:0] exp_w5;
+            exp_w5 = {7'd0, 1'b0, 8'd0, 8'hA5, 3'd0, 5'b11111};
+            check_val(mon_buf[6] === exp_w5,
+                      "Status readback: word 6 = self-test {busy=0,detail=A5,flags=1F}",
+                      mon_buf[6], exp_w5);
+        end
+
+        // v9c words 6-7
+        begin : status_w6_check
+            reg [31:0] exp_w6;
+            exp_w6 = {16'd1024, 8'd32, 8'd0};
+            check_val(mon_buf[7] === exp_w6,
+                      "Status readback: word 7 = {cfar_cells, cfar_cols, 0}",
+                      mon_buf[7], exp_w6);
+        end
+
+        begin : status_w7_check
+            reg [31:0] exp_w7;
+            exp_w7 = {16'd112, 16'd2048};
+            check_val(mon_buf[8] === exp_w7,
+                      "Status readback: word 8 = {detect_count, valid_count}",
+                      mon_buf[8], exp_w7);
+        end
+
+        check_val(mon_buf[9] === {24'h000000, 8'h55},
+                  "Status readback: word 9 = footer 0x55",
+                  mon_buf[9], {24'h000000, 8'h55});
+
         check(uut.current_state === S_IDLE,
-              "Status readback: returned to IDLE after 8-word response");
-
-        // Verify the status snapshot was captured correctly.
-        // status_words[0] = {0xFF, 3'b000, mode[1:0], 5'b0, stream_ctrl[2:0], cfar_threshold[15:0]}
-        // = {8'hFF, 3'b000, 2'b01, 5'b00000, 3'b101, 16'hABCD}
-        // = 0xFF_09_05_ABCD... let's compute:
-        // Byte 3: 0xFF = 8'hFF
-        // Byte 2: {3'b000, 2'b01} = 5'b00001 + 3 high bits of next field...
-        // Actually the packing is: {8'hFF, 3'b000, status_radar_mode[1:0], 5'b00000, status_stream_ctrl[2:0], status_cfar_threshold[15:0]}
-        // = {8'hFF, 3'b000, 2'b01, 5'b00000, 3'b101, 16'hABCD}
-        // = 8'hFF, 5'b00001, 8'b00000101, 16'hABCD
-        // = FF_09_05_ABCD? Let me compute carefully:
-        // Bits [31:24] = 8'hFF = 0xFF
-        // Bits [23:21] = 3'b000
-        // Bits [20:19] = 2'b01 (mode)
-        // Bits [18:14] = 5'b00000
-        // Bits [13:11] = 3'b101 (stream_ctrl)
-        // Bits [10:0]  = ... wait, cfar_threshold is 16 bits → [15:0]
-        // Total bits = 8+3+2+5+3+16 = 37 bits — won't fit in 32!
-        // Re-reading the RTL: the packing at line 241 is:
-        //   {8'hFF, 3'b000, status_radar_mode, 5'b00000, status_stream_ctrl, status_cfar_threshold}
-        //   = 8 + 3 + 2 + 5 + 3 + 16 = 37 bits
-        // This would be truncated to 32 bits. Let me re-read the actual RTL to check.
-        // For now, just verify status_words[1] (word index 1 in the packet = idx 2 in FSM)
-        // status_words[1] = {status_long_chirp, status_long_listen} = {16'd3000, 16'd13700}
-        check(uut.status_words[1] === {16'd3000, 16'd13700},
-              "Status readback: word 1 = {long_chirp, long_listen}");
-        check(uut.status_words[2] === {16'd17540, 16'd50},
-              "Status readback: word 2 = {guard, short_chirp}");
-        check(uut.status_words[3] === {16'd17450, 10'd0, 6'd32},
-              "Status readback: word 3 = {short_listen, 0, chirps_per_elev}");
-        check(uut.status_words[4] === {30'd0, 2'b10},
-              "Status readback: word 4 = range_mode=2'b10");
-        // status_words[5] = {7'd0, busy, 8'd0, detail[7:0], 3'd0, flags[4:0]}
-        // = {7'd0, 1'b0, 8'd0, 8'hA5, 3'd0, 5'b11111}
-        check(uut.status_words[5] === {7'd0, 1'b0, 8'd0, 8'hA5, 3'd0, 5'b11111},
-              "Status readback: word 5 = self-test {busy=0, detail=A5, flags=1F}");
+              "Status readback: returned to IDLE");
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 17: New Chirp Timing Opcodes (Gap 2)
-        // Verify opcodes 0x10-0x15 are properly decoded by the
-        // read path.
+        // TEST GROUP 16: Status Priority Over Data
+        //
+        // Status request should be serviced before pending data.
         // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 17: Chirp Timing Opcodes (Gap 2) ---");
+        $display("\n--- Test Group 16: Status Priority Over Data ---");
+        apply_reset;
+        ft601_txe = 0;
+        mon_reset;
+
+        // Pulse range_valid AND status_request simultaneously.
+        // Set between edges so the DUT sees a clean 0→1 transition.
+        // range_valid must be held for a full clock cycle so the DUT
+        // captures it into range_data_pending.
+        @(posedge ft601_clk_in);
+        #2;
+        range_profile  = 32'h1234_5678;
+        range_valid    = 1;
+        status_request = 1;
+        @(posedge ft601_clk_in);  // DUT samples both: req edge + range_valid
+        #2;
+        range_valid    = 0;       // deassert mid-cycle after DUT has sampled
+        @(posedge ft601_clk_in);  // DUT latches status_req_prev=1
+        #2;
+        status_request = 0;
+
+        // Wait for both packets to complete
+        // Status(10) + Range(6) = 16 words
+        wait_packet_done(300);
+        repeat (2) @(posedge ft601_clk_in);
+        wait_packet_done(200);
+        repeat (2) @(posedge ft601_clk_in);
+        mon_stop;
+
+        // First header should be status (0xBB) — higher priority
+        check_val(mon_buf[0] === {24'h0, 8'hBB},
+                  "Status priority: first header = 0xBB (status)",
+                  mon_buf[0], {24'h0, 8'hBB});
+        // After 10-word status, range header at index 10
+        check_val(mon_buf[10] === {24'h0, 8'hAA},
+                  "Status priority: second header = 0xAA (range after status)",
+                  mon_buf[10], {24'h0, 8'hAA});
+        check_val(mon_count == 16, "Status priority: 16 total words (10+6)",
+                  mon_count, 16);
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 17: Chirp Timing Opcodes (read path)
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 17: Chirp Timing Opcodes ---");
         apply_reset;
 
-        // 0x10: Long chirp cycles
-        send_host_command({8'h10, 8'h00, 16'd2500});
+        send_host_command(8'h10, 8'h00, 16'd2500);
         check(cmd_opcode === 8'h10,
               "Chirp opcode: 0x10 (long chirp cycles)");
         check(cmd_value === 16'd2500,
               "Chirp opcode: value=2500");
 
-        // 0x11: Long listen cycles
-        send_host_command({8'h11, 8'h00, 16'd12000});
+        send_host_command(8'h11, 8'h00, 16'd12000);
         check(cmd_opcode === 8'h11,
               "Chirp opcode: 0x11 (long listen cycles)");
         check(cmd_value === 16'd12000,
               "Chirp opcode: value=12000");
 
-        // 0x12: Guard cycles
-        send_host_command({8'h12, 8'h00, 16'd15000});
+        send_host_command(8'h12, 8'h00, 16'd15000);
         check(cmd_opcode === 8'h12,
               "Chirp opcode: 0x12 (guard cycles)");
         check(cmd_value === 16'd15000,
               "Chirp opcode: value=15000");
 
-        // 0x13: Short chirp cycles
-        send_host_command({8'h13, 8'h00, 16'd40});
+        send_host_command(8'h13, 8'h00, 16'd40);
         check(cmd_opcode === 8'h13,
               "Chirp opcode: 0x13 (short chirp cycles)");
         check(cmd_value === 16'd40,
               "Chirp opcode: value=40");
 
-        // 0x14: Short listen cycles
-        send_host_command({8'h14, 8'h00, 16'd16000});
+        send_host_command(8'h14, 8'h00, 16'd16000);
         check(cmd_opcode === 8'h14,
               "Chirp opcode: 0x14 (short listen cycles)");
         check(cmd_value === 16'd16000,
               "Chirp opcode: value=16000");
 
-        // 0x15: Chirps per elevation
-        send_host_command({8'h15, 8'h00, 16'd16});
+        send_host_command(8'h15, 8'h00, 16'd16);
         check(cmd_opcode === 8'h15,
               "Chirp opcode: 0x15 (chirps per elevation)");
         check(cmd_value === 16'd16,
               "Chirp opcode: value=16");
 
-        // 0xFF: Status request (opcode decode check — actual readback tested above)
-        send_host_command({8'hFF, 8'h00, 16'h0000});
+        send_host_command(8'hFF, 8'h00, 16'h0000);
         check(cmd_opcode === 8'hFF,
               "Chirp opcode: 0xFF (status request)");
 
         // ════════════════════════════════════════════════════════
         // TEST GROUP 18: Self-Test Readback Variants
-        // Verify self-test busy flag, partial failures, and
-        // alternate status word 5 values.
         // ════════════════════════════════════════════════════════
         $display("\n--- Test Group 18: Self-Test Readback Variants ---");
         apply_reset;
         ft601_txe = 0;
 
-        // Scenario A: Self-test busy, partial failure, different detail
-        status_self_test_flags  = 5'b10110;  // T0 fail, T3 fail
+        status_self_test_flags  = 5'b10110;
         status_self_test_detail = 8'h42;
         status_self_test_busy   = 1'b1;
 
-        // Trigger status readback
-        @(posedge clk);
+        // Set between edges for clean 0→1 edge detection
+        @(posedge ft601_clk_in);
+        #2;
         status_request = 1;
-        @(posedge clk);
+        @(posedge ft601_clk_in);
+        @(posedge ft601_clk_in);
+        #2;
         status_request = 0;
 
-        repeat (8) @(posedge ft601_clk_in); #1;
-        wait_for_state(S_SEND_STATUS, 20);
+        wait_for_state(S_SEND_STATUS, 30);
         #1;
         check(uut.current_state === S_SEND_STATUS,
-              "Self-test readback A: FSM entered SEND_STATUS");
+              "Self-test readback: FSM entered SEND_STATUS");
 
-        wait_for_state(S_IDLE, 100);
+        wait_idle(200);
         #1;
         check(uut.current_state === S_IDLE,
-              "Self-test readback A: returned to IDLE");
+              "Self-test readback: returned to IDLE");
 
-        // Verify word 5: {7'd0, busy=1, 8'd0, detail=0x42, 3'd0, flags=5'b10110}
-        check(uut.status_words[5] === {7'd0, 1'b1, 8'd0, 8'h42, 3'd0, 5'b10110},
-              "Self-test readback A: word 5 = {busy=1, detail=42, flags=16}");
+        begin : selftest_check
+            reg [31:0] exp;
+            exp = {7'd0, 1'b1, 8'd0, 8'h42, 3'd0, 5'b10110};
+            check_val(uut.status_words[5] === exp,
+                      "Self-test readback: word 5 = {busy=1,detail=42,flags=16}",
+                      uut.status_words[5], exp);
+        end
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 19: Write-Idle Indicator
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 19: Write-Idle Indicator ---");
+        apply_reset;
+        #1;
+
+        check(write_idle === 1'b1,
+              "Write-idle: high when FSM idle after startup");
+
+        ft601_txe = 0;
+        pulse_range_valid(32'h9999_8888);
+        wait_for_state(S_SEND_RANGE_HDR, 20);
+        #1;
+        check(write_idle === 1'b0,
+              "Write-idle: low during packet transmission");
+
+        wait_idle(200);
+        repeat (2) @(posedge ft601_clk_in); #1;
+        check(write_idle === 1'b1,
+              "Write-idle: high again after packet complete");
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 20: Debug Counter Verification
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 20: Debug Counter Verification ---");
+        apply_reset;
+        ft601_txe = 0;
+
+        begin : dbg_counter_block
+            reg [15:0] starts_before, completions_before;
+            starts_before      = dbg_pkt_starts;
+            completions_before = dbg_pkt_completions;
+
+            pulse_range_valid(32'h1234_5678);
+            wait_packet_done(200);
+            repeat (2) @(posedge ft601_clk_in); #1;
+
+            check_val(dbg_pkt_starts === starts_before + 16'd1,
+                      "Debug counter: pkt_starts incremented by 1",
+                      dbg_pkt_starts, starts_before + 16'd1);
+            check_val(dbg_pkt_completions === completions_before + 16'd1,
+                      "Debug counter: pkt_completions incremented by 1",
+                      dbg_pkt_completions, completions_before + 16'd1);
+        end
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 21: Doppler Packet with Different Metadata
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 21: Doppler Metadata Variants ---");
+        apply_reset;
+        ft601_txe = 0;
+
+        // Test with max bin values: range_bin=63, doppler_bin=31, sub_frame=0
+        mon_reset;
+        pulse_doppler_valid(16'hFFFF, 16'h8000, 6'd63, 5'd31, 1'b0);
+        wait_packet_done(200);
+        repeat (2) @(posedge ft601_clk_in);
+        mon_stop;
+
+        begin : doppler_max_check
+            reg [31:0] exp_w1;
+            exp_w1 = {6'd63, 5'd31, 1'b0, 4'b0000, 16'hFFFF};
+            check_val(mon_buf[1] === exp_w1,
+                      "Doppler max bins: word 1 metadata correct",
+                      mon_buf[1], exp_w1);
+            check_val(mon_buf[2] === {16'h8000, 16'hFFFF},
+                      "Doppler max bins: word 2 = {Q, I}",
+                      mon_buf[2], {16'h8000, 16'hFFFF});
+        end
+
+        // Test with zero bins
+        mon_reset;
+        pulse_doppler_valid(16'h0000, 16'h0000, 6'd0, 5'd0, 1'b0);
+        wait_packet_done(200);
+        repeat (2) @(posedge ft601_clk_in);
+        mon_stop;
+
+        begin : doppler_zero_check
+            reg [31:0] exp_w1;
+            exp_w1 = {6'd0, 5'd0, 1'b0, 4'b0000, 16'h0000};
+            check_val(mon_buf[1] === exp_w1,
+                      "Doppler zero bins: word 1 metadata correct",
+                      mon_buf[1], exp_w1);
+        end
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 22: CFAR Packet with Edge Values
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 22: CFAR Edge Values ---");
+        apply_reset;
+        ft601_txe = 0;
+
+        mon_reset;
+        pulse_cfar_valid(1'b1, 6'd63, 5'd31, 17'd131071, 17'd131071);
+        wait_packet_done(200);
+        repeat (2) @(posedge ft601_clk_in);
+        mon_stop;
+
+        begin : cfar_max_check
+            reg [31:0] exp_w1, exp_w2;
+            exp_w1 = {1'b1, 6'd63, 5'd31, 3'b000, 17'd131071};
+            exp_w2 = {15'b0, 17'd131071};
+            check_val(mon_buf[1] === exp_w1,
+                      "CFAR max values: word 1 correct",
+                      mon_buf[1], exp_w1);
+            check_val(mon_buf[2] === exp_w2,
+                      "CFAR max values: word 2 = max threshold",
+                      mon_buf[2], exp_w2);
+        end
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 23: Startup Lockout
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 23: Startup Lockout ---");
+
+        // Custom reset: don't wait for lockout to expire
+        mon_active = 0;
+        reset_n = 0;
+        range_profile = 32'h0;
+        range_valid   = 0;
+        stream_control = 3'b111;
+        ft601_txe = 0;
+        ft601_rxf = 1;
+        repeat (6) @(posedge ft601_clk_in);
+        reset_n = 1;
+        repeat (6) @(posedge ft601_clk_in);  // stream_control CDC
+
+        // Pulse range_valid during lockout
+        @(posedge ft601_clk_in);
+        range_profile = 32'hA0CE_0001;
+        range_valid   = 1;
+        @(posedge ft601_clk_in);
+        range_valid = 0;
+        repeat (10) @(posedge ft601_clk_in); #1;
+
+        check(uut.current_state === S_IDLE,
+              "Startup lockout: FSM stays IDLE during lockout");
+
+        // Wait for lockout to expire
+        repeat (250) @(posedge ft601_clk_in);
+
+        // The pending range data should now be consumed
+        wait_for_state(S_SEND_RANGE_HDR, 20);
+        wait_idle(200);
+        #1;
+        check(uut.current_state === S_IDLE,
+              "Startup lockout: pending data consumed after lockout expires");
 
         // ════════════════════════════════════════════════════════
         // Summary
