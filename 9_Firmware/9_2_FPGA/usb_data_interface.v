@@ -85,7 +85,14 @@ module usb_data_interface (
     output wire [15:0] dbg_wr_strobes,     // Total WR_N=0 assertions (write cycles)
     output wire [15:0] dbg_txe_blocks,     // Cycles where FSM wanted to write but TXE was high
     output wire [15:0] dbg_pkt_starts,     // SEND_HEADER entries (packet starts)
-    output wire [15:0] dbg_pkt_completions // WAIT_ACK entries (packet completions)
+    output wire [15:0] dbg_pkt_completions, // WAIT_ACK entries (packet completions)
+
+    // ========== WRITE IDLE OUTPUT (v8b: throughput fix) ==========
+    // HIGH when the write FSM is in IDLE, the read FSM is in RD_IDLE,
+    // and the startup lockout has expired. Consumers can use this to
+    // gate data submission to avoid losing range_valid pulses when the
+    // USB FSM is busy sending a previous packet.
+    output wire write_idle
 );
 
 // USB packet structure (same as before)
@@ -108,7 +115,7 @@ localparam [2:0] IDLE                = 3'd0,
                  WAIT_ACK            = 3'd6,
                  SEND_STATUS         = 3'd7;  // Gap 2: status readback
 
-reg [2:0] current_state;
+(* fsm_encoding = "none" *) reg [2:0] current_state;
 reg [7:0] byte_counter;
 reg [31:0] data_buffer;
 reg [31:0] ft601_data_out;
@@ -144,7 +151,7 @@ localparam [2:0] RD_IDLE      = 3'd0,  // Waiting for RXF
                  RD_DEASSERT  = 3'd3,  // Deassert RD_N, then OE_N
                  RD_PROCESS   = 3'd4;  // Process received command word
 
-reg [2:0] read_state;
+(* fsm_encoding = "none" *) reg [2:0] read_state;
 reg [31:0] rx_data_captured;  // Data word read from host
 
 // ========== POST-POR STARTUP LOCKOUT ==========
@@ -190,6 +197,13 @@ reg cfar_detection_hold;
 // Gap 2: Status request toggle register (clk_100m domain).
 // Declared here (before the always block) to satisfy iverilog forward-ref rules.
 reg status_req_toggle_100m;
+
+// v8b: Write-idle indicator — consumer (top wrapper) uses this to gate
+// data submission from the FIFO. Only HIGH when both FSMs are idle and
+// the startup lockout has expired. Placed here (after all reg/localparam
+// declarations) to satisfy iverilog forward-reference rules.
+assign write_idle = (current_state == IDLE) && !startup_lockout_active &&
+                    (read_state == RD_IDLE);
 
 // Source-domain holding registers (clk domain)
 always @(posedge clk or negedge reset_n) begin

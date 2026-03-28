@@ -187,7 +187,8 @@ usb_data_interface usb_inst (
     .dbg_wr_strobes(dbg_wr_strobes),
     .dbg_txe_blocks(dbg_txe_blocks),
     .dbg_pkt_starts(dbg_pkt_starts),
-    .dbg_pkt_completions(dbg_pkt_completions)
+    .dbg_pkt_completions(dbg_pkt_completions),
+    .write_idle()  // Not used in dev wrapper — no FIFO needed at slow data rate
 );
 
 // Board bring-up self-test controller

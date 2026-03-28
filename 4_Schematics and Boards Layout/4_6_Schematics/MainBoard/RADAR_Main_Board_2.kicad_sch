@@ -25672,6 +25672,18 @@
 		(uuid "4bcdf55a-f8bb-410c-84eb-d6abe0c5600f")
 	)
 	(junction
+		(at 435.61 495.3)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "4c50450d-242e-4661-ac75-68e9674e491f")
+	)
+	(junction
+		(at 435.61 502.92)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "4c856617-9fae-48b4-9e91-c74fc8b75a65")
+	)
+	(junction
 		(at 391.16 236.22)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -25816,6 +25828,12 @@
 		(uuid "8452d99e-73ba-4748-8d38-96e45b39268a")
 	)
 	(junction
+		(at 530.86 382.27)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "85592502-3ac7-4a03-8636-362f7ab70bef")
+	)
+	(junction
 		(at 793.75 198.12)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -25832,6 +25850,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "93ca9d46-ef5e-4805-ab7d-08b9750306f6")
+	)
+	(junction
+		(at 463.55 505.46)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "94b26697-44cf-4081-a74b-425a45503c4f")
 	)
 	(junction
 		(at 77.47 495.3)
@@ -25940,6 +25964,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "ae33dd2b-df42-4615-b47f-0c037652d2a2")
+	)
+	(junction
+		(at 553.72 383.54)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "afb35288-4405-482d-83ef-1aa69e2c0abf")
 	)
 	(junction
 		(at 203.2 246.38)
@@ -26515,6 +26545,16 @@
 	)
 	(wire
 		(pts
+			(xy 568.96 518.16) (xy 572.77 518.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "038a7c95-f899-4255-bb71-09eb670d1dc1")
+	)
+	(wire
+		(pts
 			(xy 711.2 534.67) (xy 722.63 534.67)
 		)
 		(stroke
@@ -26685,6 +26725,16 @@
 	)
 	(wire
 		(pts
+			(xy 568.96 523.24) (xy 572.77 523.24)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "07930195-9306-41d1-802f-d3d439aa45d8")
+	)
+	(wire
+		(pts
 			(xy 64.77 292.1) (xy 57.15 292.1)
 		)
 		(stroke
@@ -26742,6 +26792,16 @@
 			(type default)
 		)
 		(uuid "0a868f23-6b19-4165-9d2d-596c279553e2")
+	)
+	(wire
+		(pts
+			(xy 554.99 533.4) (xy 558.8 533.4)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0aa56ef8-74fd-407c-9f8e-7e9e68c2e3d7")
 	)
 	(wire
 		(pts
@@ -26872,6 +26932,16 @@
 			(type solid)
 		)
 		(uuid "0d636827-9fb3-424b-b835-7e83c5963ca1")
+	)
+	(wire
+		(pts
+			(xy 430.53 500.38) (xy 440.69 500.38)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0d73a94b-3287-4181-8165-ecf4be967a96")
 	)
 	(wire
 		(pts
@@ -27355,6 +27425,16 @@
 	)
 	(wire
 		(pts
+			(xy 533.4 416.56) (xy 535.94 416.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1ae08d7a-66d9-4dbb-88e4-24011d076131")
+	)
+	(wire
+		(pts
 			(xy 115.57 289.56) (xy 123.19 289.56)
 		)
 		(stroke
@@ -27372,6 +27452,16 @@
 			(type default)
 		)
 		(uuid "1b1daded-bec7-4fcd-b1bc-dcd19bb7db03")
+	)
+	(wire
+		(pts
+			(xy 435.61 502.92) (xy 440.69 502.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1b91ebbc-7ab2-4c11-b8af-5ba3a0898838")
 	)
 	(wire
 		(pts
@@ -27452,6 +27542,16 @@
 			(type solid)
 		)
 		(uuid "1e59b365-eb70-417a-90a0-7c95ed9c9754")
+	)
+	(wire
+		(pts
+			(xy 525.78 374.65) (xy 535.94 374.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1ea9a37c-72fc-45b1-826f-20d7395e2c84")
 	)
 	(wire
 		(pts
@@ -27985,6 +28085,16 @@
 	)
 	(wire
 		(pts
+			(xy 450.85 500.38) (xy 454.66 500.38)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2e75256d-5c68-4247-82bd-4fc0f477d203")
+	)
+	(wire
+		(pts
 			(xy 822.96 212.09) (xy 822.96 204.47)
 		)
 		(stroke
@@ -28042,6 +28152,16 @@
 			(type solid)
 		)
 		(uuid "307c0ffd-17a7-4532-adb1-e752fe98f04f")
+	)
+	(wire
+		(pts
+			(xy 554.99 535.94) (xy 558.8 535.94)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "308e9992-c886-4702-a788-2bb289e5b59a")
 	)
 	(wire
 		(pts
@@ -28105,16 +28225,6 @@
 	)
 	(wire
 		(pts
-			(xy 274.32 462.28) (xy 274.32 472.44)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "32989875-54e1-41ff-acb5-2b6a920b2fed")
-	)
-	(wire
-		(pts
 			(xy 617.22 480.06) (xy 617.22 483.87)
 		)
 		(stroke
@@ -28175,6 +28285,16 @@
 	)
 	(wire
 		(pts
+			(xy 554.99 530.86) (xy 558.8 530.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "33d9b26c-05c0-497c-8e7e-bf9eeb8b3515")
+	)
+	(wire
+		(pts
 			(xy 584.2 314.96) (xy 579.12 314.96)
 		)
 		(stroke
@@ -28215,6 +28335,16 @@
 	)
 	(wire
 		(pts
+			(xy 549.91 375.92) (xy 557.53 375.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "353b72ca-0683-463b-a38c-e821a1c2d8bd")
+	)
+	(wire
+		(pts
 			(xy 97.79 532.13) (xy 95.25 532.13)
 		)
 		(stroke
@@ -28222,16 +28352,6 @@
 			(type default)
 		)
 		(uuid "35cc5eec-9f5e-49d1-b37b-bc33a2058833")
-	)
-	(wire
-		(pts
-			(xy 284.48 472.44) (xy 284.48 477.52)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "369ae83f-18f4-428d-b6ea-b893e71a9cf3")
 	)
 	(wire
 		(pts
@@ -28295,6 +28415,26 @@
 	)
 	(wire
 		(pts
+			(xy 549.91 383.54) (xy 553.72 383.54)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "38b5df24-f8f5-4e30-9d82-f0922ef636ec")
+	)
+	(wire
+		(pts
+			(xy 554.99 528.32) (xy 558.8 528.32)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "38fc6fc8-a16e-4b40-97ac-dec124d61754")
+	)
+	(wire
+		(pts
 			(xy 520.7 314.96) (xy 523.24 314.96)
 		)
 		(stroke
@@ -28302,6 +28442,16 @@
 			(type solid)
 		)
 		(uuid "3928c134-3deb-496d-9431-dee5b4f7bd79")
+	)
+	(wire
+		(pts
+			(xy 568.96 530.86) (xy 572.77 530.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "395833d2-af80-4a66-bbdf-9ec678b6dbbc")
 	)
 	(wire
 		(pts
@@ -28352,6 +28502,16 @@
 			(type default)
 		)
 		(uuid "3c5f7cfa-2d6d-4e8d-8f33-4947774f584e")
+	)
+	(wire
+		(pts
+			(xy 463.55 492.76) (xy 463.55 505.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3ca535bd-8711-452f-9b24-ab055f587f85")
 	)
 	(wire
 		(pts
@@ -28435,6 +28595,16 @@
 	)
 	(wire
 		(pts
+			(xy 554.99 525.78) (xy 558.8 525.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3f7c8bf8-67ae-42e3-8fc3-201e2da4ac34")
+	)
+	(wire
+		(pts
 			(xy 284.48 177.8) (xy 284.48 187.96)
 		)
 		(stroke
@@ -28505,16 +28675,6 @@
 	)
 	(wire
 		(pts
-			(xy 276.86 467.36) (xy 289.56 467.36)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "417df52a-a68e-4755-9e40-cdda27c58465")
-	)
-	(wire
-		(pts
 			(xy 494.03 521.97) (xy 497.84 521.97)
 		)
 		(stroke
@@ -28552,6 +28712,16 @@
 			(type default)
 		)
 		(uuid "4215f03d-d511-4775-8676-56e69aea2cde")
+	)
+	(wire
+		(pts
+			(xy 568.96 535.94) (xy 572.77 535.94)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "42319d08-b82b-4710-899f-822e38433e37")
 	)
 	(wire
 		(pts
@@ -28725,6 +28895,16 @@
 	)
 	(wire
 		(pts
+			(xy 440.69 492.76) (xy 435.61 492.76)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "46de9297-c3e3-4749-a2e8-2b891ce020a8")
+	)
+	(wire
+		(pts
 			(xy 72.39 513.08) (xy 69.85 513.08)
 		)
 		(stroke
@@ -28762,6 +28942,16 @@
 			(type solid)
 		)
 		(uuid "482d27ff-c3fd-41fa-8cdb-2af2ab87e4cc")
+	)
+	(wire
+		(pts
+			(xy 435.61 492.76) (xy 435.61 495.3)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4844f741-0ce1-44e6-9a8c-f388fb6b075f")
 	)
 	(wire
 		(pts
@@ -28852,6 +29042,16 @@
 			(type solid)
 		)
 		(uuid "4a8baa85-d28b-4332-bc8c-dd67fe4461a4")
+	)
+	(wire
+		(pts
+			(xy 533.4 426.72) (xy 535.94 426.72)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4ad43152-c136-4129-900c-3593923cbaff")
 	)
 	(wire
 		(pts
@@ -29062,6 +29262,16 @@
 			(type default)
 		)
 		(uuid "51d148ad-d5a7-4832-96e2-593567dbafc2")
+	)
+	(wire
+		(pts
+			(xy 533.4 424.18) (xy 535.94 424.18)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "51da8adf-b294-4474-8bba-6ffb4a948e1f")
 	)
 	(wire
 		(pts
@@ -29355,6 +29565,16 @@
 	)
 	(wire
 		(pts
+			(xy 430.53 497.84) (xy 440.69 497.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5d096d5b-36aa-4723-9f61-dfd4de38075a")
+	)
+	(wire
+		(pts
 			(xy 196.85 565.15) (xy 196.85 567.69)
 		)
 		(stroke
@@ -29565,16 +29785,6 @@
 	)
 	(wire
 		(pts
-			(xy 281.94 477.52) (xy 281.94 480.06)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "633e1aec-7ce4-4c4d-8bb2-5a2a3ff58f44")
-	)
-	(wire
-		(pts
 			(xy 378.46 236.22) (xy 391.16 236.22)
 		)
 		(stroke
@@ -29765,6 +29975,16 @@
 	)
 	(wire
 		(pts
+			(xy 440.69 505.46) (xy 435.61 505.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "68e6d979-f64e-43da-a68e-8348497e9879")
+	)
+	(wire
+		(pts
 			(xy 127 450.85) (xy 128.27 450.85)
 		)
 		(stroke
@@ -29852,6 +30072,16 @@
 			(type default)
 		)
 		(uuid "6b47484e-d14a-4fa8-8e70-d1dd0709ee5f")
+	)
+	(wire
+		(pts
+			(xy 568.96 520.7) (xy 572.77 520.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6b4b1d52-1e20-4d95-9b06-e7233e04917c")
 	)
 	(wire
 		(pts
@@ -30295,6 +30525,36 @@
 	)
 	(wire
 		(pts
+			(xy 568.96 528.32) (xy 572.77 528.32)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "784af6ec-2435-4904-849b-5b6338af95f2")
+	)
+	(wire
+		(pts
+			(xy 450.85 495.3) (xy 454.66 495.3)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "788742b4-48d3-4492-b4e2-7254397612a9")
+	)
+	(wire
+		(pts
+			(xy 533.4 431.8) (xy 535.94 431.8)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "78e4037c-0557-4198-b6a0-e6c13d29ef6a")
+	)
+	(wire
+		(pts
 			(xy 85.09 515.62) (xy 74.93 515.62)
 		)
 		(stroke
@@ -30375,6 +30635,16 @@
 	)
 	(wire
 		(pts
+			(xy 554.99 520.7) (xy 558.8 520.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7aa3378c-6693-44ba-b6f2-0d184ea48ffe")
+	)
+	(wire
+		(pts
 			(xy 533.4 571.5) (xy 537.21 571.5)
 		)
 		(stroke
@@ -30392,6 +30662,16 @@
 			(type solid)
 		)
 		(uuid "7adba2a0-bf5c-4439-82ba-c8d42129754e")
+	)
+	(wire
+		(pts
+			(xy 463.55 505.46) (xy 463.55 509.27)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7af1da8a-45fd-48d7-a559-49b562be3dec")
 	)
 	(wire
 		(pts
@@ -30525,16 +30805,6 @@
 	)
 	(wire
 		(pts
-			(xy 279.4 490.22) (xy 281.94 490.22)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "7eb5af9b-7b4f-40b1-a435-d7b9c0fd8edc")
-	)
-	(wire
-		(pts
 			(xy 474.98 416.56) (xy 477.52 416.56)
 		)
 		(stroke
@@ -30622,6 +30892,36 @@
 			(type default)
 		)
 		(uuid "818a1aef-7298-4653-a116-3661a4dd3093")
+	)
+	(wire
+		(pts
+			(xy 533.4 411.48) (xy 535.94 411.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "82150db7-46fd-41bd-bd73-997885e7bfc8")
+	)
+	(wire
+		(pts
+			(xy 435.61 505.46) (xy 435.61 502.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "83220f87-d1ef-4351-a912-4cd61601eaf6")
+	)
+	(wire
+		(pts
+			(xy 430.53 487.68) (xy 440.69 487.68)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8331945f-b36a-4062-b613-bb32f69fc02a")
 	)
 	(wire
 		(pts
@@ -30805,16 +31105,6 @@
 	)
 	(wire
 		(pts
-			(xy 276.86 459.74) (xy 276.86 467.36)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "89dcefee-c8e8-4e1a-b1d8-b664fb770d62")
-	)
-	(wire
-		(pts
 			(xy 430.53 431.8) (xy 433.07 431.8)
 		)
 		(stroke
@@ -30882,16 +31172,6 @@
 			(type solid)
 		)
 		(uuid "8bc6aa9c-c0ef-4a28-9b9b-31d836c248a4")
-	)
-	(wire
-		(pts
-			(xy 279.4 480.06) (xy 279.4 490.22)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "8bf738c0-83d6-46b5-9679-c16fece6a808")
 	)
 	(wire
 		(pts
@@ -31115,6 +31395,16 @@
 	)
 	(wire
 		(pts
+			(xy 450.85 464.82) (xy 453.39 464.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "92d19e30-2701-4eef-bde9-a35f5d52d03c")
+	)
+	(wire
+		(pts
 			(xy 347.98 165.1) (xy 350.52 165.1)
 		)
 		(stroke
@@ -31172,6 +31462,16 @@
 			(type default)
 		)
 		(uuid "9488c231-a2a9-4ae2-8e14-b6ea214c261d")
+	)
+	(wire
+		(pts
+			(xy 554.99 518.16) (xy 558.8 518.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "948f2126-e044-418e-a355-9100c6562d5d")
 	)
 	(wire
 		(pts
@@ -31405,6 +31705,16 @@
 	)
 	(wire
 		(pts
+			(xy 450.85 487.68) (xy 453.39 487.68)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9b498d1c-6002-4e8d-ab92-32acc5f90e27")
+	)
+	(wire
+		(pts
 			(xy 328.93 401.32) (xy 316.23 401.32)
 		)
 		(stroke
@@ -31475,6 +31785,16 @@
 	)
 	(wire
 		(pts
+			(xy 430.53 406.4) (xy 440.69 406.4)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9d7746fd-10d9-45e7-82e8-9cf950ff058b")
+	)
+	(wire
+		(pts
 			(xy 547.37 566.42) (xy 551.18 566.42)
 		)
 		(stroke
@@ -31522,6 +31842,16 @@
 			(type default)
 		)
 		(uuid "9f34b77c-bb13-4ddd-b3ec-92a2891e6009")
+	)
+	(wire
+		(pts
+			(xy 525.78 382.27) (xy 530.86 382.27)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9f4732cb-bda0-43c8-ab43-daf05ede5c7c")
 	)
 	(wire
 		(pts
@@ -31775,6 +32105,16 @@
 	)
 	(wire
 		(pts
+			(xy 430.53 490.22) (xy 440.69 490.22)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a849838d-75c9-4726-8a41-3d447fd69d51")
+	)
+	(wire
+		(pts
 			(xy 115.57 322.58) (xy 123.19 322.58)
 		)
 		(stroke
@@ -31855,6 +32195,16 @@
 	)
 	(wire
 		(pts
+			(xy 554.99 523.24) (xy 558.8 523.24)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ac538d95-e617-438d-8b94-a0d774a269c1")
+	)
+	(wire
+		(pts
 			(xy 407.67 523.24) (xy 407.67 525.78)
 		)
 		(stroke
@@ -31862,6 +32212,16 @@
 			(type default)
 		)
 		(uuid "acdec1cc-7807-40ae-8b90-5a0f4e22a762")
+	)
+	(wire
+		(pts
+			(xy 450.85 492.76) (xy 463.55 492.76)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ad2a97df-6786-4d6d-bdb7-9a7aff055476")
 	)
 	(wire
 		(pts
@@ -31935,6 +32295,16 @@
 	)
 	(wire
 		(pts
+			(xy 435.61 495.3) (xy 440.69 495.3)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "af31c69a-5cf1-4ca7-b7d5-dc036afd18db")
+	)
+	(wire
+		(pts
 			(xy 822.96 219.71) (xy 822.96 212.09)
 		)
 		(stroke
@@ -31982,6 +32352,16 @@
 			(type solid)
 		)
 		(uuid "b0fd4af3-862a-4397-8f22-8a905193e11a")
+	)
+	(wire
+		(pts
+			(xy 450.85 406.4) (xy 454.66 406.4)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b10efc96-f45c-45df-ab11-544db6d2fc47")
 	)
 	(wire
 		(pts
@@ -32042,16 +32422,6 @@
 			(type solid)
 		)
 		(uuid "b3bd1070-d2cd-4097-bcfc-f889aea2fa51")
-	)
-	(wire
-		(pts
-			(xy 261.62 477.52) (xy 281.94 477.52)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "b3e1fad6-b5f7-4fe4-887a-8efa90ac20d3")
 	)
 	(wire
 		(pts
@@ -32245,6 +32615,16 @@
 	)
 	(wire
 		(pts
+			(xy 533.4 414.02) (xy 535.94 414.02)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bc2a7e33-30f3-4689-97e3-6188f3dd01de")
+	)
+	(wire
+		(pts
 			(xy 259.08 152.4) (xy 259.08 149.86)
 		)
 		(stroke
@@ -32302,6 +32682,16 @@
 			(type default)
 		)
 		(uuid "bd631862-e3b9-4f16-8c98-b6f9a631db89")
+	)
+	(wire
+		(pts
+			(xy 568.96 533.4) (xy 572.77 533.4)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "be28d19b-e8cb-40d2-8377-cf8d85f37db9")
 	)
 	(wire
 		(pts
@@ -32415,6 +32805,16 @@
 	)
 	(wire
 		(pts
+			(xy 450.85 490.22) (xy 453.39 490.22)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c139cf18-8422-4ee4-b0e9-086fe66e08c1")
+	)
+	(wire
+		(pts
 			(xy 815.34 219.71) (xy 815.34 212.09)
 		)
 		(stroke
@@ -32492,6 +32892,16 @@
 			(type solid)
 		)
 		(uuid "c3bd54f6-18cd-419c-96d6-19cafc392d04")
+	)
+	(wire
+		(pts
+			(xy 530.86 382.27) (xy 535.94 382.27)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c3d00e60-7995-4604-8b14-6f817f047075")
 	)
 	(wire
 		(pts
@@ -32795,6 +33205,16 @@
 	)
 	(wire
 		(pts
+			(xy 450.85 505.46) (xy 463.55 505.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ccaeb60d-0fa5-401c-b7dd-8dcc6e2d20ad")
+	)
+	(wire
+		(pts
 			(xy 325.12 431.8) (xy 328.93 431.8)
 		)
 		(stroke
@@ -32812,6 +33232,16 @@
 			(type default)
 		)
 		(uuid "ccfa9b7e-504b-4371-8df9-52a0190dcb9f")
+	)
+	(wire
+		(pts
+			(xy 533.4 436.88) (xy 535.94 436.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cd3eec55-cc3f-4741-b6ac-38b6ce8ab117")
 	)
 	(wire
 		(pts
@@ -32875,16 +33305,6 @@
 	)
 	(wire
 		(pts
-			(xy 274.32 472.44) (xy 284.48 472.44)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "cfc29cea-2a60-4d68-ac1d-654d069014f3")
-	)
-	(wire
-		(pts
 			(xy 115.57 345.44) (xy 123.19 345.44)
 		)
 		(stroke
@@ -32912,6 +33332,16 @@
 			(type solid)
 		)
 		(uuid "d06de72a-55ae-4d02-8e80-2ef683d29453")
+	)
+	(wire
+		(pts
+			(xy 450.85 502.92) (xy 454.66 502.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d0a3e757-04b3-41cf-8c90-1f488e4d49ce")
 	)
 	(wire
 		(pts
@@ -32985,6 +33415,16 @@
 	)
 	(wire
 		(pts
+			(xy 430.53 403.86) (xy 440.69 403.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d21418b3-1570-4301-a4d6-e50a34b26a79")
+	)
+	(wire
+		(pts
 			(xy 474.98 495.3) (xy 477.52 495.3)
 		)
 		(stroke
@@ -33035,6 +33475,26 @@
 	)
 	(wire
 		(pts
+			(xy 430.53 441.96) (xy 440.69 441.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d4984f28-e846-4c7d-9d7c-0d5d523e2f95")
+	)
+	(wire
+		(pts
+			(xy 553.72 383.54) (xy 557.53 383.54)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d4bdfad8-c48f-4663-b140-50e4249d42c9")
+	)
+	(wire
+		(pts
 			(xy 542.29 495.3) (xy 533.4 495.3)
 		)
 		(stroke
@@ -33045,7 +33505,7 @@
 	)
 	(wire
 		(pts
-			(xy 543.56 403.86) (xy 533.4 403.86)
+			(xy 534.67 403.86) (xy 533.4 403.86)
 		)
 		(stroke
 			(width 0)
@@ -33062,6 +33522,16 @@
 			(type solid)
 		)
 		(uuid "d5dfae9f-49c7-46aa-9b38-a90a2ed0c304")
+	)
+	(wire
+		(pts
+			(xy 533.4 421.64) (xy 535.94 421.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d67068e3-4370-4c67-b652-98a7acebf719")
 	)
 	(wire
 		(pts
@@ -33202,6 +33672,16 @@
 			(type default)
 		)
 		(uuid "d9564711-dc81-44b4-8c11-fba1a4efe2a1")
+	)
+	(wire
+		(pts
+			(xy 430.53 502.92) (xy 435.61 502.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d96b5802-8186-492f-9191-59547ac4b842")
 	)
 	(wire
 		(pts
@@ -33405,6 +33885,16 @@
 	)
 	(wire
 		(pts
+			(xy 568.96 525.78) (xy 572.77 525.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e0ade76f-c1f2-46b7-b19e-2918b9f798ab")
+	)
+	(wire
+		(pts
 			(xy 711.2 529.59) (xy 718.82 529.59)
 		)
 		(stroke
@@ -33495,6 +33985,16 @@
 	)
 	(wire
 		(pts
+			(xy 533.4 408.94) (xy 535.94 408.94)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e3e28150-9b26-4639-8459-c7fdd6cbd3a1")
+	)
+	(wire
+		(pts
 			(xy 770.89 198.12) (xy 760.73 198.12)
 		)
 		(stroke
@@ -33545,6 +34045,16 @@
 	)
 	(wire
 		(pts
+			(xy 450.85 436.88) (xy 454.66 436.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e47e63d2-19d5-44fb-9a21-5e55326398fc")
+	)
+	(wire
+		(pts
 			(xy 236.22 162.56) (xy 238.76 162.56)
 		)
 		(stroke
@@ -33585,16 +34095,6 @@
 	)
 	(wire
 		(pts
-			(xy 261.62 480.06) (xy 279.4 480.06)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "e56d0fc9-3c88-4f6f-a9fb-a3b6cc13fc74")
-	)
-	(wire
-		(pts
 			(xy 162.56 560.07) (xy 154.94 560.07)
 		)
 		(stroke
@@ -33612,6 +34112,16 @@
 			(type default)
 		)
 		(uuid "e58a7c80-aaeb-4d90-9220-f9598e3a8f24")
+	)
+	(wire
+		(pts
+			(xy 450.85 403.86) (xy 454.66 403.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e5b89c4d-a4ba-4c6f-8146-41d8db150abe")
 	)
 	(wire
 		(pts
@@ -33725,6 +34235,16 @@
 	)
 	(wire
 		(pts
+			(xy 533.4 419.1) (xy 535.94 419.1)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e8c557d3-a4c7-4b5a-9866-480db2db03ab")
+	)
+	(wire
+		(pts
 			(xy 675.64 309.88) (xy 683.26 309.88)
 		)
 		(stroke
@@ -33755,6 +34275,16 @@
 	)
 	(wire
 		(pts
+			(xy 533.4 429.26) (xy 535.94 429.26)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e9d9abdb-2923-4b85-9f91-49aea82cf8db")
+	)
+	(wire
+		(pts
 			(xy 378.46 248.92) (xy 365.76 248.92)
 		)
 		(stroke
@@ -33762,6 +34292,16 @@
 			(type solid)
 		)
 		(uuid "e9f2fe4b-4476-4058-83c5-93b18ddbe7c5")
+	)
+	(wire
+		(pts
+			(xy 430.53 436.88) (xy 440.69 436.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ea586119-79e6-4958-8875-6b3da0312bea")
 	)
 	(wire
 		(pts
@@ -33972,6 +34512,16 @@
 			(type default)
 		)
 		(uuid "f26f2ab0-95f3-4d33-a48a-eeda7a491613")
+	)
+	(wire
+		(pts
+			(xy 450.85 441.96) (xy 454.66 441.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f276983e-5320-424d-9a06-10b7249c5bb4")
 	)
 	(wire
 		(pts
@@ -34265,6 +34815,16 @@
 	)
 	(wire
 		(pts
+			(xy 430.53 464.82) (xy 440.69 464.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fafeaae8-7462-46a8-936f-4a14e24b3f0a")
+	)
+	(wire
+		(pts
 			(xy 604.52 408.94) (xy 607.06 408.94)
 		)
 		(stroke
@@ -34375,13 +34935,13 @@
 	)
 	(wire
 		(pts
-			(xy 284.48 477.52) (xy 289.56 477.52)
+			(xy 430.53 495.3) (xy 435.61 495.3)
 		)
 		(stroke
-			(width 0.1524)
-			(type solid)
+			(width 0)
+			(type default)
 		)
-		(uuid "fde6ca19-41f3-4be6-8ef2-2a7766091f8a")
+		(uuid "fd9ae362-e4a0-4f3d-bbdb-37010e24ce85")
 	)
 	(wire
 		(pts
@@ -34402,6 +34962,16 @@
 			(type default)
 		)
 		(uuid "fe6d1168-1cac-452e-88dc-c5f40bc87b55")
+	)
+	(wire
+		(pts
+			(xy 450.85 497.84) (xy 454.66 497.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fe9e0337-e9db-48fe-a8a0-bd4314147501")
 	)
 	(wire
 		(pts
@@ -34443,6 +35013,16 @@
 		)
 		(uuid "fff8418f-4a8e-4128-9dd5-0a44ee86e835")
 	)
+	(label "FPGA-C15"
+		(at 453.39 487.68 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "001edcea-e734-4c6b-bedb-a83d1521bd9c")
+	)
 	(label "FT-61"
 		(at 551.18 556.26 0)
 		(effects
@@ -34470,6 +35050,16 @@
 			)
 		)
 		(uuid "015f8085-2959-4767-858e-49c8cd51991b")
+	)
+	(label "FPGA-F14"
+		(at 535.94 431.8 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "01736653-37b6-4d14-bef0-cb22921bb018")
 	)
 	(label "EN_+3V3_SW"
 		(at 304.8 177.8 180)
@@ -34668,6 +35258,16 @@
 		)
 		(uuid "0adb6433-8201-4f4a-a8a0-3d1905bf3300")
 	)
+	(label "FPGA-F14"
+		(at 454.66 497.84 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "0c8c8d1f-c227-4dec-aca2-4dd7f025bb96")
+	)
 	(label "FT-74"
 		(at 433.07 434.34 0)
 		(effects
@@ -34747,6 +35347,26 @@
 			(justify left bottom)
 		)
 		(uuid "1140347f-d669-469e-b085-a951f38ef3d9")
+	)
+	(label "FPGA-C19"
+		(at 535.94 419.1 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "12632eaf-9f87-418e-814f-3a2ae1f54d31")
+	)
+	(label "FPGA-C15"
+		(at 535.94 414.02 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "138ee8b3-029b-4878-b1dd-5755c24e63fa")
 	)
 	(label "FPGA-D21"
 		(at 474.98 429.26 180)
@@ -35043,6 +35663,16 @@
 		)
 		(uuid "28896f24-f282-499e-bbd8-36df6951bbbe")
 	)
+	(label "FPGA-E14"
+		(at 554.99 520.7 180)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right bottom)
+		)
+		(uuid "28e418fd-8e6e-4d32-84c1-8a4e4209b029")
+	)
 	(label "ADC_D6_N"
 		(at 262.89 426.72 0)
 		(effects
@@ -35172,6 +35802,16 @@
 		)
 		(uuid "2fa98440-ed6d-4454-ac15-93362272cd89")
 	)
+	(label "FPGA-C19"
+		(at 454.66 436.88 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "30d0e83f-26c1-4f23-a17a-230a68d224ba")
+	)
 	(label "ADC_PWRD"
 		(at 262.89 436.88 0)
 		(effects
@@ -35200,6 +35840,26 @@
 			(justify left bottom)
 		)
 		(uuid "3320490b-a803-4220-a73c-6b1467e07f40")
+	)
+	(label "FT-76"
+		(at 572.77 535.94 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "34dabb7c-0472-421d-91c6-d8d882ea8599")
+	)
+	(label "FPGA-E13"
+		(at 554.99 518.16 180)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right bottom)
+		)
+		(uuid "34f9bd44-326d-493e-addf-8a586e2aad1d")
 	)
 	(label "FPGA_ADC_CLOCK_P"
 		(at 151.13 560.07 180)
@@ -35425,6 +36085,16 @@
 		)
 		(uuid "4cddea88-f914-4ffe-86c1-ecb4819262df")
 	)
+	(label "FPGA-C14"
+		(at 535.94 411.48 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "4d5143b7-cb43-4c86-ba65-e4d69e7624c9")
+	)
 	(label "EN_+3V3_VDD_SW"
 		(at 502.92 314.96 180)
 		(effects
@@ -35434,6 +36104,16 @@
 			(justify right bottom)
 		)
 		(uuid "4d592b86-d765-4a2d-b7ba-73ced6153149")
+	)
+	(label "FPGA-F13"
+		(at 454.66 500.38 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "4dd76822-974b-4baf-a1a5-d07d92343a69")
 	)
 	(label "DAC_5"
 		(at 316.23 462.28 0)
@@ -35472,6 +36152,16 @@
 			(justify right bottom)
 		)
 		(uuid "4f67ba47-e776-4b20-98f2-6ad5c2a2558c")
+	)
+	(label "FT-71"
+		(at 572.77 523.24 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "4ff4584f-5740-4582-ba1f-51b329f407bb")
 	)
 	(label "DAC_SLEEP"
 		(at 316.23 492.76 0)
@@ -35550,6 +36240,16 @@
 		)
 		(uuid "58363366-6ea1-4de2-ad36-9456bb1a4679")
 	)
+	(label "FPGA-F13"
+		(at 535.94 429.26 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "583bdea3-883c-4f44-9d3b-3dd5178a4eba")
+	)
 	(label "FPGA_DAC_CLOCK"
 		(at 334.01 562.61 180)
 		(effects
@@ -35569,6 +36269,36 @@
 			(justify left bottom)
 		)
 		(uuid "5940ab5a-7638-46bc-8159-6db575a0efb0")
+	)
+	(label "FPGA-E22"
+		(at 554.99 535.94 180)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right bottom)
+		)
+		(uuid "5978bf60-5fa8-49ba-8db5-c0ef5a0425cb")
+	)
+	(label "FPGA-E17"
+		(at 554.99 525.78 180)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right bottom)
+		)
+		(uuid "5d42e214-a44c-4e53-adbc-756d0cad52f0")
+	)
+	(label "FT-70"
+		(at 572.77 520.7 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "5dda44a9-58ec-41a4-9eda-516032def2e9")
 	)
 	(label "FPGA-D14"
 		(at 474.98 444.5 180)
@@ -35706,6 +36436,16 @@
 		)
 		(uuid "672f1100-d798-4c44-9ac9-35105597d5a3")
 	)
+	(label "FT-73"
+		(at 572.77 528.32 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "685cc881-4931-43b4-86a2-3856dd7c13d6")
+	)
 	(label "FPGA-A20"
 		(at 461.01 568.96 180)
 		(effects
@@ -35725,6 +36465,16 @@
 			(justify left bottom)
 		)
 		(uuid "6af68c60-05b0-4537-892b-1b2eafbbc768")
+	)
+	(label "FPGA-F15"
+		(at 454.66 502.92 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "6be78570-e8ef-4c74-bdd2-526cc330a55d")
 	)
 	(label "FT-63"
 		(at 433.07 444.5 0)
@@ -35755,6 +36505,16 @@
 			(justify right bottom)
 		)
 		(uuid "6cf9953f-704e-4fe2-bd03-86d422f640d8")
+	)
+	(label "FPGA-F15"
+		(at 535.94 424.18 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "6d10b341-1796-4222-8a14-2f0252e0e3ca")
 	)
 	(label "STM32_OSC_N"
 		(at 350.52 185.42 0)
@@ -35814,6 +36574,16 @@
 		)
 		(uuid "703676cc-be62-4124-a0aa-7893b1b1d4c2")
 	)
+	(label "FPGA-C22"
+		(at 454.66 403.86 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "70431582-914a-4417-9595-60f3a04d0e88")
+	)
 	(label "STM32_TX3"
 		(at 179.07 210.82 180)
 		(effects
@@ -35869,6 +36639,16 @@
 			)
 		)
 		(uuid "73fe505d-2392-47d5-aec9-72be4aacc89e")
+	)
+	(label "FPGA-C17"
+		(at 535.94 416.56 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "741f5cbc-9199-486d-bbe9-f20ce7b622bc")
 	)
 	(label "ADF4382_TX_LKDET"
 		(at 350.52 170.18 0)
@@ -36075,6 +36855,16 @@
 			(justify left bottom)
 		)
 		(uuid "82a44d39-d78b-4a4f-a625-880cf09b6719")
+	)
+	(label "FPGA-C20"
+		(at 535.94 421.64 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "82dc5779-3dec-4e1e-b19f-1f2ac8e831b6")
 	)
 	(label "FPGA-E22"
 		(at 474.98 403.86 180)
@@ -36422,6 +37212,26 @@
 		)
 		(uuid "9c7bdff9-f854-4e60-8f92-ea4151127149")
 	)
+	(label "FPGA-C13"
+		(at 535.94 408.94 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "9d664733-c8ce-43d4-8752-54d21782c4d8")
+	)
+	(label "FT-74"
+		(at 572.77 530.86 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "9e0324c0-c002-44c2-aacd-7d53f6abd2f8")
+	)
 	(label "STM32_SDA3"
 		(at 241.3 165.1 0)
 		(effects
@@ -36562,6 +37372,16 @@
 		)
 		(uuid "a8173e9b-6e45-4c22-80f7-1fec724015af")
 	)
+	(label "FT-75"
+		(at 572.77 533.4 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "a8e9c04a-9675-46c0-ab8a-cbeb3d07ebf7")
+	)
 	(label "FT-55"
 		(at 511.81 532.13 0)
 		(effects
@@ -36638,6 +37458,16 @@
 			)
 		)
 		(uuid "b06785f9-992c-4897-95db-a6dfce91e76f")
+	)
+	(label "FPGA-E21"
+		(at 554.99 533.4 180)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right bottom)
+		)
+		(uuid "b2631699-1924-43f1-8730-46833f0cc7c1")
 	)
 	(label "FT-56"
 		(at 433.07 398.78 0)
@@ -36856,6 +37686,16 @@
 		)
 		(uuid "bd6b7720-889a-486b-8d79-7844871f0e37")
 	)
+	(label "FPGA-C17"
+		(at 454.66 441.96 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "bdc941a3-afa4-41ae-b552-f1b98cf1a9a2")
+	)
 	(label "STM32_MISO1"
 		(at 184.15 157.48 0)
 		(effects
@@ -36875,6 +37715,26 @@
 			(justify left bottom)
 		)
 		(uuid "bf61e1a0-6663-43fb-bd45-98b192da736f")
+	)
+	(label "FPGA-C20"
+		(at 454.66 406.4 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "c0271726-07cd-4303-8fae-108e205f9c42")
+	)
+	(label "FPGA-F16"
+		(at 454.66 495.3 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "c03286f6-27b9-4e6b-888c-f114b128d00a")
 	)
 	(label "ADAR_2_CS_3V3"
 		(at 184.15 144.78 0)
@@ -37033,6 +37893,16 @@
 			(justify left bottom)
 		)
 		(uuid "cd0f5fae-4543-48ad-a675-7e39b030d094")
+	)
+	(label "FPGA-E19"
+		(at 554.99 530.86 180)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right bottom)
+		)
+		(uuid "cd91a907-5771-4dd5-9c01-be638581fdd6")
 	)
 	(label "DIG_1"
 		(at 238.76 208.28 0)
@@ -37201,6 +38071,16 @@
 		)
 		(uuid "d4832748-d057-4a86-a01e-36e709d94c75")
 	)
+	(label "FT-72"
+		(at 572.77 525.78 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "d6461d71-0c81-4931-a9b8-2b721f9c4667")
+	)
 	(label "AD9523_SYNC"
 		(at 579.12 307.34 180)
 		(effects
@@ -37210,6 +38090,16 @@
 			(justify right bottom)
 		)
 		(uuid "d735fd94-f892-45eb-a3f0-b51c5d0f2b57")
+	)
+	(label "FPGA-F16"
+		(at 535.94 436.88 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify bottom)
+		)
+		(uuid "d77da78b-c6c7-43ec-8adb-635422ff509d")
 	)
 	(label "AD9523_STATUS0"
 		(at 579.12 314.96 180)
@@ -37260,6 +38150,16 @@
 			(justify left bottom)
 		)
 		(uuid "d9976dfe-91d8-4e6f-8e90-8fcf1eed50eb")
+	)
+	(label "FPGA-C14"
+		(at 453.39 490.22 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "da3a54a1-3268-4ac7-acd8-f4fb6ecbf89c")
 	)
 	(label "FPGA_SYS_CLOCK"
 		(at 316.23 383.54 0)
@@ -37398,6 +38298,16 @@
 			(justify right bottom)
 		)
 		(uuid "e6ba7938-82fd-4bfa-9819-58e2b3cb47fb")
+	)
+	(label "FPGA-E16"
+		(at 554.99 523.24 180)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right bottom)
+		)
+		(uuid "e7883c41-5e7f-4516-a73e-76ce9a3bbe96")
 	)
 	(label "FPGA-A13"
 		(at 461.01 553.72 180)
@@ -37548,6 +38458,16 @@
 		)
 		(uuid "f17faa7a-8155-48ba-919d-aa91b24e7043")
 	)
+	(label "FT-69"
+		(at 572.77 518.16 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "f196e5b8-a16a-409c-9851-2578978aae9f")
+	)
 	(label "STM32_MOSI1"
 		(at 316.23 421.64 0)
 		(effects
@@ -37556,6 +38476,16 @@
 			)
 		)
 		(uuid "f24fe77e-0e7c-4396-90ca-07d5c2a98e7e")
+	)
+	(label "FPGA-E18"
+		(at 554.99 528.32 180)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right bottom)
+		)
+		(uuid "f4e8bb6d-f74a-4fec-b22c-c4b20427f343")
 	)
 	(label "EN_+5V5_PA"
 		(at 523.24 299.72 0)
@@ -37597,6 +38527,16 @@
 		)
 		(uuid "f7ba1396-9ee2-4309-8005-5566a66782aa")
 	)
+	(label "FPGA-C22"
+		(at 535.94 426.72 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "f87e5d27-4232-4f2a-9267-64a0d29ea397")
+	)
 	(label "FPGA-D14"
 		(at 533.4 553.72 180)
 		(effects
@@ -37616,6 +38556,16 @@
 			(justify left bottom)
 		)
 		(uuid "f9c3d02b-862e-4485-bd64-246e1f4f8532")
+	)
+	(label "FPGA-C13"
+		(at 453.39 464.82 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "f9e1fbc6-7e51-4eb1-a735-90d205069eec")
 	)
 	(label "EN_+1V8_FPGA"
 		(at 304.8 162.56 180)
@@ -38057,6 +39007,30 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+			)
+		)
+	)
+	(global_label "VCC33_2"
+		(shape bidirectional)
+		(at 581.66 375.92 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left)
+		)
+		(uuid "138db8e2-a328-44cc-9969-8b10b7df06fc")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 581.66 366.0633 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 			)
 		)
 	)
@@ -38876,6 +39850,30 @@
 			)
 		)
 	)
+	(global_label "+3V3_FPGA"
+		(shape input)
+		(at 463.55 509.27 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "39304b54-07c7-4791-87d8-7482b8662a5b")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 463.55 523.02 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
 	(global_label "+1V0_FPGA"
 		(shape input)
 		(at 123.19 360.68 0)
@@ -38889,6 +39887,54 @@
 		(uuid "3a1f870e-5b5e-4f7a-b58d-545625f00c00")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 136.94 360.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "AVDD"
+		(shape bidirectional)
+		(at 553.72 375.92 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left)
+		)
+		(uuid "3bc3c711-4d19-4170-8011-48ee1b9097ea")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 553.72 368.8693 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "VCCIO"
+		(shape bidirectional)
+		(at 459.74 374.65 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left)
+		)
+		(uuid "3d59e0cf-65da-4686-86f4-8b19ae242274")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 459.74 366.922 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40028,6 +41074,30 @@
 			)
 		)
 	)
+	(global_label "VDDA"
+		(shape bidirectional)
+		(at 530.86 374.65 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left)
+		)
+		(uuid "780d7928-b992-4614-9e62-2a61a88deb00")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 530.86 367.5993 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
 	(global_label "+1V8_FPGA"
 		(shape input)
 		(at 57.15 363.22 180)
@@ -40521,6 +41591,30 @@
 		(uuid "8aecc5dd-8098-4b9e-a5fc-b812ca32dcad")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 130.0457 238.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "VCCIO_4"
+		(shape bidirectional)
+		(at 471.17 374.65 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left)
+		)
+		(uuid "8b928d9c-c54b-47c9-adad-dc12d0e96974")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 471.17 365.1803 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41345,6 +42439,30 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+			)
+		)
+	)
+	(global_label "VCCIO_3"
+		(shape bidirectional)
+		(at 487.68 374.65 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left)
+		)
+		(uuid "a7d182fc-7c0c-46e3-8778-714d6b5ffece")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 487.68 365.1803 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 			)
 		)
 	)
@@ -42356,6 +43474,30 @@
 			)
 		)
 	)
+	(global_label "VCCIO_2"
+		(shape bidirectional)
+		(at 570.23 375.92 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left)
+		)
+		(uuid "dc7722d1-3467-473c-b08f-fb8c2bab4ec9")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 570.23 366.4503 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
 	(global_label "+1V8_FPGA"
 		(shape input)
 		(at 685.8 483.87 270)
@@ -42766,7 +43908,7 @@
 	)
 	(global_label "AVDD"
 		(shape bidirectional)
-		(at 543.56 403.86 0)
+		(at 534.67 403.86 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -42776,7 +43918,7 @@
 		)
 		(uuid "f2372f93-c11e-4b91-9fa5-2a491976176f")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 550.6107 403.86 0)
+			(at 541.7207 403.86 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42953,6 +44095,30 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+			)
+		)
+	)
+	(global_label "VCC33"
+		(shape bidirectional)
+		(at 505.46 374.65 90)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left)
+		)
+		(uuid "f80b46c0-4860-47d2-96ea-ed9e91640e3a")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 505.46 366.535 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 			)
 		)
 	)
@@ -43314,6 +44480,86 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "#GND26")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 492.76 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "0540e1de-ee24-450d-9611-a40cad0faa12")
+		(property "Reference" "R204"
+			(at 441.706 490.982 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "10K"
+			(at 448.564 491.998 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 492.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 492.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 492.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "f54a5dc1-5394-43de-aa19-19cb07c20a2c")
+		)
+		(pin "1"
+			(uuid "e7c74770-f8b0-4256-8321-efa4c9843d90")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R204")
 					(unit 1)
 				)
 			)
@@ -45332,6 +46578,85 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:GND")
+		(at 505.46 384.81 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "0a069d2a-0bc5-47f0-98ed-464774058a40")
+		(property "Reference" "#GND0737"
+			(at 505.46 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 508 387.35 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" ""
+			(at 505.46 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 505.46 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "SUPPLY SYMBOL"
+			(at 505.46 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0400babc-2394-404c-8d35-91caf93439ee")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "#GND0737")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:142-0731-211")
 		(at 401.32 562.61 0)
 		(unit 1)
@@ -45828,6 +47153,85 @@
 	)
 	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:GND")
+		(at 570.23 386.08 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "0dee5a5d-f8f4-4528-933e-3f74c5bc262a")
+		(property "Reference" "#GND0280"
+			(at 570.23 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 572.77 388.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" ""
+			(at 570.23 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 570.23 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "SUPPLY SYMBOL"
+			(at 570.23 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "fb724e76-6d84-417f-9049-03cc33b2b24e")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "#GND0280")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:GND")
 		(at 612.14 558.8 0)
 		(unit 1)
 		(body_style 1)
@@ -46301,6 +47705,86 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "C111")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 490.22 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "185f648a-3b22-4f0d-845d-98b32c81dc90")
+		(property "Reference" "R194"
+			(at 441.706 488.442 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 489.458 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 490.22 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 490.22 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 490.22 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "0d1e4a5d-55d4-47ac-ae86-29d3fa971a06")
+		)
+		(pin "1"
+			(uuid "c70be62d-8af7-4018-8a3c-c66367cbb330")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R194")
 					(unit 1)
 				)
 			)
@@ -46791,6 +48275,247 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:GND")
+		(at 459.74 384.81 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "1e4470dc-a4bb-4a7c-8ba7-fb8af2291f31")
+		(property "Reference" "#GND0740"
+			(at 459.74 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 462.28 387.35 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" ""
+			(at 459.74 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 459.74 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "SUPPLY SYMBOL"
+			(at 459.74 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "2d6fcbf3-62de-4e41-bc75-72721810be40")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "#GND0740")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:C-EUC0805")
+		(at 557.53 378.46 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "1e50d029-3c93-4ec1-9e68-ab3a6d53cea0")
+		(property "Reference" "C188"
+			(at 554.228 377.952 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "4.7uF"
+			(at 554.736 382.27 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:C0805"
+			(at 557.53 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 557.53 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "CAPACITOR, European symbol"
+			(at 557.53 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "aacac576-8d99-47fa-82fe-6de03f899f84")
+		)
+		(pin "1"
+			(uuid "59b75ca3-5ae9-4dc0-a5b7-fce2f9633427")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "C188")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:C-EUC0805")
+		(at 549.91 378.46 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "20673ec6-56f8-4d2f-bfdc-ad530c3c71c0")
+		(property "Reference" "C187"
+			(at 546.608 377.952 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 546.354 382.27 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:C0805"
+			(at 549.91 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 549.91 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "CAPACITOR, European symbol"
+			(at 549.91 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "faac93ba-e27c-4125-a7a0-08b785817411")
+		)
+		(pin "1"
+			(uuid "0e1d7475-d9d1-4ca7-aafa-8f81db400afa")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "C187")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:CC0201")
 		(at 403.86 251.46 0)
 		(unit 1)
@@ -47194,6 +48919,87 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:C-EUC0805")
+		(at 581.66 378.46 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "26e08d41-c6be-47fe-b844-59acc56883e9")
+		(property "Reference" "C190"
+			(at 578.358 377.952 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 578.104 382.27 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:C0805"
+			(at 581.66 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 581.66 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "CAPACITOR, European symbol"
+			(at 581.66 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "a149f664-125e-4220-a72f-cd8b9f4e2d74")
+		)
+		(pin "1"
+			(uuid "ff80526e-4f12-4f08-b1e7-56938bc8d0ea")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "C190")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:CC0201")
 		(at 365.76 251.46 0)
 		(unit 1)
@@ -47349,6 +49155,87 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "R183")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:C-EUC0805")
+		(at 570.23 378.46 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "2b28c3a6-a4f0-4693-b135-48d748b996e3")
+		(property "Reference" "C189"
+			(at 566.928 377.952 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 566.674 382.27 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:C0805"
+			(at 570.23 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 570.23 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "CAPACITOR, European symbol"
+			(at 570.23 378.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "940de118-4b53-46e8-9e3d-ff7277af25db")
+		)
+		(pin "1"
+			(uuid "487e389c-533d-4753-a205-daa6ca2fbc5d")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "C189")
 					(unit 1)
 				)
 			)
@@ -47671,6 +49558,244 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "C159")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 500.38 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "307714fa-dc27-4a2b-a7eb-97ee1a997cb8")
+		(property "Reference" "R198"
+			(at 441.706 498.602 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 499.618 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 500.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 500.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 500.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "740ca07d-1286-44f5-bdbc-6aa83eaefbc7")
+		)
+		(pin "1"
+			(uuid "c6b87122-5f35-4ecb-ae2b-48d1863230ca")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R198")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:GND")
+		(at 471.17 384.81 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "32fe4d2a-641f-4c72-8fa1-b56d27eac662")
+		(property "Reference" "#GND0739"
+			(at 471.17 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 473.71 387.35 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" ""
+			(at 471.17 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 471.17 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "SUPPLY SYMBOL"
+			(at 471.17 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "80bc3de6-fa77-4823-822c-d787cd53c8e6")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "#GND0739")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:GND")
+		(at 581.66 386.08 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "347d8d57-5ee3-40d3-964c-8dec8988c048")
+		(property "Reference" "#GND0339"
+			(at 581.66 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 584.2 388.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" ""
+			(at 581.66 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 581.66 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "SUPPLY SYMBOL"
+			(at 581.66 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "de70f562-657d-4d80-946e-e77f381b514c")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "#GND0339")
 					(unit 1)
 				)
 			)
@@ -48166,6 +50291,86 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 502.92 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "3e3eb7c6-e172-4296-98aa-3870f81602a2")
+		(property "Reference" "R199"
+			(at 441.706 501.142 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 502.158 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 502.92 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 502.92 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 502.92 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "bea17620-e3fc-47ac-a812-f30a90202b4a")
+		)
+		(pin "1"
+			(uuid "b444c0d9-3762-46e4-a16c-d8b70fcaaef3")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R199")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:GND")
 		(at 599.44 320.04 0)
 		(unit 1)
@@ -48480,6 +50685,86 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "R185")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 464.82 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "456748a9-c5df-480f-9b54-8d66842232e0")
+		(property "Reference" "R193"
+			(at 441.706 463.042 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 464.058 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 464.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 464.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 464.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "e6db7e29-90ef-41c8-ac77-f804c50abfcc")
+		)
+		(pin "1"
+			(uuid "e4ec6094-2749-4db0-9de5-4696d155320b")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R193")
 					(unit 1)
 				)
 			)
@@ -49206,6 +51491,87 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:C-EUC0805")
+		(at 525.78 377.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "4b222a02-1a77-4161-a721-04d968fa58a6")
+		(property "Reference" "C191"
+			(at 522.478 376.682 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 522.224 381 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:C0805"
+			(at 525.78 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 525.78 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "CAPACITOR, European symbol"
+			(at 525.78 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "e65b726e-53ab-40a5-b154-09febe1d3873")
+		)
+		(pin "1"
+			(uuid "26b7c408-859f-4177-a17c-cbd33bc3ba9b")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "C191")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:GND")
 		(at 115.57 523.24 0)
 		(unit 1)
@@ -49359,6 +51725,87 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "C177")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:C-EUC0805")
+		(at 459.74 377.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "4dcb49c0-fb21-4038-ae0c-6c69d94b32d4")
+		(property "Reference" "C352"
+			(at 456.438 376.682 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 456.184 381 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:C0805"
+			(at 459.74 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 459.74 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "CAPACITOR, European symbol"
+			(at 459.74 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "1782c462-ad6b-4d78-a802-7d1d295fcc8e")
+		)
+		(pin "1"
+			(uuid "eb9b56f3-9151-4e3d-b893-e0befffb8365")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "C352")
 					(unit 1)
 				)
 			)
@@ -51126,6 +53573,86 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 436.88 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "54d5430b-d8af-4300-8b63-5e8f50896384")
+		(property "Reference" "R201"
+			(at 441.706 435.102 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 436.118 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 436.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 436.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 436.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "bf66074d-1c71-4d63-87de-eda5e5d3c1e5")
+		)
+		(pin "1"
+			(uuid "10470491-ef55-4c44-85c3-d8e5de30f79e")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R201")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:GND")
 		(at 793.75 208.28 0)
 		(mirror y)
@@ -51277,6 +53804,87 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "#GND1059")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:C-EUC0805")
+		(at 487.68 377.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "5783d26b-c762-424e-b9eb-fd0742ba7a22")
+		(property "Reference" "C194"
+			(at 484.378 376.682 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 484.124 381 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:C0805"
+			(at 487.68 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 487.68 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "CAPACITOR, European symbol"
+			(at 487.68 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "de0e39b3-78ac-44a3-9d64-f9709d781af2")
+		)
+		(pin "1"
+			(uuid "77a6d4bc-48b9-489d-a493-63e5038f0e00")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "C194")
 					(unit 1)
 				)
 			)
@@ -51866,86 +54474,6 @@
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "U2")
 					(unit 2)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
-		(at 563.88 537.21 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "596d7fed-5cef-4cdb-bc65-84247ef15eee")
-		(property "Reference" "R146"
-			(at 559.816 535.432 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.778 1.5113)
-				)
-			)
-		)
-		(property "Value" "33R"
-			(at 566.674 536.448 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.778 1.5113)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Footprint" "RADAR_Main_Board:R0402"
-			(at 563.88 537.21 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 563.88 537.21 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "RESISTOR, European symbol"
-			(at 563.88 537.21 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "981f5e95-5c87-4a96-8398-0b3b90c752ad")
-		)
-		(pin "1"
-			(uuid "8601e63b-3d32-49a0-85e8-ec561a2dd3af")
-		)
-		(instances
-			(project "RADAR_Main_Board"
-				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
-					(reference "R146")
-					(unit 1)
 				)
 			)
 		)
@@ -52979,87 +55507,6 @@
 		)
 	)
 	(symbol
-		(lib_id "RADAR_Main_Board-eagle-import:RR0201")
-		(at 284.48 452.12 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "64bf6a60-ed93-48fe-980e-5161c41ccea8")
-		(property "Reference" "R5"
-			(at 282.9814 455.93 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.778 1.5113)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Value" "100R"
-			(at 287.782 453.39 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.778 1.5113)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Footprint" "RADAR_Main_Board:R0201"
-			(at 284.48 452.12 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 284.48 452.12 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "RESISTOR, European symbol"
-			(at 284.48 452.12 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "e9caeb23-1d1e-41e7-bc01-1f20f42fdf57")
-		)
-		(pin "2"
-			(uuid "99cf63cd-960a-492f-82d9-c0251d0d0623")
-		)
-		(instances
-			(project "RADAR_Main_Board"
-				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
-					(reference "R5")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:PINHD-1X3")
 		(at 304.8 302.26 0)
 		(unit 1)
@@ -54046,7 +56493,7 @@
 	)
 	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
-		(at 563.88 532.13 0)
+		(at 563.88 530.86 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -54056,7 +56503,7 @@
 		(dnp no)
 		(uuid "6f1483bd-2c98-436d-a399-01a56cdae444")
 		(property "Reference" "R144"
-			(at 559.816 530.352 0)
+			(at 559.816 529.082 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -54066,7 +56513,7 @@
 			)
 		)
 		(property "Value" "33R"
-			(at 566.674 531.368 0)
+			(at 566.674 530.098 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -54077,7 +56524,7 @@
 			)
 		)
 		(property "Footprint" "RADAR_Main_Board:R0402"
-			(at 563.88 532.13 0)
+			(at 563.88 530.86 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -54088,7 +56535,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 563.88 532.13 0)
+			(at 563.88 530.86 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -54099,7 +56546,7 @@
 			)
 		)
 		(property "Description" "RESISTOR, European symbol"
-			(at 563.88 532.13 0)
+			(at 563.88 530.86 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -54696,6 +57143,87 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:C-EUC0805")
+		(at 535.94 377.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "82736535-8d46-4d4b-8a23-e0d03bcba06b")
+		(property "Reference" "C192"
+			(at 532.638 376.682 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "4.7uF"
+			(at 533.146 381 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:C0805"
+			(at 535.94 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 535.94 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "CAPACITOR, European symbol"
+			(at 535.94 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "1a71ec8c-6a30-43db-8394-3c61b61c81c5")
+		)
+		(pin "1"
+			(uuid "d84a5dad-45ab-40d8-af79-69b05da552f4")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "C192")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:GND")
 		(at 538.48 472.44 90)
 		(mirror x)
@@ -54850,6 +57378,166 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "C176")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 403.86 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "84b1cb1e-6f07-4f58-be1a-55dccd1a0e9e")
+		(property "Reference" "R200"
+			(at 441.706 402.082 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 403.098 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 403.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 403.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 403.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "438e0cfe-d3cf-4c1c-bf6e-40524b574504")
+		)
+		(pin "1"
+			(uuid "c2f4db51-ee93-4087-a4c6-d468ae2deeb6")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R200")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 495.3 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "86207058-83cc-4c34-afbd-d54f668f3de2")
+		(property "Reference" "R203"
+			(at 441.706 493.522 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 494.538 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 495.3 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 495.3 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 495.3 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "40d4a2b1-76dc-4e71-a2bf-a1609576d8bc")
+		)
+		(pin "1"
+			(uuid "b66e96f5-f92f-430c-ade4-f17e352bad18")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R203")
 					(unit 1)
 				)
 			)
@@ -55420,87 +58108,6 @@
 		)
 	)
 	(symbol
-		(lib_id "RADAR_Main_Board-eagle-import:RR0201")
-		(at 281.94 485.14 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "91edf22e-cacd-4786-a555-1ff2ea954823")
-		(property "Reference" "R8"
-			(at 280.4414 488.95 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.778 1.5113)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Value" "100R"
-			(at 285.242 486.41 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.778 1.5113)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Footprint" "RADAR_Main_Board:R0201"
-			(at 281.94 485.14 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 281.94 485.14 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "RESISTOR, European symbol"
-			(at 281.94 485.14 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c4221d8b-09f7-4cc1-915b-44dfc1199518")
-		)
-		(pin "2"
-			(uuid "7f2c1045-d866-4c42-98f3-75057885544b")
-		)
-		(instances
-			(project "RADAR_Main_Board"
-				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
-					(reference "R8")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:L-EUL5650M")
 		(at 781.05 198.12 270)
 		(mirror x)
@@ -55905,6 +58512,86 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 497.84 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "9a6df472-0133-4cfd-aade-6ef7af33cf92")
+		(property "Reference" "R197"
+			(at 441.706 496.062 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 497.078 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 497.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 497.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 497.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "28ebe350-d4f3-40f3-aa34-244b2b0182d4")
+		)
+		(pin "1"
+			(uuid "e6c1eb04-5524-4c09-8e17-b4148b6c826e")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R197")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:GND")
 		(at 396.24 238.76 0)
 		(unit 1)
@@ -56218,6 +58905,86 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "#GND71")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 487.68 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "a00491ac-4049-4a1a-bf78-c394bc003bd5")
+		(property "Reference" "R195"
+			(at 441.706 485.902 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 486.918 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 487.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 487.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 487.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "c7d89eef-7cc5-4d58-b104-053d9fa2665e")
+		)
+		(pin "1"
+			(uuid "8070c306-243e-4ec3-8f4a-c34e2dacacca")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R195")
 					(unit 1)
 				)
 			)
@@ -56940,6 +59707,86 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "R3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 505.46 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "a6cc8004-3c8a-491c-bf5a-9083e2c2be56")
+		(property "Reference" "R205"
+			(at 441.706 503.682 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "10K"
+			(at 448.564 504.698 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 505.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 505.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 505.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "ca47d715-b53f-4332-9370-c4b6526ec8dc")
+		)
+		(pin "1"
+			(uuid "f37180aa-716a-41e6-88a7-f0dde203bfd2")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R205")
 					(unit 1)
 				)
 			)
@@ -57894,6 +60741,85 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "R180")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:GND")
+		(at 530.86 384.81 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "b4fed9b4-6b87-45dd-a39b-74e680a3c342")
+		(property "Reference" "#GND0398"
+			(at 530.86 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 533.4 387.35 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" ""
+			(at 530.86 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 530.86 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "SUPPLY SYMBOL"
+			(at 530.86 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "541e821c-5ca2-481a-a33a-6a60b5500be0")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "#GND0398")
 					(unit 1)
 				)
 			)
@@ -58909,87 +61835,6 @@
 		)
 	)
 	(symbol
-		(lib_id "RADAR_Main_Board-eagle-import:RR0201")
-		(at 289.56 472.44 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "c3a89c6b-4190-420c-9a38-b6fe25fb27e1")
-		(property "Reference" "R7"
-			(at 288.0614 476.25 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.778 1.5113)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Value" "100R"
-			(at 292.862 473.71 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.778 1.5113)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Footprint" "RADAR_Main_Board:R0201"
-			(at 289.56 472.44 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 289.56 472.44 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "RESISTOR, European symbol"
-			(at 289.56 472.44 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "a8f65edf-f189-4e51-8dfa-9049b6c05f06")
-		)
-		(pin "2"
-			(uuid "5338b02e-49c2-41fc-8a6b-0594d0da763b")
-		)
-		(instances
-			(project "RADAR_Main_Board"
-				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
-					(reference "R7")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
 		(at 502.92 527.05 0)
 		(unit 1)
@@ -59314,8 +62159,8 @@
 	)
 	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:GND")
-		(at 538.48 401.32 90)
-		(mirror x)
+		(at 487.68 384.81 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -59323,9 +62168,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "ca9e8889-9532-4e62-bcbe-0c8a7cfe96e1")
-		(property "Reference" "#GND70"
-			(at 538.48 401.32 0)
+		(uuid "ca22bf38-99ae-4993-a75c-168e0b4d49ec")
+		(property "Reference" "#GND0738"
+			(at 487.68 384.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -59336,7 +62181,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 541.02 398.78 0)
+			(at 490.22 387.35 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -59347,7 +62192,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 538.48 401.32 0)
+			(at 487.68 384.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -59358,7 +62203,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 538.48 401.32 0)
+			(at 487.68 384.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -59369,7 +62214,86 @@
 			)
 		)
 		(property "Description" "SUPPLY SYMBOL"
-			(at 538.48 401.32 0)
+			(at 487.68 384.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "9cc1c269-a55f-4285-9cdd-9f2c476a1657")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "#GND0738")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:GND")
+		(at 535.94 398.78 0)
+		(mirror x)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "ca9e8889-9532-4e62-bcbe-0c8a7cfe96e1")
+		(property "Reference" "#GND70"
+			(at 535.94 398.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 533.4 396.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" ""
+			(at 535.94 398.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 535.94 398.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "SUPPLY SYMBOL"
+			(at 535.94 398.78 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -59386,6 +62310,86 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "#GND70")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 406.4 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "cabaa1cb-d348-419b-8013-ea833ddbbbaf")
+		(property "Reference" "R202"
+			(at 441.706 404.622 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 405.638 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 406.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 406.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 406.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "711310f5-93c0-422a-92c6-b87fe7e6324a")
+		)
+		(pin "1"
+			(uuid "754ca7f1-48a2-4528-ab62-0fd4cc605d2a")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R202")
 					(unit 1)
 				)
 			)
@@ -59635,7 +62639,7 @@
 	)
 	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
-		(at 563.88 529.59 0)
+		(at 563.88 528.32 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -59645,7 +62649,7 @@
 		(dnp no)
 		(uuid "cdd33b9d-4883-49b6-beca-b12c366d89fd")
 		(property "Reference" "R142"
-			(at 559.816 527.812 0)
+			(at 559.816 526.542 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -59655,7 +62659,7 @@
 			)
 		)
 		(property "Value" "33R"
-			(at 566.674 528.828 0)
+			(at 566.674 527.558 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -59666,7 +62670,7 @@
 			)
 		)
 		(property "Footprint" "RADAR_Main_Board:R0402"
-			(at 563.88 529.59 0)
+			(at 563.88 528.32 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -59677,7 +62681,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 563.88 529.59 0)
+			(at 563.88 528.32 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -59688,7 +62692,7 @@
 			)
 		)
 		(property "Description" "RESISTOR, European symbol"
-			(at 563.88 529.59 0)
+			(at 563.88 528.32 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -60542,6 +63546,85 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:GND")
+		(at 553.72 386.08 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "d6e83af3-daed-4a75-be33-0718b85a04f3")
+		(property "Reference" "#GND0221"
+			(at 553.72 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 556.26 388.62 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" ""
+			(at 553.72 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 553.72 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "SUPPLY SYMBOL"
+			(at 553.72 386.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "d68a9db5-1cab-4d8f-baa9-c3cee3f5d3a6")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "#GND0221")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:RR0201")
 		(at 80.01 500.38 90)
 		(unit 1)
@@ -60780,7 +63863,7 @@
 	)
 	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
-		(at 563.88 527.05 0)
+		(at 563.88 525.78 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -60790,7 +63873,7 @@
 		(dnp no)
 		(uuid "da296146-4634-4141-b799-c22a4453e5d6")
 		(property "Reference" "R141"
-			(at 559.816 525.272 0)
+			(at 559.816 524.002 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -60800,7 +63883,7 @@
 			)
 		)
 		(property "Value" "33R"
-			(at 566.674 526.288 0)
+			(at 566.674 525.018 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -60811,7 +63894,7 @@
 			)
 		)
 		(property "Footprint" "RADAR_Main_Board:R0402"
-			(at 563.88 527.05 0)
+			(at 563.88 525.78 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -60822,7 +63905,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 563.88 527.05 0)
+			(at 563.88 525.78 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -60833,7 +63916,7 @@
 			)
 		)
 		(property "Description" "RESISTOR, European symbol"
-			(at 563.88 527.05 0)
+			(at 563.88 525.78 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -61901,6 +64984,87 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:C-EUC0805")
+		(at 471.17 377.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e46f8b87-bcf5-44a8-8976-e2f0b13ad3a3")
+		(property "Reference" "C195"
+			(at 467.868 376.682 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 467.614 381 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:C0805"
+			(at 471.17 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 471.17 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "CAPACITOR, European symbol"
+			(at 471.17 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "6ad7584d-4eae-40ab-88bc-ea39654b5415")
+		)
+		(pin "1"
+			(uuid "46bbadfe-bdc7-4d74-abc7-26ff3d175825")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "C195")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
 		(at 542.29 566.42 0)
 		(unit 1)
@@ -62053,6 +65217,87 @@
 			(project "RADAR_Main_Board"
 				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
 					(reference "#GND41")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:C-EUC0805")
+		(at 505.46 377.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e6f2ec16-8c26-4d62-8bf6-5f087c97b6e3")
+		(property "Reference" "C193"
+			(at 502.158 376.682 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 501.904 381 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:C0805"
+			(at 505.46 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 505.46 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "CAPACITOR, European symbol"
+			(at 505.46 377.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "c52c7ef2-f6f8-47e8-9ea4-796e2c5f1550")
+		)
+		(pin "1"
+			(uuid "257eafda-e00a-4ac6-966f-291a2a58fa0b")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "C193")
 					(unit 1)
 				)
 			)
@@ -65807,6 +69052,86 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 445.77 441.96 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "eecb03ce-a745-4ea5-87c8-f2805c30b55d")
+		(property "Reference" "R196"
+			(at 441.706 440.182 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 448.564 441.198 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 445.77 441.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 445.77 441.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 445.77 441.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "c329f7ed-64cd-416a-986b-b726890d8b76")
+		)
+		(pin "1"
+			(uuid "a2e1f6a3-b594-4cde-80e4-fd2ca210c58c")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R196")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:GND")
 		(at 621.03 529.59 270)
 		(unit 1)
@@ -68299,6 +71624,86 @@
 		)
 	)
 	(symbol
+		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
+		(at 563.88 535.94 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "fbce6c73-50d7-44df-8e8d-dff569ffe2ac")
+		(property "Reference" "R146"
+			(at 559.816 534.162 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+			)
+		)
+		(property "Value" "33R"
+			(at 566.674 535.178 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.778 1.5113)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Footprint" "RADAR_Main_Board:R0402"
+			(at 563.88 535.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 563.88 535.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RESISTOR, European symbol"
+			(at 563.88 535.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "fa9fee07-5fa6-4f2f-a5d0-df5cb188bf87")
+		)
+		(pin "1"
+			(uuid "d5caa811-aad4-4719-9f01-429ef1d7f9a5")
+		)
+		(instances
+			(project "RADAR_Main_Board"
+				(path "/e294342a-dc9b-4bba-983e-ec7d495d6725"
+					(reference "R146")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:GND")
 		(at 246.38 307.34 0)
 		(unit 1)
@@ -68460,7 +71865,7 @@
 	)
 	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:RR0402")
-		(at 563.88 534.67 0)
+		(at 563.88 533.4 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -68470,7 +71875,7 @@
 		(dnp no)
 		(uuid "fd4d5255-343b-4cec-a5e8-c25529bb529d")
 		(property "Reference" "R145"
-			(at 559.816 532.892 0)
+			(at 559.816 531.622 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -68480,7 +71885,7 @@
 			)
 		)
 		(property "Value" "33R"
-			(at 566.674 533.908 0)
+			(at 566.674 532.638 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -68491,7 +71896,7 @@
 			)
 		)
 		(property "Footprint" "RADAR_Main_Board:R0402"
-			(at 563.88 534.67 0)
+			(at 563.88 533.4 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -68502,7 +71907,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 563.88 534.67 0)
+			(at 563.88 533.4 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -68513,7 +71918,7 @@
 			)
 		)
 		(property "Description" "RESISTOR, European symbol"
-			(at 563.88 534.67 0)
+			(at 563.88 533.4 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)

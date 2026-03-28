@@ -94083,7 +94083,7 @@
 	)
 	(symbol
 		(lib_id "RADAR_Main_Board-eagle-import:FRAME_E_L")
-		(at 674.37 787.4 0)
+		(at 576.58 835.66 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -94093,7 +94093,7 @@
 		(dnp no)
 		(uuid "98839dde-a219-49e2-b69c-09f05b17efc4")
 		(property "Reference" "#FRAME3"
-			(at 674.37 787.4 0)
+			(at 576.58 835.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -94104,7 +94104,7 @@
 			)
 		)
 		(property "Value" "FRAME_E_L"
-			(at 674.37 787.4 0)
+			(at 576.58 835.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -94115,7 +94115,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 674.37 787.4 0)
+			(at 576.58 835.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -94126,7 +94126,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 674.37 787.4 0)
+			(at 576.58 835.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -94137,7 +94137,7 @@
 			)
 		)
 		(property "Description" "FRAME E Size , 34 x 44 INCH, Landscape"
-			(at 674.37 787.4 0)
+			(at 576.58 835.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)

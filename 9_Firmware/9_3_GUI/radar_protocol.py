@@ -456,6 +456,10 @@ class FT601Connection:
                 log.error("ftd3xx.create returned None")
                 return False
             self._handle = self._device.handle
+            # CRITICAL: Reset and re-initialize USB stream pipes.
+            # Without this sequence, reads may timeout indefinitely after
+            # FPGA reprogramming or USB reconnects (discovered 2026-03-28).
+            self._init_pipes()
             # Flush any stale data from the IN pipe
             self._flush()
             self.is_open = True
@@ -487,6 +491,32 @@ class FT601Connection:
             self._device.flushPipe(PIPE_IN)
         except Exception:
             pass
+
+    def _init_pipes(self):
+        """Reset and re-initialize USB stream pipes.
+
+        The FT601 D3XX driver can get into a state where reads timeout
+        indefinitely (st=19) after FPGA reprogramming or USB cable
+        reconnects.  The fix is to abort, flush, clear, and re-set the
+        stream pipes before any transfers.  Discovered 2026-03-28.
+        """
+        if _ftd3xx_ll is None or self._handle is None:
+            return
+        h = self._handle
+        zero = ctypes.c_ubyte(0)
+        try:
+            _ftd3xx_ll.FT_AbortPipe(h, ctypes.c_ubyte(PIPE_IN))
+            _ftd3xx_ll.FT_AbortPipe(h, ctypes.c_ubyte(PIPE_OUT))
+            _ftd3xx_ll.FT_FlushPipe(h, ctypes.c_ubyte(PIPE_IN))
+            _ftd3xx_ll.FT_ClearStreamPipe(h, zero, zero, ctypes.c_ubyte(PIPE_IN))
+            _ftd3xx_ll.FT_ClearStreamPipe(h, zero, zero, ctypes.c_ubyte(PIPE_OUT))
+            _ftd3xx_ll.FT_SetStreamPipe(h, zero, zero, ctypes.c_ubyte(PIPE_IN),
+                                         ctypes.c_ulong(65536))
+            _ftd3xx_ll.FT_SetStreamPipe(h, zero, zero, ctypes.c_ubyte(PIPE_OUT),
+                                         ctypes.c_ulong(4))
+            log.info("FT601 stream pipes initialized (abort/flush/clear/set)")
+        except Exception as e:
+            log.warning(f"FT601 pipe init failed (non-fatal): {e}")
 
     def read(self, size: int = 16384) -> Optional[bytes]:
         """Read raw bytes from FT601. Returns None on error/timeout."""

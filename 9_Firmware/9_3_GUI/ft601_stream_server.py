@@ -120,6 +120,10 @@ class FT601StreamServer:
                 log.error("ftd3xx.create returned None")
                 return False
             self._handle = self._device.handle
+            # CRITICAL: Reset and re-initialize USB stream pipes.
+            # Without this, reads timeout after FPGA reprogramming or
+            # USB reconnects (discovered 2026-03-28).
+            self._init_pipes()
             # Flush stale data
             for _ in range(50):
                 d = raw_read(self._handle, PIPE_IN, 16384, timeout_ms=50)
@@ -150,6 +154,32 @@ class FT601StreamServer:
             self._device = None
             self._handle = None
             log.info("FT601 device closed")
+
+    def _init_pipes(self):
+        """Reset and re-initialize USB stream pipes.
+
+        The FT601 D3XX driver can enter a state where reads timeout
+        indefinitely (st=19) after FPGA reprogramming or USB reconnects.
+        Aborting, flushing, clearing, and re-setting the stream pipes
+        resolves this.  Discovered 2026-03-28.
+        """
+        if self._handle is None:
+            return
+        h = self._handle
+        zero = ctypes.c_ubyte(0)
+        try:
+            _ll.FT_AbortPipe(h, ctypes.c_ubyte(PIPE_IN))
+            _ll.FT_AbortPipe(h, ctypes.c_ubyte(PIPE_OUT))
+            _ll.FT_FlushPipe(h, ctypes.c_ubyte(PIPE_IN))
+            _ll.FT_ClearStreamPipe(h, zero, zero, ctypes.c_ubyte(PIPE_IN))
+            _ll.FT_ClearStreamPipe(h, zero, zero, ctypes.c_ubyte(PIPE_OUT))
+            _ll.FT_SetStreamPipe(h, zero, zero, ctypes.c_ubyte(PIPE_IN),
+                                  ctypes.c_ulong(65536))
+            _ll.FT_SetStreamPipe(h, zero, zero, ctypes.c_ubyte(PIPE_OUT),
+                                  ctypes.c_ulong(4))
+            log.info("FT601 stream pipes initialized (abort/flush/clear/set)")
+        except Exception as e:
+            log.warning(f"FT601 pipe init failed (non-fatal): {e}")
 
     def run(self):
         if not self._open_ft601():
