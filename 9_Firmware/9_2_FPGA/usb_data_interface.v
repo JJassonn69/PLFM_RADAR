@@ -92,7 +92,14 @@ module usb_data_interface (
     input wire [15:0] cfar_detect_count,
 
     // ========== WRITE IDLE OUTPUT (v8b) ==========
-    output wire write_idle
+    output wire write_idle,
+
+    // ========== PENDING FLAG OUTPUTS (v9d: handshake for Pop FSMs) ==========
+    // Exported so Pop FSMs can wait until pending is consumed before next pop.
+    // Prevents overwriting captured data when USB FSM hasn't consumed yet.
+    output wire range_pending_out,
+    output wire doppler_pending_out,
+    output wire cfar_pending_out
 );
 
 // ============================================================================
@@ -140,6 +147,16 @@ assign dbg_wr_strobes     = dbg_wr_strobes_r;
 assign dbg_txe_blocks     = dbg_txe_blocks_r;
 assign dbg_pkt_starts     = dbg_pkt_starts_r;
 assign dbg_pkt_completions = dbg_pkt_completions_r;
+
+// ========== PER-TYPE DEBUG COUNTERS (v9d: off-by-one diagnosis) ==========
+// These counters live INSIDE the USB FSM module, immune to TB timing artifacts.
+// They provide authoritative counts of pending-set, consumption, and discard events.
+reg [15:0] dbg_doppler_pending_sets_r;   // doppler_valid fired (pending 0→1)
+reg [15:0] dbg_doppler_consumed_r;       // IDLE→SEND_DOPPLER_HDR transitions
+reg [15:0] dbg_doppler_discarded_r;      // pending cleared via !stream_doppler_en
+reg [15:0] dbg_range_consumed_r;         // IDLE→SEND_RANGE_HDR transitions
+reg [15:0] dbg_range_discarded_r;        // range pending discarded
+reg [15:0] dbg_cfar_consumed_r;          // IDLE→SEND_CFAR_HDR transitions
 
 // ============================================================================
 // READ FSM State definitions (Gap 4: USB Read Path)
@@ -199,6 +216,11 @@ reg [16:0] cfar_thr_cap;              // v9
 reg range_data_pending;
 reg doppler_data_pending;
 reg cfar_data_pending;
+
+// v9d: Pending flag outputs — Pop FSMs must wait for pending=0 before next pop
+assign range_pending_out   = range_data_pending;
+assign doppler_pending_out = doppler_data_pending;
+assign cfar_pending_out    = cfar_data_pending;
 
 // Gap 2: CDC for stream_control
 (* ASYNC_REG = "TRUE" *) reg [2:0] stream_ctrl_sync_0;
@@ -328,6 +350,12 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
         dbg_txe_blocks_r <= 16'd0;
         dbg_pkt_starts_r <= 16'd0;
         dbg_pkt_completions_r <= 16'd0;
+        dbg_doppler_pending_sets_r <= 16'd0;
+        dbg_doppler_consumed_r   <= 16'd0;
+        dbg_doppler_discarded_r  <= 16'd0;
+        dbg_range_consumed_r     <= 16'd0;
+        dbg_range_discarded_r    <= 16'd0;
+        dbg_cfar_consumed_r      <= 16'd0;
         status_word_idx <= 4'd0;
         status_req_pending <= 1'b0;
         status_busy <= 1'b0;
@@ -354,8 +382,10 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
         // is visible to the FSM on the NEXT cycle after it's set.
         if (range_valid)
             range_data_pending <= 1'b1;
-        if (doppler_valid)
+        if (doppler_valid) begin
             doppler_data_pending <= 1'b1;
+            dbg_doppler_pending_sets_r <= dbg_doppler_pending_sets_r + 16'd1;
+        end
         if (cfar_valid)
             cfar_data_pending <= 1'b1;
 
@@ -445,19 +475,37 @@ always @(posedge ft601_clk_in or negedge ft601_reset_n) begin
                             current_state <= SEND_RANGE_HDR;
                             byte_counter <= 0;
                             range_data_pending <= 1'b0;
+                            dbg_range_consumed_r <= dbg_range_consumed_r + 16'd1;
                         end
                         // Priority 3: Doppler data (burst after frame accumulation)
                         else if (doppler_data_pending && stream_doppler_en && ft601_rxf_r) begin
                             current_state <= SEND_DOPPLER_HDR;
                             byte_counter <= 0;
                             doppler_data_pending <= 1'b0;
+                            dbg_doppler_consumed_r <= dbg_doppler_consumed_r + 16'd1;
                         end
                         // Priority 4: CFAR detections (sparse, after Doppler)
                         else if (cfar_data_pending && stream_cfar_en && ft601_rxf_r) begin
                             current_state <= SEND_CFAR_HDR;
                             byte_counter <= 0;
                             cfar_data_pending <= 1'b0;
+                            dbg_cfar_consumed_r <= dbg_cfar_consumed_r + 16'd1;
                         end
+
+                        // v9d: Discard pending flags for disabled streams.
+                        // Without this, pending stays stuck when stream is disabled,
+                        // preventing the Pop FSM from draining the FIFO (which blocks
+                        // lower-priority channels that check fifo_empty).
+                        if (range_data_pending && !stream_range_en) begin
+                            range_data_pending <= 1'b0;
+                            dbg_range_discarded_r <= dbg_range_discarded_r + 16'd1;
+                        end
+                        if (doppler_data_pending && !stream_doppler_en) begin
+                            doppler_data_pending <= 1'b0;
+                            dbg_doppler_discarded_r <= dbg_doppler_discarded_r + 16'd1;
+                        end
+                        if (cfar_data_pending && !stream_cfar_en)
+                            cfar_data_pending <= 1'b0;
                     end
                 end
 

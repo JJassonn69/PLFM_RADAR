@@ -135,6 +135,13 @@ reg [16:0] cfar_thr_usb = 17'd0;
 // v8b: write_idle from USB interface — HIGH when FSM can accept new data
 wire usb_write_idle;
 
+// v9d: Pending flag handshake outputs from USB interface
+// Pop FSMs must check pending=0 before popping next entry, to prevent
+// overwriting captured data before the USB FSM has consumed it.
+wire usb_range_pending;
+wire usb_doppler_pending;
+wire usb_cfar_pending;
+
 // =========================================================================
 // RANGE DATA FIFO (v8b: 2048 entries × 32 bits = 8 KB BRAM)
 // =========================================================================
@@ -577,10 +584,12 @@ always @(posedge ft601_clk_in) begin
 
         // =============================================================
         // RANGE POP FSM
+        // v9d: Added !usb_range_pending check to prevent popping while
+        // the USB FSM hasn't consumed the previous entry's pending flag.
         // =============================================================
         case (range_pop_state)
             POP_IDLE: begin
-                if (!range_fifo_empty && usb_write_idle) begin
+                if (!range_fifo_empty && usb_write_idle && !usb_range_pending) begin
                     range_profile_usb <= range_fifo_dout;
                     range_valid_usb <= 1'b1;
                     range_fifo_rd <= range_fifo_rd + 1;
@@ -610,10 +619,12 @@ always @(posedge ft601_clk_in) begin
         // =============================================================
         // DOPPLER POP FSM
         // Only pops when range FIFO is empty (range has priority)
+        // v9d: Added !usb_doppler_pending check — handshake fix
         // =============================================================
         case (doppler_pop_state)
             POP_IDLE: begin
-                if (!doppler_fifo_empty && usb_write_idle && range_fifo_empty) begin
+                if (!doppler_fifo_empty && usb_write_idle && range_fifo_empty
+                    && !usb_doppler_pending) begin
                     // Unpack FIFO entry
                     doppler_real_usb       <= doppler_fifo_dout[15:0];   // I
                     doppler_imag_usb       <= doppler_fifo_dout[31:16];  // Q
@@ -648,11 +659,13 @@ always @(posedge ft601_clk_in) begin
         // =============================================================
         // CFAR POP FSM
         // Only pops when both range and Doppler FIFOs are empty
+        // v9d: Added !usb_cfar_pending check — handshake fix
         // =============================================================
         case (cfar_pop_state)
             POP_IDLE: begin
                 if (!cfar_fifo_empty && usb_write_idle &&
-                    range_fifo_empty && doppler_fifo_empty) begin
+                    range_fifo_empty && doppler_fifo_empty
+                    && !usb_cfar_pending) begin
                     // Unpack FIFO entry
                     cfar_thr_usb     <= cfar_fifo_dout[16:0];   // threshold
                     cfar_mag_usb     <= cfar_fifo_dout[33:17];  // magnitude
@@ -768,7 +781,12 @@ usb_data_interface usb_inst (
     .cfar_dbg_valid_count(cfar_dbg_valid),
     .cfar_detect_count(cfar_detect_count),
 
-    .write_idle(usb_write_idle)
+    .write_idle(usb_write_idle),
+
+    // v9d: Pending flag handshake — Pop FSMs must wait for pending=0
+    .range_pending_out(usb_range_pending),
+    .doppler_pending_out(usb_doppler_pending),
+    .cfar_pending_out(usb_cfar_pending)
 );
 
 // =========================================================================

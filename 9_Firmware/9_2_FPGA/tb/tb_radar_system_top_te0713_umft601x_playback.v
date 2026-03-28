@@ -318,6 +318,99 @@ module tb_radar_system_top_te0713_umft601x_playback;
     end
 
     // =====================================================================
+    // Doppler handshake watchdog — silent unless actual race/error detected
+    // =====================================================================
+    integer doppler_pop_while_pending;
+    integer doppler_pending_lost;
+    reg     prev_doppler_pending;
+
+    initial begin
+        doppler_pop_while_pending = 0;
+        doppler_pending_lost = 0;
+        prev_doppler_pending = 0;
+    end
+
+    always @(posedge ft601_clk_in) begin
+        // Pop-while-pending race (should NEVER happen with v9d guards)
+        if (dut.doppler_pop_state == 2'd0 &&
+            !dut.doppler_fifo_empty && dut.usb_write_idle && dut.range_fifo_empty
+            && !dut.usb_doppler_pending) begin
+            if (dut.usb_inst.doppler_data_pending) begin
+                doppler_pop_while_pending <= doppler_pop_while_pending + 1;
+                $display("    *** RACE: Doppler pop while pending=1 at time %0t", $time);
+            end
+        end
+
+        // Simultaneous set+clear on pending flag (valid fires while FSM consuming)
+        if (dut.doppler_valid_usb &&
+            dut.usb_inst.current_state == 4'd0 &&
+            dut.usb_inst.doppler_data_pending &&
+            dut.usb_inst.stream_ctrl_sync_1[1]) begin
+            doppler_pending_lost <= doppler_pending_lost + 1;
+            $display("    *** LOST: doppler_valid + IDLE consuming pending at time %0t", $time);
+        end
+
+        prev_doppler_pending <= dut.usb_inst.doppler_data_pending;
+    end
+
+    // =====================================================================
+    // Doppler valid-while-pending detector — catches Pop FSM race
+    // =====================================================================
+    integer doppler_valid_while_pending;
+    reg     prev_dop_valid;
+
+    initial begin
+        doppler_valid_while_pending = 0;
+        prev_dop_valid = 0;
+    end
+
+    always @(posedge ft601_clk_in) begin
+        prev_dop_valid <= dut.doppler_valid_usb;
+        // Rising edge of doppler_valid_usb while pending already set
+        if (dut.doppler_valid_usb && !prev_dop_valid) begin
+            if (dut.usb_inst.doppler_data_pending) begin
+                doppler_valid_while_pending <= doppler_valid_while_pending + 1;
+                if (doppler_valid_while_pending < 5)
+                    $display("    *** VALID-WHILE-PENDING #%0d at time %0t",
+                             doppler_valid_while_pending + 1, $time);
+            end
+        end
+    end
+
+    // Enhanced Doppler packet sniffer — capture first/last range_bin/doppler_bin
+    integer  first_dop_range_bin, first_dop_doppler_bin;
+    integer  last_dop_range_bin, last_dop_doppler_bin;
+    reg      dop_sniffer_word1;
+
+    initial begin
+        first_dop_range_bin = -1;
+        first_dop_doppler_bin = -1;
+        last_dop_range_bin = -1;
+        last_dop_doppler_bin = -1;
+        dop_sniffer_word1 = 0;
+    end
+
+    always @(posedge ft601_clk_in) begin
+        if (ft601_wr_n === 1'b0 && ft601_txe === 1'b0) begin
+            if (ft601_data[7:0] == 8'hCC && ft601_data[31:8] == 24'h000000) begin
+                dop_sniffer_word1 <= 1;
+            end else if (dop_sniffer_word1) begin
+                dop_sniffer_word1 <= 0;
+                last_dop_range_bin <= ft601_data[31:26];
+                last_dop_doppler_bin <= ft601_data[25:21];
+                if (first_dop_range_bin == -1) begin
+                    first_dop_range_bin <= ft601_data[31:26];
+                    first_dop_doppler_bin <= ft601_data[25:21];
+                end
+            end
+        end
+    end
+
+
+
+
+
+    // =====================================================================
     // Main test
     // =====================================================================
     initial begin
@@ -852,6 +945,8 @@ module tb_radar_system_top_te0713_umft601x_playback;
                 // Now wait for ALL three FIFOs to drain through USB
                 $display("    Draining all three FIFOs...");
                 wait_all_fifos_empty(2000000);
+                // Wait for last packet to complete through USB FSM pipeline
+                wait_ft_clk(20);
                 wait_fsm_idle(1000);
 
                 // === Verify all FIFOs are empty ===
@@ -926,9 +1021,22 @@ module tb_radar_system_top_te0713_umft601x_playback;
         begin : phase16_block
             integer range_pkt_before;
             integer doppler_pkt_before;
+            // RTL-internal counter snapshots
+            integer rtl_dop_consumed_before;
+            integer rtl_dop_discarded_before;
+            integer rtl_range_discarded_before;
 
             range_pkt_before   = range_pkt_count;
             doppler_pkt_before = doppler_pkt_count;
+            rtl_dop_consumed_before  = dut.usb_inst.dbg_doppler_consumed_r;
+            rtl_dop_discarded_before = dut.usb_inst.dbg_doppler_discarded_r;
+            rtl_range_discarded_before = dut.usb_inst.dbg_range_discarded_r;
+
+            // Reset first/last Doppler sniffer for this phase
+            first_dop_range_bin = -1;
+            first_dop_doppler_bin = -1;
+            last_dop_range_bin = -1;
+            last_dop_doppler_bin = -1;
 
             // Set stream_control = 0x02 (doppler only)
             ft601_host_write(8'h04, 8'h00, 16'h0002);
@@ -955,36 +1063,22 @@ module tb_radar_system_top_te0713_umft601x_playback;
 
             // Drain all FIFOs
             wait_all_fifos_empty(2000000);
+            // Wait for last packet to complete through USB FSM pipeline
+            wait_ft_clk(20);
             wait_fsm_idle(1000);
 
-            // Range FIFO fills regardless (push is unconditional), but pop
-            // FSM checks usb_write_idle AND USB FSM only sends range packets
-            // when stream_range_en is set. With stream_control=0x02, the
-            // USB FSM's priority arbiter won't select SEND_RANGE_HDR.
-            // However, the range FIFO pop FSM still pops data and pulses
-            // range_valid_usb — the USB FSM just ignores it because
-            // range_data_pending gets set but stream_range_en is 0.
-            //
-            // Wait — actually let's re-read the RTL carefully:
-            //   range_data_pending is set on range_valid_ft, cleared in IDLE
-            //   when "range_data_pending && stream_range_en" — if stream_range_en=0,
-            //   pending accumulates but never triggers. The pop FSM fires
-            //   range_valid_usb repeatedly. Pending gets stuck at 1 but
-            //   never cleared.
-            //
-            // Key insight: Range FIFO pop FSM triggers independently, but
-            // USB FSM never picks up the data. So the range FIFO may NOT
-            // drain because the pop FSM is stuck in POP_WAIT/POP_DONE cycles
-            // with the pending flag never being consumed. After timeout (100
-            // cycles), it goes back to POP_IDLE and retries.
-            //
-            // This is actually fine — the range FIFO will eventually drain
-            // (each pop takes ~100 cycles timeout), just slowly. The key
-            // test is that NO 0xAA range packets appear on the wire.
-
-            $display("    Phase 16 sniffer: range(0xAA)=%0d  doppler(0xCC)=%0d",
+            // Verify no range packets sent in Doppler-only mode
+            $display("    Phase 16: range(0xAA)=%0d  doppler(0xCC)=%0d",
                      range_pkt_count - range_pkt_before,
                      doppler_pkt_count - doppler_pkt_before);
+            $display("    RTL counters (delta): dop_consumed=%0d  dop_discarded=%0d  range_discarded=%0d",
+                     dut.usb_inst.dbg_doppler_consumed_r - rtl_dop_consumed_before,
+                     dut.usb_inst.dbg_doppler_discarded_r - rtl_dop_discarded_before,
+                     dut.usb_inst.dbg_range_discarded_r - rtl_range_discarded_before);
+            $display("    First Doppler pkt: range_bin=%0d doppler_bin=%0d",
+                     first_dop_range_bin, first_dop_doppler_bin);
+            $display("    Last Doppler pkt:  range_bin=%0d doppler_bin=%0d",
+                     last_dop_range_bin, last_dop_doppler_bin);
 
             // No range packets should have been sent
             check_val("v9: no range packets in doppler-only mode",
@@ -993,6 +1087,24 @@ module tb_radar_system_top_te0713_umft601x_playback;
             // Doppler packets should have been sent
             check("v9: doppler packets > 0 in doppler-only mode",
                   (doppler_pkt_count > doppler_pkt_before), 1'b1);
+
+            // Exact Doppler count: 64 range bins x 32 Doppler bins = 2048
+            check_val("v9: exactly 2048 doppler packets in doppler-only mode",
+                      doppler_pkt_count - doppler_pkt_before, 2048);
+
+            // Verify last Doppler packet is the final cell (range=63, doppler=31)
+            check_val("v9: last doppler pkt range_bin=63",
+                      last_dop_range_bin, 63);
+            check_val("v9: last doppler pkt doppler_bin=31",
+                      last_dop_doppler_bin, 31);
+
+            // Verify no handshake races occurred
+            check_val("v9: no pop-while-pending races",
+                      doppler_pop_while_pending, 0);
+            check_val("v9: no pending-lost events",
+                      doppler_pending_lost, 0);
+            check_val("v9: no valid-while-pending events",
+                      doppler_valid_while_pending, 0);
         end
 
         // -----------------------------------------------------------------
