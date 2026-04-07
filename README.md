@@ -18,6 +18,8 @@ The AERIS-10 project aims to democratize radar technology by providing a fully o
 
 ## 🔬 Key Features
 
+> **Alpha Project.** Core hardware (schematics, PCB, FPGA pipeline) works and is in active use. GPS/map integration, full attitude correction, and beam steering UI are not yet complete or validated on hardware. See [issues](https://github.com/NawfalMotii79/PLFM_RADAR/issues) for current status.
+
 - **Open Source Hardware & Software** - Complete schematics, PCB layouts, firmware, and software available
 - **Dual Version Availability**:
   - **AERIS-10N (Nexus)**: 3km range with 8x16 patch antenna array
