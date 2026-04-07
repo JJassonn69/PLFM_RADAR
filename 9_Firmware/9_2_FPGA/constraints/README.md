@@ -139,10 +139,7 @@ Channel A is used (245 Synchronous FIFO mode). Channel B is unconnected.
 ### Quick Reference
 
 ```bash
-# SSH into the build server:
-ssh -i ~/.ssh/gpu_server_key -p 8765 -o StrictHostKeyChecking=no jason-stone@livepeerservice.ddns.net
-source /mnt/bcache/Xilinx/Vivado/2025.2/Vivado/settings64.sh
-cd /home/jason-stone/PLFM_RADAR_work/9_Firmware/9_2_FPGA
+# From the FPGA source directory (9_Firmware/9_2_FPGA):
 
 # 50T production build (FT2232H, USB_MODE=1):
 vivado -mode batch -source scripts/50t/build_50t.tcl 2>&1 | tee build_50t/vivado.log
