@@ -9,7 +9,7 @@ set project_root    [file normalize [file join $script_dir ".."]]
 set project_dir     [file join $project_root "build_50t"]
 set rtl_dir         $project_root
 set fpga_part       "xc7a50tftg256-2"
-set top_module      "radar_system_top"
+set top_module      "radar_system_top_50t"
 
 puts "================================================================"
 puts "  AERIS-10 — XC7A50T Production Build"
@@ -51,7 +51,12 @@ add_files -fileset constrs_1 -norecurse [file join $project_root "constraints" "
 # NOTE: DRC severity waivers are set both before synthesis and after open_run
 # synth_1. Implementation uses direct commands (opt_design, place_design, etc.)
 # rather than launch_runs/wait_on_run, so all commands share the same Vivado
-# context. This also allows removing unconstrained ports before placement.
+# context where the waivers are active.
+#
+# The top module is radar_system_top_50t — a thin wrapper that exposes only
+# the 64 physically-connected ports on the FTG256 board. Unconstrained ports
+# (FT601, debug, status) are tied off internally, keeping the full radar
+# pipeline intact while fitting within the 69 available IO pins.
 #
 # BIVC-1: Bank 14 VCCO=2.5V (enforced by LVDS_25) with LVCMOS25 adc_pwdn.
 # This should no longer fire now that adc_pwdn is LVCMOS25, but we keep
@@ -86,51 +91,14 @@ report_utilization -file "${report_dir}/01_utilization_post_synth.rpt"
 
 # ===== IMPLEMENTATION (non-project-mode style) =====
 # We run implementation steps directly in the parent process instead of
-# using launch_runs/wait_on_run. This ensures DRC waivers and port removal
-# commands execute in the same Vivado context as place_design.
+# using launch_runs/wait_on_run. This ensures DRC waivers are active in
+# the same Vivado context as place_design.
 set impl_start [clock seconds]
 
 # Re-apply DRC waivers in this context (parent process)
 set_property SEVERITY {Warning} [get_drc_checks BIVC-1]
 set_property SEVERITY {Warning} [get_drc_checks NSTD-1]
 set_property SEVERITY {Warning} [get_drc_checks UCIO-1]
-
-# ---- Remove unconstrained ports from netlist ----
-# The 50T board (FTG256, 69 usable IOs) cannot accommodate all 182 port bits.
-# These ports have no physical connections on the 50T PCB: FT601 USB 3.0
-# (chip unwired), dac_clk (driven by AD9523, not FPGA), and all
-# status/debug outputs. Removing them from the netlist avoids [Place 30-58].
-set unconstrained_ports {
-    ft601_clk_in ft601_data ft601_be ft601_txe_n ft601_rxf_n
-    ft601_txe ft601_rxf ft601_wr_n ft601_rd_n ft601_oe_n
-    ft601_siwu_n ft601_srb ft601_swb ft601_clk_out
-    dac_clk
-    current_elevation current_azimuth current_chirp new_chirp_frame
-    dbg_doppler_data dbg_doppler_valid dbg_doppler_bin dbg_range_bin
-    system_status
-}
-set removed_count 0
-foreach p $unconstrained_ports {
-    # Match scalar port or bus port bits (e.g., "ft601_data" matches ft601_data[*])
-    set port_objs [get_ports -quiet "${p}\[*\]"]
-    if {[llength $port_objs] == 0} {
-        set port_objs [get_ports -quiet $p]
-    }
-    foreach port_obj $port_objs {
-        # Disconnect the net(s) driving/driven by this port first
-        set net_objs [get_nets -quiet -of_objects $port_obj]
-        foreach net_obj $net_objs {
-            catch {disconnect_net -net $net_obj -objects $port_obj}
-        }
-        # Now remove the disconnected port
-        if {[catch {remove_port $port_obj} err]} {
-            puts "  WARN: Could not remove port $port_obj: $err"
-        } else {
-            incr removed_count
-        }
-    }
-}
-puts "  Removed $removed_count unconstrained port(s) from netlist"
 
 # ---- Run implementation steps ----
 opt_design -directive Explore
