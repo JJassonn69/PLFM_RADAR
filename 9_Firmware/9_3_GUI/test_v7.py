@@ -69,6 +69,39 @@ class TestRadarSettings(unittest.TestCase):
         self.assertEqual(s.max_distance, 50000)
 
 
+class TestWaveformConfig(unittest.TestCase):
+    """WaveformConfig — range/velocity resolution from waveform params."""
+
+    def test_adi_phaser_range_resolution(self):
+        """ADI CN0566 defaults: 4MSPS, 500MHz BW, 300µs chirp, 1079 samples."""
+        wf = _models().WaveformConfig()  # ADI phaser defaults
+        r_res = wf.range_resolution(n_samples=1079)
+        # Expected: c * fs / (2 * N * slope) = 3e8 * 4e6 / (2 * 1079 * 1.667e12)
+        # ≈ 0.334 m/bin
+        self.assertAlmostEqual(r_res, 0.334, places=2)
+
+    def test_adi_phaser_velocity_resolution(self):
+        """ADI phaser: 256 chirps, 1079 samples at 4 MSPS."""
+        wf = _models().WaveformConfig()
+        v_res = wf.velocity_resolution(n_samples=1079, n_chirps=256)
+        # λ * fs / (2 * N * M) = 0.03 * 4e6 / (2 * 1079 * 256) ≈ 0.217 m/s/bin
+        self.assertAlmostEqual(v_res, 0.217, places=2)
+
+    def test_max_range(self):
+        wf = _models().WaveformConfig()
+        max_r = wf.max_range(n_range_bins=64, n_samples=1079)
+        # 0.334 * 64 ≈ 21.4 m
+        self.assertAlmostEqual(max_r, 21.4, places=0)
+
+    def test_plfm_defaults_differ(self):
+        """PLFM FPGA defaults (781.25 m/bin) must NOT equal ADI phaser."""
+        default_settings = _models().RadarSettings()
+        wf = _models().WaveformConfig()
+        r_res = wf.range_resolution(n_samples=1079)
+        self.assertNotAlmostEqual(default_settings.range_resolution, r_res,
+                                  places=0)  # 781 vs 0.33
+
+
 class TestGPSData(unittest.TestCase):
     def test_to_dict(self):
         g = _models().GPSData(latitude=41.9, longitude=12.5,

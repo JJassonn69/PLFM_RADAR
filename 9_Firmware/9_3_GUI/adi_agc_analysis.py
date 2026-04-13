@@ -32,83 +32,24 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from v7.agc_sim import (
+    encoding_to_signed,
+    apply_gain_shift,
+    quantize_iq,
+    AGCConfig,
+    AGCState,
+    process_agc_frame,
+)
+
 # ---------------------------------------------------------------------------
 # FPGA AGC parameters (rx_gain_control.v reset defaults)
 # ---------------------------------------------------------------------------
 AGC_TARGET = 200       # host_agc_target (8-bit, default 200)
-AGC_ATTACK = 1         # host_agc_attack (4-bit, default 1)
-AGC_DECAY = 1          # host_agc_decay  (4-bit, default 1)
-AGC_HOLDOFF = 4        # host_agc_holdoff (4-bit, default 4)
 ADC_RAIL = 4095        # 12-bit ADC max absolute value
 
 
 # ---------------------------------------------------------------------------
-# Gain encoding helpers (match RTL signed_to_encoding / encoding_to_signed)
-# ---------------------------------------------------------------------------
-
-def signed_to_encoding(g: int) -> int:
-    """Convert signed gain (-7..+7) to gain_shift[3:0] encoding.
-    [3]=0, [2:0]=N → amplify (left shift) by N
-    [3]=1, [2:0]=N → attenuate (right shift) by N
-    """
-    if g >= 0:
-        return g & 0x07
-    return 0x08 | ((-g) & 0x07)
-
-
-def encoding_to_signed(enc: int) -> int:
-    """Convert gain_shift[3:0] encoding to signed gain."""
-    if (enc & 0x08) == 0:
-        return enc & 0x07
-    return -(enc & 0x07)
-
-
-def clamp_gain(val: int) -> int:
-    """Clamp to [-7, +7] (matches RTL clamp_gain function)."""
-    return max(-7, min(7, val))
-
-
-# ---------------------------------------------------------------------------
-# Apply gain shift to IQ data (matches RTL combinational logic)
-# ---------------------------------------------------------------------------
-
-def apply_gain_shift(frame_i: np.ndarray, frame_q: np.ndarray,
-                     gain_enc: int) -> tuple[np.ndarray, np.ndarray, int]:
-    """Apply gain_shift encoding to 16-bit signed IQ arrays.
-
-    Returns (shifted_i, shifted_q, overflow_count).
-    Matches the RTL: left shift = amplify, right shift = attenuate,
-    saturate to ±32767 on overflow.
-    """
-    direction = (gain_enc >> 3) & 1  # 0=amplify, 1=attenuate
-    amount = gain_enc & 0x07
-
-    if amount == 0:
-        return frame_i.copy(), frame_q.copy(), 0
-
-    if direction == 0:
-        # Left shift (amplify)
-        si = frame_i.astype(np.int64) * (1 << amount)
-        sq = frame_q.astype(np.int64) * (1 << amount)
-    else:
-        # Arithmetic right shift (attenuate)
-        si = frame_i.astype(np.int64) >> amount
-        sq = frame_q.astype(np.int64) >> amount
-
-    # Count overflows (post-shift values outside 16-bit signed range)
-    overflow_i = (si > 32767) | (si < -32768)
-    overflow_q = (sq > 32767) | (sq < -32768)
-    overflow_count = int((overflow_i | overflow_q).sum())
-
-    # Saturate to ±32767
-    si = np.clip(si, -32768, 32767).astype(np.int16)
-    sq = np.clip(sq, -32768, 32767).astype(np.int16)
-
-    return si, sq, overflow_count
-
-
-# ---------------------------------------------------------------------------
-# Per-frame AGC simulation (bit-accurate to rx_gain_control.v)
+# Per-frame AGC simulation using v7.agc_sim (bit-accurate to RTL)
 # ---------------------------------------------------------------------------
 
 def simulate_agc(frames: np.ndarray, agc_enabled: bool = True,
@@ -126,78 +67,45 @@ def simulate_agc(frames: np.ndarray, agc_enabled: bool = True,
     n_frames = frames.shape[0]
 
     # Output arrays
-    out_gain_enc = np.zeros(n_frames, dtype=int)     # gain_shift encoding [3:0]
-    out_gain_signed = np.zeros(n_frames, dtype=int)   # signed gain for plotting
-    out_peak_mag = np.zeros(n_frames, dtype=int)      # peak_magnitude[7:0]
-    out_sat_count = np.zeros(n_frames, dtype=int)     # saturation_count[7:0]
+    out_gain_enc = np.zeros(n_frames, dtype=int)
+    out_gain_signed = np.zeros(n_frames, dtype=int)
+    out_peak_mag = np.zeros(n_frames, dtype=int)
+    out_sat_count = np.zeros(n_frames, dtype=int)
     out_sat_rate = np.zeros(n_frames, dtype=float)
-    out_rms_post = np.zeros(n_frames, dtype=float)    # RMS after gain shift
+    out_rms_post = np.zeros(n_frames, dtype=float)
 
-    # AGC internal state
-    agc_gain = 0          # signed, -7..+7
-    holdoff_counter = 0
-    agc_was_enabled = False
+    # AGC state — managed by process_agc_frame()
+    state = AGCState(
+        gain=encoding_to_signed(initial_gain_enc),
+        holdoff_counter=0,
+        was_enabled=False,
+    )
 
     for i in range(n_frames):
-        frame = frames[i]
-        # Quantize to 16-bit signed (ADC is 12-bit, sign-extended to 16)
-        frame_i = np.clip(np.round(frame.real), -32768, 32767).astype(np.int16)
-        frame_q = np.clip(np.round(frame.imag), -32768, 32767).astype(np.int16)
+        frame_i, frame_q = quantize_iq(frames[i])
 
-        # --- PRE-gain peak measurement (RTL lines 133-135, 211-213) ---
-        abs_i = np.abs(frame_i.astype(np.int32))
-        abs_q = np.abs(frame_q.astype(np.int32))
-        max_iq = np.maximum(abs_i, abs_q)
-        frame_peak_15bit = int(max_iq.max())  # 15-bit unsigned
-        peak_8bit = (frame_peak_15bit >> 7) & 0xFF  # Upper 8 bits
-
-        # --- Determine effective gain ---
         agc_active = agc_enabled and (i >= enable_at_frame)
 
-        # AGC enable transition (RTL lines 250-253)
-        if agc_active and not agc_was_enabled:
-            agc_gain = encoding_to_signed(initial_gain_enc)
-            holdoff_counter = AGC_HOLDOFF
+        # Build per-frame config (enable toggles at enable_at_frame)
+        config = AGCConfig(enabled=agc_active)
 
-        effective_enc = signed_to_encoding(agc_gain) if agc_active else initial_gain_enc
-
-        agc_was_enabled = agc_active
-
-        # --- Apply gain shift + count POST-gain overflow (RTL lines 114-126, 207-209) ---
-        shifted_i, shifted_q, frame_overflow = apply_gain_shift(
-            frame_i, frame_q, effective_enc)
-        frame_sat = min(255, frame_overflow)
+        result = process_agc_frame(frame_i, frame_q, config, state)
 
         # RMS of shifted signal
         rms = float(np.sqrt(np.mean(
-            shifted_i.astype(np.float64)**2 + shifted_q.astype(np.float64)**2)))
+            result.shifted_i.astype(np.float64)**2
+            + result.shifted_q.astype(np.float64)**2)))
 
         total_samples = frame_i.size + frame_q.size
-        sat_rate = frame_overflow / total_samples if total_samples > 0 else 0.0
+        sat_rate = result.overflow_raw / total_samples if total_samples > 0 else 0.0
 
-        # --- Record outputs ---
-        out_gain_enc[i] = effective_enc
-        out_gain_signed[i] = agc_gain if agc_active else encoding_to_signed(initial_gain_enc)
-        out_peak_mag[i] = peak_8bit
-        out_sat_count[i] = frame_sat
+        # Record outputs
+        out_gain_enc[i] = result.gain_enc
+        out_gain_signed[i] = result.gain_signed
+        out_peak_mag[i] = result.peak_mag_8bit
+        out_sat_count[i] = result.saturation_count
         out_sat_rate[i] = sat_rate
         out_rms_post[i] = rms
-
-        # --- AGC update at frame boundary (RTL lines 226-246) ---
-        if agc_active:
-            if frame_sat > 0:
-                # Clipping: reduce gain immediately (attack)
-                agc_gain = clamp_gain(agc_gain - AGC_ATTACK)
-                holdoff_counter = AGC_HOLDOFF
-            elif peak_8bit < AGC_TARGET:
-                # Signal too weak: increase gain after holdoff
-                if holdoff_counter == 0:
-                    agc_gain = clamp_gain(agc_gain + AGC_DECAY)
-                else:
-                    holdoff_counter -= 1
-            else:
-                # Good range (peak >= target, no sat): hold, reset holdoff
-                holdoff_counter = AGC_HOLDOFF
 
     return {
         "gain_enc": out_gain_enc,
@@ -217,8 +125,7 @@ def process_frame_rd(frame: np.ndarray, gain_enc: int,
                      n_range: int = 64,
                      n_doppler: int = 32) -> np.ndarray:
     """Range-Doppler magnitude for one frame with gain applied."""
-    frame_i = np.clip(np.round(frame.real), -32768, 32767).astype(np.int16)
-    frame_q = np.clip(np.round(frame.imag), -32768, 32767).astype(np.int16)
+    frame_i, frame_q = quantize_iq(frame)
     si, sq, _ = apply_gain_shift(frame_i, frame_q, gain_enc)
 
     iq = si.astype(np.float64) + 1j * sq.astype(np.float64)

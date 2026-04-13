@@ -97,6 +97,47 @@ class RadarTarget:
 
 
 @dataclass
+class WaveformConfig:
+    """FMCW waveform parameters for bin-to-physical-unit conversion.
+
+    Defaults are for the ADI CN0566 phaser (10 GHz, 500 MHz BW, 300 µs chirp,
+    4 MSPS ADC).  For the PLFM FPGA waveform the values differ — but the FPGA
+    pipeline hardcodes its own bin widths, so this config is only used for
+    Raw IQ Replay (host-side FFT processing).
+    """
+    sample_rate_hz: float = 4e6         # ADC sample rate (Hz)
+    bandwidth_hz: float = 500e6         # Chirp bandwidth (Hz)
+    chirp_duration_s: float = 300e-6    # Chirp sweep time (s)
+    center_freq_hz: float = 10e9        # Carrier frequency (Hz)
+
+    # --- derived quantities (need n_samples, n_chirps from file) ---
+
+    def range_resolution(self, n_samples: int) -> float:
+        """Metres per range bin for an N-point range FFT.
+
+        range_per_bin = c · fs / (2 · N · slope)
+        where slope = BW / T_chirp.
+        """
+        c = 299_792_458.0
+        slope = self.bandwidth_hz / self.chirp_duration_s
+        return c * self.sample_rate_hz / (2.0 * n_samples * slope)
+
+    def velocity_resolution(self, n_samples: int, n_chirps: int) -> float:
+        """m/s per Doppler bin for an M-chirp Doppler FFT.
+
+        vel_per_bin = λ · fs / (2 · N · M)
+        where λ = c / fc, N = n_samples (PRI = N/fs), M = n_chirps.
+        """
+        c = 299_792_458.0
+        wavelength = c / self.center_freq_hz
+        return wavelength * self.sample_rate_hz / (2.0 * n_samples * n_chirps)
+
+    def max_range(self, n_range_bins: int, n_samples: int) -> float:
+        """Maximum unambiguous range for the given bin count."""
+        return self.range_resolution(n_samples) * n_range_bins
+
+
+@dataclass
 class RadarSettings:
     """Radar system display/map configuration.
 

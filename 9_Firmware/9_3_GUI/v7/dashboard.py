@@ -23,6 +23,7 @@ commands sent over FT2232H.
 """
 
 import time
+import re
 import logging
 from collections import deque
 from pathlib import Path
@@ -43,7 +44,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
 from .models import (
-    RadarTarget, RadarSettings, GPSData, ProcessingConfig,
+    RadarTarget, RadarSettings, WaveformConfig, GPSData, ProcessingConfig,
     DARK_BG, DARK_FG, DARK_ACCENT, DARK_HIGHLIGHT, DARK_BORDER,
     DARK_TEXT, DARK_BUTTON, DARK_BUTTON_HOVER,
     DARK_TREEVIEW, DARK_TREEVIEW_ALT,
@@ -82,6 +83,41 @@ def _make_dspin() -> QDoubleSpinBox:
     sb = QDoubleSpinBox()
     sb.setLocale(_C_LOCALE)
     return sb
+
+
+def _parse_waveform_from_filename(name: str) -> WaveformConfig | None:
+    """Try to extract waveform params from ADI phaser filename convention.
+
+    Expected pattern fragments (order-independent):
+      ``<N>MSPS`` or ``<N>MSps`` → sample rate in MHz
+      ``<N>M``  (followed by _ or end) → bandwidth in MHz
+      ``<N>u``  (followed by _ or end) → chirp duration in µs
+
+    Returns a WaveformConfig with parsed values (defaults for un-parsed),
+    or None if nothing recognisable was found.
+    """
+    cfg = WaveformConfig()  # ADI phaser defaults
+    found = False
+
+    # Sample rate: "4MSPS" or "4MSps"
+    m = re.search(r"(\d+)M[Ss][Pp][Ss]", name)
+    if m:
+        cfg.sample_rate_hz = float(m.group(1)) * 1e6
+        found = True
+
+    # Bandwidth: "500M" (must NOT be followed by S for MSPS)
+    m = re.search(r"(\d+)M(?![Ss])", name)
+    if m:
+        cfg.bandwidth_hz = float(m.group(1)) * 1e6
+        found = True
+
+    # Chirp duration: "300u"
+    m = re.search(r"(\d+)u", name)
+    if m:
+        cfg.chirp_duration_s = float(m.group(1)) * 1e-6
+        found = True
+
+    return cfg if found else None
 
 
 # =============================================================================
@@ -482,6 +518,55 @@ class RadarDashboard(QMainWindow):
         pb_layout.addStretch()
         self._playback_frame.setVisible(False)
         ctrl_layout.addWidget(self._playback_frame, 2, 0, 1, 10)
+
+        # -- Waveform config row (Raw IQ replay only) -----------------------
+        self._waveform_frame = QFrame()
+        self._waveform_frame.setStyleSheet(
+            f"background-color: {DARK_ACCENT}; border-radius: 4px;")
+        wf_layout = QHBoxLayout(self._waveform_frame)
+        wf_layout.setContentsMargins(8, 4, 8, 4)
+
+        wf_layout.addWidget(QLabel("Waveform:"))
+
+        wf_layout.addWidget(QLabel("fs (MHz):"))
+        self._wf_fs_spin = _make_dspin()
+        self._wf_fs_spin.setRange(0.1, 100.0)
+        self._wf_fs_spin.setValue(4.0)
+        self._wf_fs_spin.setDecimals(2)
+        self._wf_fs_spin.setToolTip("ADC sample rate in MHz")
+        wf_layout.addWidget(self._wf_fs_spin)
+
+        wf_layout.addWidget(QLabel("BW (MHz):"))
+        self._wf_bw_spin = _make_dspin()
+        self._wf_bw_spin.setRange(1.0, 5000.0)
+        self._wf_bw_spin.setValue(500.0)
+        self._wf_bw_spin.setDecimals(1)
+        self._wf_bw_spin.setToolTip("Chirp bandwidth in MHz")
+        wf_layout.addWidget(self._wf_bw_spin)
+
+        wf_layout.addWidget(QLabel("T (us):"))
+        self._wf_chirp_spin = _make_dspin()
+        self._wf_chirp_spin.setRange(1.0, 10000.0)
+        self._wf_chirp_spin.setValue(300.0)
+        self._wf_chirp_spin.setDecimals(1)
+        self._wf_chirp_spin.setToolTip("Chirp duration in microseconds")
+        wf_layout.addWidget(self._wf_chirp_spin)
+
+        wf_layout.addWidget(QLabel("fc (GHz):"))
+        self._wf_fc_spin = _make_dspin()
+        self._wf_fc_spin.setRange(0.1, 100.0)
+        self._wf_fc_spin.setValue(10.0)
+        self._wf_fc_spin.setDecimals(2)
+        self._wf_fc_spin.setToolTip("Carrier frequency in GHz")
+        wf_layout.addWidget(self._wf_fc_spin)
+
+        self._wf_res_label = QLabel("")
+        self._wf_res_label.setStyleSheet(f"color: {DARK_INFO}; font-size: 10px;")
+        wf_layout.addWidget(self._wf_res_label)
+
+        wf_layout.addStretch()
+        self._waveform_frame.setVisible(False)
+        ctrl_layout.addWidget(self._waveform_frame, 3, 0, 1, 10)
 
         layout.addWidget(ctrl)
 
@@ -1294,6 +1379,10 @@ class RadarDashboard(QMainWindow):
 
     def _start_radar(self):
         """Start radar data acquisition using production protocol."""
+        # Mutual exclusion: stop demo if running
+        if self._demo_mode:
+            self._stop_demo()
+
         try:
             mode = self._mode_combo.currentText()
 
@@ -1362,6 +1451,8 @@ class RadarDashboard(QMainWindow):
             self._start_btn.setEnabled(False)
             self._stop_btn.setEnabled(True)
             self._mode_combo.setEnabled(False)
+            self._demo_btn_main.setEnabled(False)
+            self._demo_btn_map.setEnabled(False)
             self._status_label_main.setText(f"Status: Running ({mode})")
             self._sb_status.setText(f"Running ({mode})")
             self._sb_mode.setText(mode)
@@ -1413,7 +1504,10 @@ class RadarDashboard(QMainWindow):
         self._start_btn.setEnabled(True)
         self._stop_btn.setEnabled(False)
         self._mode_combo.setEnabled(True)
+        self._demo_btn_main.setEnabled(True)
+        self._demo_btn_map.setEnabled(True)
         self._playback_frame.setVisible(False)
+        self._waveform_frame.setVisible(False)
         self._pb_play_btn.setText("Play")
         self._pb_frame_label.setText("Frame: 0 / 0")
         self._pb_file_label.setText("")
@@ -1441,9 +1535,44 @@ class RadarDashboard(QMainWindow):
             self._replay_controller = RawIQReplayController()
             info = self._replay_controller.load_file(npy_path)
 
+            # -- Waveform calibration: try to parse from filename -----------
+            parsed_wf = _parse_waveform_from_filename(Path(npy_path).name)
+            if parsed_wf is not None:
+                self._wf_fs_spin.setValue(parsed_wf.sample_rate_hz / 1e6)
+                self._wf_bw_spin.setValue(parsed_wf.bandwidth_hz / 1e6)
+                self._wf_chirp_spin.setValue(parsed_wf.chirp_duration_s / 1e-6)
+                self._wf_fc_spin.setValue(parsed_wf.center_freq_hz / 1e9)
+                logger.info("Waveform params parsed from filename: %s", parsed_wf)
+
+            # Build waveform config from (possibly updated) spinboxes
+            wfc = self._waveform_config_from_ui()
+            range_res = wfc.range_resolution(info.n_samples)
+            vel_res = wfc.velocity_resolution(info.n_samples, info.n_chirps)
+            n_range_out = min(64, info.n_samples)
+            max_range = range_res * n_range_out
+
+            # Create replay-specific RadarSettings with correct calibration
+            replay_settings = RadarSettings(
+                system_frequency=wfc.center_freq_hz,
+                range_resolution=range_res,
+                velocity_resolution=vel_res,
+                max_distance=max_range,
+                map_size=max_range * 1.2,
+                coverage_radius=max_range * 1.2,
+            )
+            logger.info(
+                "Replay calibration: range_res=%.4f m/bin, vel_res=%.4f m/s/bin, "
+                "max_range=%.1f m",
+                range_res, vel_res, max_range,
+            )
+
+            # Update coverage/map spinboxes to match replay scale
+            self._coverage_spin.setValue(replay_settings.coverage_radius / 1000)
+            self._update_waveform_res_label(info.n_samples, info.n_chirps)
+
             # Create frame processor
             self._iq_processor = RawIQFrameProcessor(
-                n_range_out=min(64, info.n_samples),
+                n_range_out=n_range_out,
                 n_doppler_out=min(32, info.n_chirps),
             )
 
@@ -1493,7 +1622,7 @@ class RadarDashboard(QMainWindow):
                 controller=self._replay_controller,
                 processor=self._iq_processor,
                 host_processor=self._processor,
-                settings=self._settings,
+                settings=replay_settings,
                 gps_data_ref=self._radar_position,
             )
             self._replay_worker.frameReady.connect(self._on_frame_ready)
@@ -1518,7 +1647,10 @@ class RadarDashboard(QMainWindow):
             self._start_btn.setEnabled(False)
             self._stop_btn.setEnabled(True)
             self._mode_combo.setEnabled(False)
+            self._demo_btn_main.setEnabled(False)
+            self._demo_btn_map.setEnabled(False)
             self._playback_frame.setVisible(True)
+            self._waveform_frame.setVisible(True)
             self._pb_frame_label.setText(f"Frame: 0 / {info.n_frames}")
             self._pb_file_label.setText(
                 f"{Path(npy_path).name} "
@@ -1568,6 +1700,27 @@ class RadarDashboard(QMainWindow):
         if self._replay_controller is not None:
             self._replay_controller.set_loop(checked)
 
+    def _waveform_config_from_ui(self) -> WaveformConfig:
+        """Build a WaveformConfig from the waveform spinboxes."""
+        return WaveformConfig(
+            sample_rate_hz=self._wf_fs_spin.value() * 1e6,
+            bandwidth_hz=self._wf_bw_spin.value() * 1e6,
+            chirp_duration_s=self._wf_chirp_spin.value() * 1e-6,
+            center_freq_hz=self._wf_fc_spin.value() * 1e9,
+        )
+
+    def _update_waveform_res_label(self, n_samples: int, n_chirps: int) -> None:
+        """Update the waveform resolution info label."""
+        wfc = self._waveform_config_from_ui()
+        r_res = wfc.range_resolution(n_samples)
+        v_res = wfc.velocity_resolution(n_samples, n_chirps)
+        n_r = min(64, n_samples)
+        max_r = r_res * n_r
+        self._wf_res_label.setText(
+            f"Range: {r_res:.3f} m/bin  |  Vel: {v_res:.3f} m/s/bin  |  "
+            f"Max range: {max_r:.1f} m ({n_r} bins)"
+        )
+
     @pyqtSlot(str)
     def _on_playback_state_changed(self, state_str: str):
         if state_str == "playing":
@@ -1590,6 +1743,10 @@ class RadarDashboard(QMainWindow):
 
     def _start_demo(self):
         if self._simulator:
+            return
+        # Mutual exclusion: do not start demo while radar/replay is running
+        if self._running:
+            logger.warning("Cannot start demo while radar is running")
             return
         self._simulator = TargetSimulator(self._radar_position, self)
         self._simulator.targetsUpdated.connect(self._on_demo_targets)

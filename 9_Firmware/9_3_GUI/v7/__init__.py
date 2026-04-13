@@ -11,6 +11,7 @@ top-level imports:
 from .models import (
     RadarTarget,
     RadarSettings,
+    WaveformConfig,
     GPSData,
     ProcessingConfig,
     TileServer,
@@ -66,7 +67,7 @@ except ImportError:  # PyQt6 not installed (e.g. CI headless runner)
 
 __all__ = [  # noqa: RUF022
     # models
-    "RadarTarget", "RadarSettings", "GPSData", "ProcessingConfig", "TileServer",
+    "RadarTarget", "RadarSettings", "WaveformConfig", "GPSData", "ProcessingConfig", "TileServer",
     "DARK_BG", "DARK_FG", "DARK_ACCENT", "DARK_HIGHLIGHT", "DARK_BORDER",
     "DARK_TEXT", "DARK_BUTTON", "DARK_BUTTON_HOVER",
     "DARK_TREEVIEW", "DARK_TREEVIEW_ALT",
