@@ -622,7 +622,8 @@ typedef enum {
     ERROR_POWER_SUPPLY,
     ERROR_TEMPERATURE_HIGH,
     ERROR_MEMORY_ALLOC,
-    ERROR_WATCHDOG_TIMEOUT
+    ERROR_WATCHDOG_TIMEOUT,
+    ERROR_COUNT  // must be last — used for bounds checking error_strings[]
 } SystemError_t;
 
 static SystemError_t last_error = ERROR_NONE;
@@ -632,6 +633,27 @@ static bool system_emergency_state = false;
 // Error handler function
 SystemError_t checkSystemHealth(void) {
     SystemError_t current_error = ERROR_NONE;
+
+    // 0. Watchdog: detect main-loop stall (checkSystemHealth not called for >60 s).
+    //    Timestamp is captured at function ENTRY and updated unconditionally, so
+    //    any early return from a sub-check below cannot leave a stale value that
+    //    would later trip a spurious ERROR_WATCHDOG_TIMEOUT. A dedicated cold-start
+    //    branch ensures the first call after boot never trips (last_health_check==0
+    //    would otherwise make `HAL_GetTick() - 0 > 60000` true forever after the
+    //    60-s mark of the init sequence).
+    static uint32_t last_health_check = 0;
+    uint32_t now_tick = HAL_GetTick();
+    if (last_health_check == 0) {
+        last_health_check = now_tick;          // cold start: seed only
+    } else {
+        uint32_t elapsed = now_tick - last_health_check;
+        last_health_check = now_tick;          // update BEFORE any early return
+        if (elapsed > 60000) {
+            current_error = ERROR_WATCHDOG_TIMEOUT;
+            DIAG_ERR("SYS", "Health check: Watchdog timeout (>60s since last check)");
+            return current_error;
+        }
+    }
 
     // 1. Check AD9523 Clock Generator
     static uint32_t last_clock_check = 0;
@@ -733,14 +755,7 @@ SystemError_t checkSystemHealth(void) {
         return current_error;
     }
 
-    // 9. Simple watchdog check
-    static uint32_t last_health_check = 0;
-    if (HAL_GetTick() - last_health_check > 60000) {
-        current_error = ERROR_WATCHDOG_TIMEOUT;
-        DIAG_ERR("SYS", "Health check: Watchdog timeout (>60s since last check)");
-        return current_error;
-    }
-    last_health_check = HAL_GetTick();
+    // 9. Watchdog check is performed at function entry (see step 0).
 
     if (current_error != ERROR_NONE) {
         DIAG_ERR("SYS", "checkSystemHealth returning error code %d", current_error);
@@ -852,7 +867,7 @@ void handleSystemError(SystemError_t error) {
     DIAG_ERR("SYS", "handleSystemError: error=%d error_count=%lu", error, error_count);
 
     char error_msg[100];
-    const char* error_strings[] = {
+    static const char* const error_strings[] = {
         "No error",
         "AD9523 Clock failure",
         "ADF4382 TX LO unlocked",
@@ -872,9 +887,16 @@ void handleSystemError(SystemError_t error) {
         "Watchdog timeout"
     };
 
+    static_assert(sizeof(error_strings) / sizeof(error_strings[0]) == ERROR_COUNT,
+                  "error_strings[] and SystemError_t enum are out of sync");
+
+    const char* err_name = (error >= 0 && error < (int)(sizeof(error_strings) / sizeof(error_strings[0])))
+                           ? error_strings[error]
+                           : "Unknown error";
+
     snprintf(error_msg, sizeof(error_msg),
              "ERROR #%d: %s (Count: %lu)\r\n",
-             error, error_strings[error], error_count);
+             error, err_name, error_count);
     HAL_UART_Transmit(&huart3, (uint8_t*)error_msg, strlen(error_msg), 1000);
 
     // Blink LED pattern based on error code
@@ -900,7 +922,7 @@ void handleSystemError(SystemError_t error) {
     if ((error >= ERROR_RF_PA_OVERCURRENT && error <= ERROR_POWER_SUPPLY) ||
         error == ERROR_TEMPERATURE_HIGH ||
         error == ERROR_WATCHDOG_TIMEOUT) {
-        DIAG_ERR("SYS", "CRITICAL ERROR (code %d: %s) -- initiating Emergency_Stop()", error, error_strings[error]);
+        DIAG_ERR("SYS", "CRITICAL ERROR (code %d: %s) -- initiating Emergency_Stop()", error, err_name);
         snprintf(error_msg, sizeof(error_msg),
                  "CRITICAL ERROR! Initiating emergency shutdown.\r\n");
         HAL_UART_Transmit(&huart3, (uint8_t*)error_msg, strlen(error_msg), 1000);
