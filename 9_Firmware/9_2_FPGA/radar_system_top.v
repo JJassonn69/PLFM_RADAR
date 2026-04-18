@@ -142,7 +142,7 @@ module radar_system_top (
 parameter USE_LONG_CHIRP = 1'b1;          // Default to long chirp
 parameter DOPPLER_ENABLE = 1'b1;           // Enable Doppler processing
 parameter USB_ENABLE = 1'b1;               // Enable USB data transfer
-parameter USB_MODE = 0;                    // 0=FT601 (32-bit, 200T), 1=FT2232H (8-bit, 50T)
+parameter USB_MODE = 1;                    // 0=FT601 (32-bit, 200T), 1=FT2232H (8-bit, 50T) — default: FT2232H production board
 
 // ============================================================================
 // INTERNAL SIGNALS

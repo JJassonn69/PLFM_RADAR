@@ -70,6 +70,7 @@ PROD_RTL=(
     xfft_16.v
     fft_engine.v
     usb_data_interface.v
+    usb_data_interface_ft2232h.v
     edge_detector.v
     radar_mode_controller.v
     rx_gain_control.v
@@ -452,7 +453,8 @@ if [[ "$QUICK" -eq 0 ]]; then
         chirp_memory_loader_param.v latency_buffer.v \
         matched_filter_multi_segment.v matched_filter_processing_chain.v \
         range_bin_decimator.v doppler_processor.v xfft_16.v fft_engine.v \
-        usb_data_interface.v edge_detector.v radar_mode_controller.v \
+        usb_data_interface.v usb_data_interface_ft2232h.v \
+        edge_detector.v radar_mode_controller.v \
         rx_gain_control.v cfar_ca.v mti_canceller.v fpga_self_test.v
 
     # E2E integration (46 strict checks: TX, RX, USB R/W, CDC, safety, reset)
@@ -466,7 +468,8 @@ if [[ "$QUICK" -eq 0 ]]; then
         chirp_memory_loader_param.v latency_buffer.v \
         matched_filter_multi_segment.v matched_filter_processing_chain.v \
         range_bin_decimator.v doppler_processor.v xfft_16.v fft_engine.v \
-        usb_data_interface.v edge_detector.v radar_mode_controller.v \
+        usb_data_interface.v usb_data_interface_ft2232h.v \
+        edge_detector.v radar_mode_controller.v \
         rx_gain_control.v cfar_ca.v mti_canceller.v fpga_self_test.v
 else
     echo "  (skipped receiver golden + system top + E2E — use without --quick)"

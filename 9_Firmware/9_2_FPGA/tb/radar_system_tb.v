@@ -619,7 +619,7 @@ initial begin
     // Optional: dump specific signals for debugging
     $dumpvars(1, dut.tx_inst);
     $dumpvars(1, dut.rx_inst);
-    $dumpvars(1, dut.gen_ft601.usb_inst);
+    $dumpvars(1, dut.gen_ft2232h.usb_inst);
 end
 
 endmodule
