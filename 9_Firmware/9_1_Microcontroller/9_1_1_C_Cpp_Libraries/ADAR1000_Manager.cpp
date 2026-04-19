@@ -868,11 +868,22 @@ void ADAR1000Manager::adarSetRamBypass(uint8_t deviceIndex, uint8_t broadcast) {
 }
 
 void ADAR1000Manager::adarSetRxPhase(uint8_t deviceIndex, uint8_t channel, uint8_t phase, uint8_t broadcast) {
+    // channel is 1-based (CH1..CH4) per API contract documented in
+    // ADAR1000_AGC.cpp and matching ADI datasheet terminology.
+    // Reject out-of-range early so a stale 0-based caller does not
+    // silently wrap to ((0-1) & 0x03) == 3 and write to CH4.
+    // See issue #90.
+    if (channel < 1 || channel > 4) {
+        DIAG("BF", "adarSetRxPhase: channel %u out of range [1..4], ignored", channel);
+        return;
+    }
     uint8_t i_val = VM_I[phase % 128];
     uint8_t q_val = VM_Q[phase % 128];
 
-    uint32_t mem_addr_i = REG_CH1_RX_PHS_I + (channel & 0x03) * 2;
-    uint32_t mem_addr_q = REG_CH1_RX_PHS_Q + (channel & 0x03) * 2;
+    // Subtract 1 to convert 1-based channel to 0-based register offset
+    // before masking. See issue #90.
+    uint32_t mem_addr_i = REG_CH1_RX_PHS_I + ((channel - 1) & 0x03) * 2;
+    uint32_t mem_addr_q = REG_CH1_RX_PHS_Q + ((channel - 1) & 0x03) * 2;
 
     adarWrite(deviceIndex, mem_addr_i, i_val, broadcast);
     adarWrite(deviceIndex, mem_addr_q, q_val, broadcast);
@@ -880,11 +891,16 @@ void ADAR1000Manager::adarSetRxPhase(uint8_t deviceIndex, uint8_t channel, uint8
 }
 
 void ADAR1000Manager::adarSetTxPhase(uint8_t deviceIndex, uint8_t channel, uint8_t phase, uint8_t broadcast) {
+    // channel is 1-based (CH1..CH4). See issue #90.
+    if (channel < 1 || channel > 4) {
+        DIAG("BF", "adarSetTxPhase: channel %u out of range [1..4], ignored", channel);
+        return;
+    }
     uint8_t i_val = VM_I[phase % 128];
     uint8_t q_val = VM_Q[phase % 128];
 
-    uint32_t mem_addr_i = REG_CH1_TX_PHS_I + (channel & 0x03) * 2;
-    uint32_t mem_addr_q = REG_CH1_TX_PHS_Q + (channel & 0x03) * 2;
+    uint32_t mem_addr_i = REG_CH1_TX_PHS_I + ((channel - 1) & 0x03) * 2;
+    uint32_t mem_addr_q = REG_CH1_TX_PHS_Q + ((channel - 1) & 0x03) * 2;
 
     adarWrite(deviceIndex, mem_addr_i, i_val, broadcast);
     adarWrite(deviceIndex, mem_addr_q, q_val, broadcast);
@@ -892,13 +908,23 @@ void ADAR1000Manager::adarSetTxPhase(uint8_t deviceIndex, uint8_t channel, uint8
 }
 
 void ADAR1000Manager::adarSetRxVgaGain(uint8_t deviceIndex, uint8_t channel, uint8_t gain, uint8_t broadcast) {
-    uint32_t mem_addr = REG_CH1_RX_GAIN + (channel & 0x03);
+    // channel is 1-based (CH1..CH4). See issue #90.
+    if (channel < 1 || channel > 4) {
+        DIAG("BF", "adarSetRxVgaGain: channel %u out of range [1..4], ignored", channel);
+        return;
+    }
+    uint32_t mem_addr = REG_CH1_RX_GAIN + ((channel - 1) & 0x03);
     adarWrite(deviceIndex, mem_addr, gain, broadcast);
     adarWrite(deviceIndex, REG_LOAD_WORKING, 0x1, broadcast);
 }
 
 void ADAR1000Manager::adarSetTxVgaGain(uint8_t deviceIndex, uint8_t channel, uint8_t gain, uint8_t broadcast) {
-    uint32_t mem_addr = REG_CH1_TX_GAIN + (channel & 0x03);
+    // channel is 1-based (CH1..CH4). See issue #90.
+    if (channel < 1 || channel > 4) {
+        DIAG("BF", "adarSetTxVgaGain: channel %u out of range [1..4], ignored", channel);
+        return;
+    }
+    uint32_t mem_addr = REG_CH1_TX_GAIN + ((channel - 1) & 0x03);
     adarWrite(deviceIndex, mem_addr, gain, broadcast);
     adarWrite(deviceIndex, REG_LOAD_WORKING, LD_WRK_REGS_LDTX_OVERRIDE, broadcast);
 }
