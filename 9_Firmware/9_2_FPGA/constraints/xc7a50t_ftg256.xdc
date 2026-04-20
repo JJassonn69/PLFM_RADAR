@@ -98,20 +98,24 @@ set_input_jitter [get_clocks adc_dco_p] 0.05
 # FT2232H 60 MHz CLKOUT (Bank 35, MRCC pin C4)
 # --------------------------------------------------------------------------
 # The FT2232H provides a 60 MHz clock in 245 Synchronous FIFO mode.
-# Pin C4 is IO_L12N_T1_SRCC_35 (SRCC, not MRCC — confirmed via Vivado
-# device model: IS_CLK_CAPABLE=1, IS_MASTER=0). SRCC pins cannot drive
-# BUFG through dedicated routing, which is why the earlier build needed
-# CLOCK_DEDICATED_ROUTE=FALSE and burned ~5 ns in fabric routing.
-#
-# Fix: radar_system_top.v now instantiates BUFIO+BUFR instead of BUFG
-# for USB_MODE=1 (50T). SRCC → BUFIO → BUFR is the standard 7-series
-# path for regional clock distribution; all ft_clkout-domain logic is
-# contained in bank 35 / one clock region, so regional is sufficient.
-# The CLOCK_DEDICATED_ROUTE=FALSE override is no longer needed.
+# Pin C4 is IO_L12N_T1_MRCC_35 (N-type of MRCC pair). Vivado requires
+# CLOCK_DEDICATED_ROUTE FALSE for clock inputs on N-type MRCC pins
+# (Place 30-876). The schematic routes CLKOUT to C4; this cannot be
+# changed without a board respin. The clock still uses an IBUFG and
+# reaches the clock network — the constraint only disables the DRC check.
 set_property PACKAGE_PIN C4 [get_ports {ft_clkout}]
 set_property IOSTANDARD LVCMOS33 [get_ports {ft_clkout}]
 create_clock -name ft_clkout -period 16.667 [get_ports {ft_clkout}]
 set_input_jitter [get_clocks ft_clkout] 0.2
+# N-type MRCC pin requires dedicated route override (Place 30-876).
+# Audit F-0.4: the literal net name `ft_clkout_IBUF` exists post-synth but
+# the XDC scan happens before synthesis, when the IBUF net does not yet
+# exist — Vivado reported `No nets matched 'ft_clkout_IBUF'` + CRITICAL
+# WARNING. Use -hierarchical -filter + -quiet so the constraint matches
+# post-synth without warning during pre-synth XDC scan. The TCL duplicate
+# at scripts/50t/build_50t.tcl:119 remains as belt-and-suspenders.
+set_property -quiet CLOCK_DEDICATED_ROUTE FALSE \
+    [get_nets -quiet -hierarchical -filter {NAME =~ *ft_clkout_IBUF}]
 
 # ============================================================================
 # RESET (Active-Low)

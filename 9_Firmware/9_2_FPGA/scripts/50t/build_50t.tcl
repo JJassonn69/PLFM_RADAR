@@ -111,10 +111,12 @@ set_property SEVERITY {Warning} [get_drc_checks NSTD-1]
 set_property SEVERITY {Warning} [get_drc_checks UCIO-1]
 set_property SEVERITY {Warning} [get_drc_checks PLIO-9]
 
-# FT2232H CLKOUT routing: C4 is SRCC, not MRCC. Earlier builds used
-# CLOCK_DEDICATED_ROUTE=FALSE + implicit BUFG, which forced fabric routing
-# and burned ~5 ns. radar_system_top.v now uses BUFIO+BUFR for USB_MODE=1
-# (regional distribution from SRCC) so the override is no longer required.
+# FT2232H CLKOUT on C4 (N-type MRCC) — override dedicated clock route check.
+# The schematic routes the FT2232H 60 MHz clock to the N-pin of a differential
+# MRCC pair. Vivado Place 30-876 requires this property to allow placement.
+# The clock still reaches the clock network via IBUFG — this only suppresses
+# the DRC that demands the P-type pin.
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets {ft_clkout_IBUF}]
 
 # ---- Run implementation steps ----
 opt_design -directive Explore

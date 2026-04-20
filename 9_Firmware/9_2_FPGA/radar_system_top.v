@@ -327,27 +327,10 @@ BUFG bufg_120m (
     .O(clk_120m_dac_buf)
 );
 
-// USB clock buffering:
-//   USB_MODE=0 (200T/FT601): pin is MRCC (D17) → BUFG, global clock network.
-//   USB_MODE=1 (50T/FT2232H): pin is SRCC (C4, non-MRCC) → BUFIO + BUFR for
-//     regional dedicated routing. SRCC can drive BUFIO/BUFR but not BUFG
-//     directly (the "poor placement IO→BUFG" CLOCK_DEDICATED_ROUTE=FALSE
-//     override was burning ~5 ns in fabric routing on the ft_clkout path).
-//     All ft_clkout-domain logic (FT2232H FSM, FIFO flops, toggle CDCs) is
-//     contained in bank 35 / one clock region, so regional distribution
-//     is sufficient. See UG472 §3 BUFIO/BUFR.
-generate if (USB_MODE == 1) begin : gen_ft_bufr
-    wire ft_clk_bufio;
-    BUFIO bufio_ft (.I(ft601_clk_in), .O(ft_clk_bufio));
-    BUFR #(.BUFR_DIVIDE("BYPASS"), .SIM_DEVICE("7SERIES")) bufr_ft (
-        .I(ft_clk_bufio),
-        .O(ft601_clk_buf),
-        .CE(1'b1),
-        .CLR(1'b0)
-    );
-end else begin : gen_ft_bufg
-    BUFG bufg_ft601 (.I(ft601_clk_in), .O(ft601_clk_buf));
-end endgenerate
+BUFG bufg_ft601 (
+    .I(ft601_clk_in),
+    .O(ft601_clk_buf)
+);
 `endif
 
 // Reset synchronization (clk_100m domain)
