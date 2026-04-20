@@ -19,6 +19,11 @@ dev = [
 # ---------------------------------------------------------------------------
 # Ruff configuration
 # ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+markers = [
+    "slow: full-sweep tests (opt-in via -m slow); audit F-3.2 100-seed fuzz",
+]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

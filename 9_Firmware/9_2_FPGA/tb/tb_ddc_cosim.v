@@ -64,9 +64,11 @@ module tb_ddc_cosim;
 
     // Scenario selector (set via +define)
     reg [255:0] scenario_name;
-    reg [1023:0] hex_file_path;
-    reg [1023:0] csv_out_path;
-    reg [1023:0] csv_cic_path;
+    // Widened to 4 kbits (512 bytes) so fuzz-runner temp paths
+    // (e.g. /private/var/folders/.../pytest-of-...) fit without MSB truncation.
+    reg [4095:0] hex_file_path;
+    reg [4095:0] csv_out_path;
+    reg [4095:0] csv_cic_path;
 
     // ── Clock generation ──────────────────────────────────────
     // 400 MHz clock
@@ -152,7 +154,16 @@ module tb_ddc_cosim;
         // ── Select scenario ───────────────────────────────────
         // Default to DC scenario for fastest validation
         // Override with: +define+SCENARIO_SINGLE, +define+SCENARIO_MULTI, etc.
-        `ifdef SCENARIO_SINGLE
+        `ifdef SCENARIO_FUZZ
+            // Audit F-3.2: fuzz runner provides +hex and +csv paths plus a
+            // scenario tag. Any missing plusarg falls back to the DC vector.
+            if (!$value$plusargs("hex=%s", hex_file_path))
+                hex_file_path = "tb/cosim/adc_dc.hex";
+            if (!$value$plusargs("csv=%s", csv_out_path))
+                csv_out_path  = "tb/cosim/rtl_bb_fuzz.csv";
+            if (!$value$plusargs("tag=%s", scenario_name))
+                scenario_name = "fuzz";
+        `elsif SCENARIO_SINGLE
             hex_file_path = "tb/cosim/adc_single_target.hex";
             csv_out_path  = "tb/cosim/rtl_bb_single_target.csv";
             scenario_name = "single_target";
