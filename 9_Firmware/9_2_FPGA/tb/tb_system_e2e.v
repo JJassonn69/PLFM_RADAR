@@ -427,6 +427,8 @@ radar_system_top #(
     .adc_d_n(adc_d_n),
     .adc_dco_p(adc_dco_p),
     .adc_dco_n(adc_dco_n),
+    .adc_or_p(1'b0),
+    .adc_or_n(1'b1),
     .adc_pwdn(adc_pwdn),
 
     .stm32_new_chirp(stm32_new_chirp),
@@ -935,6 +937,106 @@ initial begin
     // G9.3: System resumes after reset — verify range processing restarts
     check(obs_range_valid_count > saved_range_count,
           "G9.3: System resumed processing after reset recovery");
+
+    $display("");
+
+    // ================================================================
+    // GROUP 9B: Adversarial reset sweep (audit F-2.2)
+    // ================================================================
+    // Drive the same auto-scan pipeline, then inject reset at four distinct
+    // offsets relative to a known-good start of operation. For each offset
+    // the system must:
+    //   (a) present system_status == 0 while held in reset
+    //   (b) produce at least one additional new_chirp_frame within the
+    //       observation window after reset release
+    //   (c) advance obs_range_valid_count (confirms full DDC+MF chain resumes)
+    // The four offsets are chosen to hit mid-chirp, mid-listen, and around
+    // the short/long chirp boundary, which covers the interesting FSM and
+    // CDC transitions in the pipeline.
+    $display("--- Group 9B: Adversarial reset sweep (F-2.2) ---");
+    begin : reset_sweep
+        integer sweep_i;
+        integer sweep_baseline_range;
+        integer sweep_baseline_chirp;
+        integer sweep_offsets [0:3];
+        integer sweep_holds   [0:3];
+        reg     sweep_ok;
+
+        // Reset injection offsets (ns) after the last auto-scan reconfigure.
+        // 3 us / 7 us / 12 us / 18 us — sprayed across a short-chirp burst.
+        sweep_offsets[0] = 3000;
+        sweep_offsets[1] = 7000;
+        sweep_offsets[2] = 12000;
+        sweep_offsets[3] = 18000;
+        // Reset-assert durations mix short (~20 clk_100m) and long (~120)
+        sweep_holds[0] = 200;
+        sweep_holds[1] = 1200;
+        sweep_holds[2] = 400;
+        sweep_holds[3] = 800;
+
+        for (sweep_i = 0; sweep_i < 4; sweep_i = sweep_i + 1) begin
+            // Re-seed auto-scan from a clean base each iteration
+            reset_n = 0;
+            bfm_rx_wr_ptr = 0;
+            bfm_rx_rd_ptr = 0;
+            #200;
+            reset_n = 1;
+            #500;
+            stm32_mixers_enable = 1;
+            ft601_txe = 0;
+            bfm_send_cmd(8'h04, 8'h00, 16'h0001);
+            #500;
+            bfm_send_cmd(8'h01, 8'h00, 16'h0001);
+            bfm_send_cmd(8'h10, 8'h00, 16'd100);
+            bfm_send_cmd(8'h11, 8'h00, 16'd200);
+            bfm_send_cmd(8'h12, 8'h00, 16'd100);
+            bfm_send_cmd(8'h13, 8'h00, 16'd20);
+            bfm_send_cmd(8'h14, 8'h00, 16'd100);
+            bfm_send_cmd(8'h15, 8'h00, 16'd4);
+
+            // Let the pipeline reach steady-state and capture a baseline
+            #30000;
+            sweep_baseline_range = obs_range_valid_count;
+            sweep_baseline_chirp = obs_chirp_frame_count;
+
+            // Wait out the configured offset, then assert reset asynchronously
+            #(sweep_offsets[sweep_i]);
+            reset_n = 0;
+            #(sweep_holds[sweep_i]);
+            sweep_ok = (system_status == 4'b0000);
+            check(sweep_ok,
+                  "G9B.a: system_status drops to 0 during injected reset");
+
+            // Release reset, re-configure (regs are cleared), allow recovery
+            reset_n = 1;
+            #500;
+            stm32_mixers_enable = 1;
+            ft601_txe = 0;
+            bfm_send_cmd(8'h04, 8'h00, 16'h0001);
+            #500;
+            bfm_send_cmd(8'h01, 8'h00, 16'h0001);
+            bfm_send_cmd(8'h10, 8'h00, 16'd100);
+            bfm_send_cmd(8'h11, 8'h00, 16'd200);
+            bfm_send_cmd(8'h12, 8'h00, 16'd100);
+            bfm_send_cmd(8'h13, 8'h00, 16'd20);
+            bfm_send_cmd(8'h14, 8'h00, 16'd100);
+            bfm_send_cmd(8'h15, 8'h00, 16'd4);
+
+            sweep_baseline_range = obs_range_valid_count;
+            sweep_baseline_chirp = obs_chirp_frame_count;
+            #60000;   // 60 us — two+ short-chirp frames
+
+            check(obs_chirp_frame_count > sweep_baseline_chirp,
+                  "G9B.b: new_chirp_frame resumes after injected reset");
+            check(obs_range_valid_count > sweep_baseline_range,
+                  "G9B.c: range pipeline resumes after injected reset");
+
+            $display("  [F-2.2] iter=%0d offset=%0dns hold=%0dns chirps=+%0d ranges=+%0d",
+                     sweep_i, sweep_offsets[sweep_i], sweep_holds[sweep_i],
+                     obs_chirp_frame_count - sweep_baseline_chirp,
+                     obs_range_valid_count - sweep_baseline_range);
+        end
+    end
 
     $display("");
 

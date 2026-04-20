@@ -487,6 +487,8 @@ radar_system_top #(
     .adc_d_n(adc_d_n),
     .adc_dco_p(adc_dco_p),
     .adc_dco_n(adc_dco_n),
+    .adc_or_p(1'b0),
+    .adc_or_n(1'b1),
     .adc_pwdn(adc_pwdn),
     
     // STM32 Control

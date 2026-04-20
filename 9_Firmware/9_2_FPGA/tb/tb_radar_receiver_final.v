@@ -139,6 +139,8 @@ radar_receiver_final dut (
     // ADC "LVDS" -- stub treats adc_d_p as single-ended data
     .adc_d_p(adc_data),
     .adc_d_n(~adc_data),       // Complement (ignored by stub)
+    .adc_or_p(1'b0),           // F-0.1: no overrange stimulus in this TB
+    .adc_or_n(1'b1),
     .adc_dco_p(clk_400m),      // 400 MHz clock
     .adc_dco_n(~clk_400m),     // Complement (ignored by stub)
     .adc_pwdn(),
