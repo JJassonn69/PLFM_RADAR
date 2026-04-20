@@ -5,14 +5,14 @@
  * Co-simulation testbench for doppler_processor_optimized (doppler_processor.v).
  *
  * Tests the complete Doppler processing pipeline:
- *   - Accumulates 32 chirps x 64 range bins into BRAM
+ *   - Accumulates 32 chirps x 512 range bins into BRAM
  *   - Processes each range bin: Hamming window -> dual 16-pt FFT (staggered PRF)
- *   - Outputs 2048 samples (64 range bins x 32 packed Doppler bins)
+ *   - Outputs 16384 samples (512 range bins x 32 packed Doppler bins)
  *
  * Validates:
  *   1. FSM state transitions (IDLE -> ACCUMULATE -> LOAD_FFT -> ... -> OUTPUT)
- *   2. Correct input sample count (2048)
- *   3. Correct output sample count (2048)
+ *   2. Correct input sample count (16384)
+ *   3. Correct output sample count (16384)
  *   4. Output ordering (range_bin, doppler_bin counters)
  *   5. Output values (compared with Python golden reference via CSV)
  *
@@ -38,11 +38,11 @@ module tb_doppler_cosim;
 // ============================================================================
 localparam CLK_PERIOD    = 10.0;           // 100 MHz
 localparam DOPPLER_FFT   = 32;             // Total packed Doppler bins (2 sub-frames x 16-pt FFT)
-localparam RANGE_BINS    = 64;
+localparam RANGE_BINS    = 512;
 localparam CHIRPS        = 32;
-localparam TOTAL_INPUTS  = CHIRPS * RANGE_BINS;  // 2048
-localparam TOTAL_OUTPUTS = RANGE_BINS * DOPPLER_FFT;  // 2048
-localparam MAX_CYCLES    = 500_000;        // Timeout: 5 ms at 100 MHz
+localparam TOTAL_INPUTS  = CHIRPS * RANGE_BINS;  // 16384
+localparam TOTAL_OUTPUTS = RANGE_BINS * DOPPLER_FFT;  // 16384
+localparam MAX_CYCLES    = 4_000_000;        // Timeout: 40 ms at 100 MHz
 
 // Scenario selection — input file name
 `ifdef SCENARIO_MOVING
@@ -73,7 +73,7 @@ reg         new_chirp_frame;
 wire [31:0] doppler_output;
 wire        doppler_valid;
 wire [4:0]  doppler_bin;
-wire [5:0]  range_bin;
+wire [8:0]  range_bin;
 wire        processing_active;
 wire        frame_complete;
 wire [3:0]  dut_status;
@@ -112,7 +112,7 @@ end
 // ============================================================================
 reg signed [15:0] cap_out_i [0:TOTAL_OUTPUTS-1];
 reg signed [15:0] cap_out_q [0:TOTAL_OUTPUTS-1];
-reg [5:0]  cap_rbin  [0:TOTAL_OUTPUTS-1];
+reg [8:0]  cap_rbin  [0:TOTAL_OUTPUTS-1];
 reg [4:0]  cap_dbin  [0:TOTAL_OUTPUTS-1];
 integer out_count;
 
@@ -127,7 +127,7 @@ integer fft_in_count;
 wire fft_input_valid_w = dut.fft_input_valid;
 wire signed [15:0] fft_input_i_w = dut.fft_input_i;
 wire signed [15:0] fft_input_q_w = dut.fft_input_q;
-wire [5:0] read_range_bin_w = dut.read_range_bin;
+wire [8:0] read_range_bin_w = dut.read_range_bin;
 wire [4:0] read_doppler_idx_w = dut.read_doppler_index;
 wire [2:0] dut_state_w = dut.state;
 wire [5:0] fft_sc_w = dut.fft_sample_counter;
@@ -192,15 +192,15 @@ initial begin
     $display("============================================================");
     $display("Doppler Processor Co-Sim Testbench");
     $display("Scenario: %0s", SCENARIO);
-    $display("Input samples: %0d  (32 chirps x 64 range bins)", TOTAL_INPUTS);
-    $display("Expected outputs: %0d (64 range bins x 32 packed Doppler bins, dual 16-pt FFT)",
+    $display("Input samples: %0d  (32 chirps x 512 range bins)", TOTAL_INPUTS);
+    $display("Expected outputs: %0d (512 range bins x 32 packed Doppler bins, dual 16-pt FFT)",
              TOTAL_OUTPUTS);
     $display("============================================================");
 
     // ---- Debug: check hex file loaded ----
     $display("  input_mem[0] = %08h", input_mem[0]);
     $display("  input_mem[1] = %08h", input_mem[1]);
-    $display("  input_mem[2047] = %08h", input_mem[2047]);
+    $display("  input_mem[16383] = %08h", input_mem[16383]);
 
     // ---- Check 1: DUT starts in IDLE ----
     check(dut_state_w == 3'b000,
@@ -242,7 +242,7 @@ initial begin
     #(CLK_PERIOD * 5);
     $display("  After wait: state=%0d", dut_state_w);
     check(dut_state_w != 3'b000 && dut_state_w != 3'b001,
-          "DUT entered processing state after 2048 input samples");
+          "DUT entered processing state after 16384 input samples");
     check(processing_active == 1'b1,
           "processing_active asserted during Doppler FFT");
 
@@ -268,7 +268,7 @@ initial begin
 
     // ---- Check 3: Correct output count ----
     check(out_count == TOTAL_OUTPUTS,
-          "Output sample count == 2048");
+          "Output sample count == 16384");
 
     // ---- Check 4: Did not timeout ----
     check(cycle_count < MAX_CYCLES,
@@ -287,10 +287,10 @@ initial begin
               "First output: range_bin=0, doppler_bin=0");
     end
 
-    // Last output should be range_bin=63
+    // Last output should be range_bin=511
     if (out_count == TOTAL_OUTPUTS) begin
         check(cap_rbin[TOTAL_OUTPUTS-1] == RANGE_BINS - 1,
-              "Last output: range_bin=63");
+              "Last output: range_bin=511");
         check(cap_dbin[TOTAL_OUTPUTS-1] == DOPPLER_FFT - 1,
               "Last output: doppler_bin=31");
     end
@@ -398,7 +398,7 @@ initial begin
 
     // ---- Check: FFT input count ----
     check(fft_in_count == TOTAL_OUTPUTS,
-          "FFT input count == 2048");
+          "FFT input count == 16384");
 
     // ---- Summary ----
     $display("\n============================================================");

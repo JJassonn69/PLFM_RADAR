@@ -30,7 +30,7 @@ from fpga_model import (
 )
 
 
-FFT_SIZE = 1024
+FFT_SIZE = 2048
 
 
 def load_hex_16bit(filepath):
@@ -143,9 +143,13 @@ def main():
         bb_q = load_hex_16bit(bb_q_path)
         ref_i = load_hex_16bit(ref_i_path)
         ref_q = load_hex_16bit(ref_q_path)
+        # Zero-pad to FFT_SIZE if shorter (legacy 1024-entry files → 2048)
+        for lst in [bb_i, bb_q, ref_i, ref_q]:
+            while len(lst) < FFT_SIZE:
+                lst.append(0)
         r = generate_case("chirp", bb_i, bb_q, ref_i, ref_q,
                           "Radar chirp: 2 targets (500m, 1500m) vs ref chirp",
-                          base_dir)
+                          base_dir, write_inputs=True)
         results.append(r)
     else:
         pass

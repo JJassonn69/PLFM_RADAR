@@ -35,9 +35,9 @@ from radar_scene import Target, generate_doppler_frame
 
 DOPPLER_FFT_SIZE = 16     # Per sub-frame
 DOPPLER_TOTAL_BINS = 32   # Total output (2 sub-frames x 16)
-RANGE_BINS = 64
+RANGE_BINS = 512
 CHIRPS_PER_FRAME = 32
-TOTAL_SAMPLES = CHIRPS_PER_FRAME * RANGE_BINS  # 2048
+TOTAL_SAMPLES = CHIRPS_PER_FRAME * RANGE_BINS  # 16384
 
 
 # =============================================================================

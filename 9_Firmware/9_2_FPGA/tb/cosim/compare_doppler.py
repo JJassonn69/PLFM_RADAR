@@ -34,8 +34,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # =============================================================================
 
 DOPPLER_FFT = 32
-RANGE_BINS = 64
-TOTAL_OUTPUTS = RANGE_BINS * DOPPLER_FFT  # 2048
+RANGE_BINS = 512
+TOTAL_OUTPUTS = RANGE_BINS * DOPPLER_FFT  # 16384
 SUBFRAME_SIZE = 16
 
 SCENARIOS = {
@@ -246,7 +246,7 @@ def compare_scenario(name, config, base_dir):
     # ---- Pass/Fail ----
     checks = []
 
-    checks.append(('RTL output count == 2048', count_ok))
+    checks.append(('RTL output count == 16384', count_ok))
 
     energy_ok = (ENERGY_RATIO_MIN < energy_ratio < ENERGY_RATIO_MAX)
     checks.append((f'Energy ratio in bounds '

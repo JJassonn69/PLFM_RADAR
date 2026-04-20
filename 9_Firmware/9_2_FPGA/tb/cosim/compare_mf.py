@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Configuration
 # =============================================================================
 
-FFT_SIZE = 1024
+FFT_SIZE = 2048
 
 SCENARIOS = {
     'chirp': {
@@ -243,7 +243,7 @@ def compare_scenario(scenario_name, config, base_dir):
 
     # Check 2: RTL produced expected sample count
     correct_count = len(rtl_i) == FFT_SIZE
-    checks.append(('Correct output count (1024)', correct_count))
+    checks.append(('Correct output count (2048)', correct_count))
 
     # Check 3: Energy ratio within generous bounds
     # Allow very wide range since twiddle differences cause large gain variation

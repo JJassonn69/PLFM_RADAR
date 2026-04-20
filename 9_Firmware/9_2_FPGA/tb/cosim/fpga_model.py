@@ -291,12 +291,9 @@ class Mixer:
         Convert 8-bit unsigned ADC to 18-bit signed.
         RTL: adc_signed_w = {1'b0, adc_data, {9{1'b0}}} -
                             {1'b0, {8{1'b1}}, {9{1'b0}}} / 2
-
-        Verilog '/' binds tighter than '-', so the division applies
-        only to the second concatenation:
-            {1'b0, 8'hFF, 9'b0} = 0x1FE00
-            0x1FE00 / 2 = 0xFF00 = 65280
-        Result: (adc_data << 9) - 0xFF00
+        = (adc_data << 9) - (0xFF << 9) / 2
+        = (adc_data << 9) - (0xFF << 8)  [integer division]
+        = (adc_data << 9) - 0x7F80
         """
         adc_data_8bit = adc_data_8bit & 0xFF
         # {1'b0, adc_data, 9'b0} = adc_data << 9, zero-padded to 18 bits
@@ -712,15 +709,24 @@ class DDCInputInterface:
 # FFT Engine (1024-point radix-2 DIT, in-place, 32-bit internal)
 # =============================================================================
 
-def load_twiddle_rom(filepath=None):
+def load_twiddle_rom(filepath=None, n=2048):
     """
-    Load 256-entry quarter-wave cosine ROM from hex file.
-    Returns list of 256 signed 16-bit integers.
+    Load quarter-wave cosine ROM from hex file.
+    Returns list of N/4 signed 16-bit integers.
+
+    For N=2048: loads fft_twiddle_2048.mem (512 entries).
+    For N=1024: loads fft_twiddle_1024.mem (256 entries).
+    For N=16:   loads fft_twiddle_16.mem (4 entries).
     """
     if filepath is None:
         # Default path relative to this file
         base = os.path.dirname(os.path.abspath(__file__))
-        filepath = os.path.join(base, '..', '..', 'fft_twiddle_1024.mem')
+        if n == 2048:
+            filepath = os.path.join(base, '..', '..', 'fft_twiddle_2048.mem')
+        elif n == 16:
+            filepath = os.path.join(base, '..', '..', 'fft_twiddle_16.mem')
+        else:
+            filepath = os.path.join(base, '..', '..', 'fft_twiddle_1024.mem')
 
     values = []
     with open(filepath) as f:
@@ -762,17 +768,17 @@ class FFTEngine:
     """
     Bit-accurate model of fft_engine.v
 
-    1024-point radix-2 DIT FFT/IFFT.
+    2048-point radix-2 DIT FFT/IFFT.
     Internal: 32-bit signed working data.
     Twiddle: 16-bit Q15 from quarter-wave cosine ROM.
     Butterfly: multiply 32x16->49 bits, >>>15, add/subtract.
     Output: saturate 32->16 bits. IFFT also >>>LOG2N before saturate.
     """
 
-    def __init__(self, n=1024, twiddle_file=None):
+    def __init__(self, n=2048, twiddle_file=None):
         self.N = n
         self.LOG2N = n.bit_length() - 1
-        self.cos_rom = load_twiddle_rom(twiddle_file)
+        self.cos_rom = load_twiddle_rom(twiddle_file, n=n)
         # Working memory (32-bit signed I/Q pairs)
         self.mem_re = [0] * n
         self.mem_im = [0] * n
@@ -945,21 +951,21 @@ class MatchedFilterChain:
     Uses a single FFTEngine instance (as in RTL, engine is reused).
     """
 
-    def __init__(self, fft_size=1024, twiddle_file=None):
+    def __init__(self, fft_size=2048, twiddle_file=None):
         self.fft_size = fft_size
         self.fft = FFTEngine(n=fft_size, twiddle_file=twiddle_file)
         self.conj_mult = FreqMatchedFilter()
 
     def process(self, sig_re, sig_im, ref_re, ref_im):
         """
-        Run matched filter on 1024-sample signal + reference.
+        Run matched filter on signal + reference.
 
         Args:
-            sig_re/im: signal I/Q (16-bit signed, 1024 samples)
-            ref_re/im: reference chirp I/Q (16-bit signed, 1024 samples)
+            sig_re/im: signal I/Q (16-bit signed, fft_size samples)
+            ref_re/im: reference chirp I/Q (16-bit signed, fft_size samples)
 
         Returns:
-            (range_profile_re, range_profile_im): 1024 x 16-bit signed
+            (range_profile_re, range_profile_im): fft_size x 16-bit signed
         """
         # Forward FFT of signal
         sig_fft_re, sig_fft_im = self.fft.compute(sig_re, sig_im, inverse=False)
@@ -987,27 +993,27 @@ class RangeBinDecimator:
     Bit-accurate model of range_bin_decimator.v
 
     Three modes:
-      00: Simple decimation (take center sample at index 8)
+      00: Simple decimation (take center sample at index 2)
       01: Peak detection (max |I|+|Q|)
-      10: Averaging (sum >> 4, truncation)
+      10: Averaging (sum >> 2, truncation)
       11: Reserved (output 0)
     """
 
-    DECIMATION_FACTOR = 16
-    OUTPUT_BINS = 64
+    DECIMATION_FACTOR = 4
+    OUTPUT_BINS = 512
 
     @staticmethod
     def decimate(range_re, range_im, mode=1, start_bin=0):
         """
-        Decimate 1024 range bins to 64.
+        Decimate 2048 range bins to 512.
 
         Args:
-            range_re/im: 1024 x signed 16-bit
+            range_re/im: 2048 x signed 16-bit
             mode: 0=center, 1=peak, 2=average, 3=zero
-            start_bin: first input bin to process (0-1023)
+            start_bin: first input bin to process (0-2047)
 
         Returns:
-            (out_re, out_im): 64 x signed 16-bit
+            (out_re, out_im): 512 x signed 16-bit
         """
         out_re = []
         out_im = []
@@ -1055,9 +1061,9 @@ class RangeBinDecimator:
                     if idx < len(range_re):
                         sum_re += sign_extend(range_re[idx] & 0xFFFF, 16)
                         sum_im += sign_extend(range_im[idx] & 0xFFFF, 16)
-                # Truncate (arithmetic right shift by 4), take 16 bits
-                out_re.append(sign_extend((sum_re >> 4) & 0xFFFF, 16))
-                out_im.append(sign_extend((sum_im >> 4) & 0xFFFF, 16))
+                # Truncate (arithmetic right shift by 2), take 16 bits
+                out_re.append(sign_extend((sum_re >> 2) & 0xFFFF, 16))
+                out_im.append(sign_extend((sum_im >> 2) & 0xFFFF, 16))
 
             else:
                 # Mode 3: reserved, output 0
@@ -1093,7 +1099,7 @@ class DopplerProcessor:
     """
 
     DOPPLER_FFT_SIZE = 16     # Per sub-frame
-    RANGE_BINS = 64
+    RANGE_BINS = 512
     CHIRPS_PER_FRAME = 32
     CHIRPS_PER_SUBFRAME = 16
 
@@ -1129,11 +1135,11 @@ class DopplerProcessor:
         Process one complete Doppler frame using dual 16-pt FFTs.
 
         Args:
-            chirp_data_i: 2D array [32 chirps][64 range bins] of signed 16-bit I
-            chirp_data_q: 2D array [32 chirps][64 range bins] of signed 16-bit Q
+            chirp_data_i: 2D array [32 chirps][512 range bins] of signed 16-bit I
+            chirp_data_q: 2D array [32 chirps][512 range bins] of signed 16-bit Q
 
         Returns:
-            (doppler_map_i, doppler_map_q): 2D arrays [64 range bins][32 doppler bins]
+            (doppler_map_i, doppler_map_q): 2D arrays [512 range bins][32 doppler bins]
                                             of signed 16-bit
                                             Bins 0-15 = sub-frame 0 (long PRI)
                                             Bins 16-31 = sub-frame 1 (short PRI)
@@ -1216,7 +1222,7 @@ class SignalChain:
     IF_FREQ = 120_000_000    # IF frequency
     FTW_120MHZ = 0x4CCCCCCD  # Phase increment for 120 MHz at 400 MSPS
 
-    def __init__(self, twiddle_file_1024=None, twiddle_file_16=None):
+    def __init__(self, twiddle_file_2048=None, twiddle_file_16=None):
         self.nco = NCO()
         self.mixer = Mixer()
         self.cic_i = CICDecimator()
@@ -1224,7 +1230,7 @@ class SignalChain:
         self.fir_i = FIRFilter()
         self.fir_q = FIRFilter()
         self.ddc_interface = DDCInputInterface()
-        self.matched_filter = MatchedFilterChain(fft_size=1024, twiddle_file=twiddle_file_1024)
+        self.matched_filter = MatchedFilterChain(fft_size=2048, twiddle_file=twiddle_file_2048)
         self.range_decimator = RangeBinDecimator()
         self.doppler = DopplerProcessor(twiddle_file_16=twiddle_file_16)
 

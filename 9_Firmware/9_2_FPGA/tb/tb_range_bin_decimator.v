@@ -4,9 +4,9 @@ module tb_range_bin_decimator;
 
     // ── Parameters ─────────────────────────────────────────────
     localparam CLK_PERIOD       = 10.0;  // 100 MHz
-    localparam INPUT_BINS       = 1024;
-    localparam OUTPUT_BINS      = 64;
-    localparam DECIMATION_FACTOR = 16;
+    localparam INPUT_BINS       = 2048;
+    localparam OUTPUT_BINS      = 512;
+    localparam DECIMATION_FACTOR = 4;
 
     // ── Signals ────────────────────────────────────────────────
     reg         clk;
@@ -17,9 +17,9 @@ module tb_range_bin_decimator;
     wire signed [15:0] range_i_out;
     wire signed [15:0] range_q_out;
     wire        range_valid_out;
-    wire [5:0]  range_bin_index;
+    wire [8:0]  range_bin_index;
     reg  [1:0]  decimation_mode;
-    reg  [9:0]  start_bin;
+    reg  [10:0] start_bin;
     wire        watchdog_timeout;
 
     // ── Test bookkeeping ───────────────────────────────────────
@@ -33,7 +33,7 @@ module tb_range_bin_decimator;
     // These are written by an always block that runs concurrently
     reg signed [15:0] cap_i [0:OUTPUT_BINS-1];
     reg signed [15:0] cap_q [0:OUTPUT_BINS-1];
-    reg [5:0]         cap_idx [0:OUTPUT_BINS-1];
+    reg [8:0]         cap_idx [0:OUTPUT_BINS-1];
     integer           cap_count;
     reg               cap_enable;  // testbench sets this to enable capture
 
@@ -106,7 +106,7 @@ module tb_range_bin_decimator;
             range_i_in     = 16'd0;
             range_q_in     = 16'd0;
             decimation_mode = 2'b00;
-            start_bin      = 10'd0;
+            start_bin      = 11'd0;
             cap_enable     = 0;
             cap_count      = 0;
             repeat (4) @(posedge clk);
@@ -202,7 +202,7 @@ module tb_range_bin_decimator;
         for (i = 0; i < OUTPUT_BINS; i = i + 1) begin
             cap_i[i]   = 16'd0;
             cap_q[i]   = 16'd0;
-            cap_idx[i] = 6'd0;
+            cap_idx[i] = 9'd0;
         end
 
         // ════════════════════════════════════════════════════════
@@ -216,7 +216,7 @@ module tb_range_bin_decimator;
         check(range_valid_out === 1'b0, "range_valid_out=0 during reset");
         check(range_i_out === 16'd0,   "range_i_out=0 during reset");
         check(range_q_out === 16'd0,   "range_q_out=0 during reset");
-        check(range_bin_index === 6'd0, "range_bin_index=0 during reset");
+        check(range_bin_index === 9'd0, "range_bin_index=0 during reset");
         reset_n = 1;
         @(posedge clk); #1;
 
@@ -232,22 +232,22 @@ module tb_range_bin_decimator;
         stop_capture;
 
         $display("  Output count: %0d (expected %0d)", cap_count, OUTPUT_BINS);
-        check(cap_count == OUTPUT_BINS, "Outputs exactly 64 bins");
+        check(cap_count == OUTPUT_BINS, "Outputs exactly 512 bins");
 
-        // In mode 00, takes sample at index DECIMATION_FACTOR/2 = 8 within group
-        // Group 0: samples 0-15, center at index 8 → value = 8
-        // Group 1: samples 16-31, center at index 24 → value = 24
+        // In mode 00, takes sample at index DECIMATION_FACTOR/2 = 2 within group
+        // Group 0: samples 0-3, center at index 2 → value = 2
+        // Group 1: samples 4-7, center at index 6 → value = 6
         if (cap_count >= 2) begin
-            $display("  Bin 0: I=%0d (expect 8)", cap_i[0]);
-            $display("  Bin 1: I=%0d (expect 24)", cap_i[1]);
+            $display("  Bin 0: I=%0d (expect 2)", cap_i[0]);
+            $display("  Bin 1: I=%0d (expect 6)", cap_i[1]);
         end
-        check(cap_count >= 1 && cap_i[0] == 16'sd8,   "Bin 0: center sample I=8");
-        check(cap_count >= 2 && cap_i[1] == 16'sd24,  "Bin 1: center sample I=24");
-        check(cap_count >= 64 && cap_i[63] == 16'sd1016, "Bin 63: center sample I=1016");
+        check(cap_count >= 1 && cap_i[0] == 16'sd2,   "Bin 0: center sample I=2");
+        check(cap_count >= 2 && cap_i[1] == 16'sd6,  "Bin 1: center sample I=6");
+        check(cap_count >= 512 && cap_i[511] == 16'sd2046, "Bin 511: center sample I=2046");
 
         // Check bin indices are sequential
-        check(cap_count >= 1 && cap_idx[0]  == 6'd0,  "First bin index = 0");
-        check(cap_count >= 64 && cap_idx[63] == 6'd63, "Last bin index = 63");
+        check(cap_count >= 1 && cap_idx[0]  == 9'd0,  "First bin index = 0");
+        check(cap_count >= 512 && cap_idx[511] == 9'd511, "Last bin index = 511");
 
         // Write CSV
         csv_file = $fopen("rbd_mode00_ramp.csv", "w");
@@ -268,7 +268,7 @@ module tb_range_bin_decimator;
         stop_capture;
 
         $display("  Output count: %0d", cap_count);
-        check(cap_count == OUTPUT_BINS, "Outputs exactly 64 bins");
+        check(cap_count == OUTPUT_BINS, "Outputs exactly 512 bins");
 
         if (cap_count >= 10) begin
             $display("  Bin 0: I=%0d (expect 100)", cap_i[0]);
@@ -297,13 +297,13 @@ module tb_range_bin_decimator;
         stop_capture;
 
         $display("  Output count: %0d", cap_count);
-        check(cap_count == OUTPUT_BINS, "Outputs exactly 64 bins");
+        check(cap_count == OUTPUT_BINS, "Outputs exactly 512 bins");
 
         if (cap_count >= 1)
             $display("  Bin 0: I=%0d Q=%0d (expect 160, 80)", cap_i[0], cap_q[0]);
         check(cap_count >= 1 && cap_i[0] == 16'sd160, "Avg mode: constant I preserved (160)");
         check(cap_count >= 1 && cap_q[0] == 16'sd80,  "Avg mode: constant Q preserved (80)");
-        check(cap_count >= 64 && cap_i[63] == 16'sd160, "Avg mode: last bin I preserved");
+        check(cap_count >= 512 && cap_i[511] == 16'sd160, "Avg mode: last bin I preserved");
 
         csv_file = $fopen("rbd_mode10_avg.csv", "w");
         $fwrite(csv_file, "output_bin,index,i_value,q_value\n");
@@ -322,16 +322,16 @@ module tb_range_bin_decimator;
         feed_ramp;
         stop_capture;
 
-        check(cap_count == OUTPUT_BINS, "Outputs exactly 64 bins");
+        check(cap_count == OUTPUT_BINS, "Outputs exactly 512 bins");
 
-        // Group 0: values 0..15, sum=120, >>4 = 7
-        // Group 1: values 16..31, sum=376, >>4 = 23
+        // Group 0: values 0..3, sum=6, >>2 = 1
+        // Group 1: values 4..7, sum=22, >>2 = 5
         if (cap_count >= 2) begin
-            $display("  Bin 0: I=%0d (expect 7)", cap_i[0]);
-            $display("  Bin 1: I=%0d (expect 23)", cap_i[1]);
+            $display("  Bin 0: I=%0d (expect 1)", cap_i[0]);
+            $display("  Bin 1: I=%0d (expect 5)", cap_i[1]);
         end
-        check(cap_count >= 1 && cap_i[0] == 16'sd7,  "Avg ramp group 0 = 7");
-        check(cap_count >= 2 && cap_i[1] == 16'sd23, "Avg ramp group 1 = 23");
+        check(cap_count >= 1 && cap_i[0] == 16'sd1,  "Avg ramp group 0 = 1");
+        check(cap_count >= 2 && cap_i[1] == 16'sd5, "Avg ramp group 1 = 5");
 
         csv_file = $fopen("rbd_mode10_ramp.csv", "w");
         $fwrite(csv_file, "output_bin,index,i_value,q_value\n");
@@ -363,7 +363,7 @@ module tb_range_bin_decimator;
         feed_ramp;
         stop_capture;
         $display("  Frame 1: %0d outputs", cap_count);
-        check(cap_count == OUTPUT_BINS, "Frame 1: 64 outputs");
+        check(cap_count == OUTPUT_BINS, "Frame 1: 512 outputs");
 
         // Small gap then frame 2
         repeat (5) @(posedge clk);
@@ -371,7 +371,7 @@ module tb_range_bin_decimator;
         feed_ramp;
         stop_capture;
         $display("  Frame 2: %0d outputs", cap_count);
-        check(cap_count == OUTPUT_BINS, "Frame 2: 64 outputs");
+        check(cap_count == OUTPUT_BINS, "Frame 2: 512 outputs");
 
         // ════════════════════════════════════════════════════════
         // TEST GROUP 8: Peak detection with negative values
@@ -419,11 +419,11 @@ module tb_range_bin_decimator;
         feed_constant(16'sh7FFF, 16'sh7FFF);
         stop_capture;
         $display("    Output count: %0d", cap_count);
-        check(cap_count == OUTPUT_BINS, "9a: Outputs exactly 64 bins");
+        check(cap_count == OUTPUT_BINS, "9a: Outputs exactly 512 bins");
         if (cap_count >= 1)
             $display("    Bin 0: I=%0d Q=%0d (expect 32767, 32767)", cap_i[0], cap_q[0]);
         check(cap_count >= 1 && cap_i[0] == 16'sh7FFF, "9a: Bin 0 peak I = 0x7FFF");
-        check(cap_count >= 64 && cap_i[63] == 16'sh7FFF, "9a: Bin 63 peak I = 0x7FFF");
+        check(cap_count >= 512 && cap_i[511] == 16'sh7FFF, "9a: Bin 511 peak I = 0x7FFF");
 
         // ── Test 9b: All max negative in mode 01 (peak detection) ──
         $display("  Test 9b: All max negative, mode 01 (peak detection)");
@@ -433,7 +433,7 @@ module tb_range_bin_decimator;
         feed_constant(16'sh8000, 16'sh8000);
         stop_capture;
         $display("    Output count: %0d", cap_count);
-        check(cap_count == OUTPUT_BINS, "9b: Outputs exactly 64 bins");
+        check(cap_count == OUTPUT_BINS, "9b: Outputs exactly 512 bins");
         if (cap_count >= 1)
             $display("    Bin 0: I=%0d Q=%0d", cap_i[0], cap_q[0]);
 
@@ -445,10 +445,10 @@ module tb_range_bin_decimator;
         feed_constant(16'sh7FFF, 16'sh7FFF);
         stop_capture;
         $display("    Output count: %0d", cap_count);
-        check(cap_count == OUTPUT_BINS, "9c: Outputs exactly 64 bins");
+        check(cap_count == OUTPUT_BINS, "9c: Outputs exactly 512 bins");
         if (cap_count >= 1)
             $display("    Bin 0: I=%0d (expect 32767)", cap_i[0]);
-        // sum_i = 16 * 0x7FFF = 0x7FFF0, >>4 = 0x7FFF
+        // sum_i = 4 * 0x7FFF = 0x1FFFC, >>2 = 0x7FFF
         check(cap_count >= 1 && cap_i[0] == 16'sh7FFF, "9c: Avg of 0x7FFF = 0x7FFF");
 
         // ── Test 9d: Alternating max pos/neg in mode 10 (averaging) ──
@@ -471,8 +471,8 @@ module tb_range_bin_decimator;
         range_valid_in = 1'b0;
         stop_capture;
         $display("    Output count: %0d", cap_count);
-        check(cap_count == OUTPUT_BINS, "9d: Outputs exactly 64 bins");
-        // 8*32767 + 8*(-32768) = -8, sum[19:4] = -1
+        check(cap_count == OUTPUT_BINS, "9d: Outputs exactly 512 bins");
+        // 2*32767 + 2*(-32768) = -2, >>2 = -1 (arithmetic shift)
         if (cap_count >= 1)
             $display("    Bin 0: I=%0d (expect -1)", cap_i[0]);
         check(cap_count >= 1 && cap_i[0] == -16'sd1, "9d: Avg of alternating = -1");
@@ -485,7 +485,7 @@ module tb_range_bin_decimator;
         decimation_mode = 2'b00;
 
         start_capture;
-        // Feed 1024 samples with gaps: every 50 samples, deassert for 20 cycles
+        // Feed 2048 samples with gaps: every 50 samples, deassert for 20 cycles
         begin : gap_feed_block
             integer sample_idx;
             integer samples_since_gap;
@@ -511,17 +511,17 @@ module tb_range_bin_decimator;
         stop_capture;
 
         $display("  Output count: %0d (expected %0d)", cap_count, OUTPUT_BINS);
-        check(cap_count == OUTPUT_BINS, "10: Outputs exactly 64 bins with gaps");
-        // Mode 00 takes center sample (index 8 within group)
-        // Group 0: logical samples 0..15, center at 8 → value 8
-        // Group 1: logical samples 16..31, center at 24 → value 24
+        check(cap_count == OUTPUT_BINS, "10: Outputs exactly 512 bins with gaps");
+        // Mode 00 takes center sample (index 2 within group)
+        // Group 0: logical samples 0..3, center at 2 → value 2
+        // Group 1: logical samples 4..7, center at 6 → value 6
         if (cap_count >= 2) begin
-            $display("  Bin 0: I=%0d (expect 8)", cap_i[0]);
-            $display("  Bin 1: I=%0d (expect 24)", cap_i[1]);
+            $display("  Bin 0: I=%0d (expect 2)", cap_i[0]);
+            $display("  Bin 1: I=%0d (expect 6)", cap_i[1]);
         end
-        check(cap_count >= 1 && cap_i[0] == 16'sd8, "10: Gap test Bin 0 I=8");
-        check(cap_count >= 2 && cap_i[1] == 16'sd24, "10: Gap test Bin 1 I=24");
-        check(cap_count >= 64 && cap_i[63] == 16'sd1016, "10: Gap test Bin 63 I=1016");
+        check(cap_count >= 1 && cap_i[0] == 16'sd2, "10: Gap test Bin 0 I=2");
+        check(cap_count >= 2 && cap_i[1] == 16'sd6, "10: Gap test Bin 1 I=6");
+        check(cap_count >= 512 && cap_i[511] == 16'sd2046, "10: Gap test Bin 511 I=2046");
 
         // ════════════════════════════════════════════════════════
         // TEST GROUP 11: Reset Mid-Operation
@@ -561,7 +561,7 @@ module tb_range_bin_decimator;
         stop_capture;
 
         $display("  Output count after reset+refeed: %0d", cap_count);
-        check(cap_count == OUTPUT_BINS, "11: 64 outputs after mid-reset + new frame");
+        check(cap_count == OUTPUT_BINS, "11: 512 outputs after mid-reset + new frame");
         // Mode 01 peak detection with constant 42 → all peaks = 42
         if (cap_count >= 1)
             $display("  Bin 0: I=%0d (expect 42)", cap_i[0]);
@@ -579,13 +579,13 @@ module tb_range_bin_decimator;
         stop_capture;
 
         $display("  Output count: %0d", cap_count);
-        check(cap_count == OUTPUT_BINS, "12: Reserved mode outputs 64 bins");
+        check(cap_count == OUTPUT_BINS, "12: Reserved mode outputs 512 bins");
         if (cap_count >= 1)
             $display("  Bin 0: I=%0d Q=%0d (expect 0, 0)", cap_i[0], cap_q[0]);
         check(cap_count >= 1 && cap_i[0] == 16'sd0, "12: Reserved mode I=0");
         check(cap_count >= 1 && cap_q[0] == 16'sd0, "12: Reserved mode Q=0");
         // Check last bin too
-        check(cap_count >= 64 && cap_i[63] == 16'sd0, "12: Reserved mode Bin 63 I=0");
+        check(cap_count >= 512 && cap_i[511] == 16'sd0, "12: Reserved mode Bin 511 I=0");
 
         // ════════════════════════════════════════════════════════
         // TEST GROUP 13: Overflow Test for Accumulator (mode 10)
@@ -612,11 +612,9 @@ module tb_range_bin_decimator;
         stop_capture;
 
         $display("  Output count: %0d", cap_count);
-        check(cap_count == OUTPUT_BINS, "13: Accumulator stress outputs 64 bins");
-        // Even groups (16×7FFF): sum=0x7FFF0, >>4=0x7FFF=32767
-        // Odd groups  (16×8000): sum=0x80000 in 21 bits, but 20-bit reg wraps
-        // 16 * (-32768) = -524288 = 20'h80000 which is exactly representable
-        // sum_i[19:4] = 16'h8000 = -32768
+        check(cap_count == OUTPUT_BINS, "13: Accumulator stress outputs 512 bins");
+        // Even groups (4×7FFF): sum=0x1FFFC, >>2=0x7FFF=32767
+        // Odd groups  (4×8000): sum=-131072, >>2=-32768=0x8000
         if (cap_count >= 2) begin
             $display("  Bin 0 (even grp): I=%0d (expect 32767)", cap_i[0]);
             $display("  Bin 1 (odd  grp): I=%0d (expect -32768)", cap_i[1]);
@@ -634,18 +632,16 @@ module tb_range_bin_decimator;
         // 14a: start_bin=16, mode 00 (simple decimation), ramp input
         // With start_bin=16, the first 16 samples are skipped.
         // Processing starts at input sample 16.
-        // Group 0: input samples 16..31, center at index 8 within group → sample 24 → I=24
-        // Group 1: input samples 32..47, center at index 8 → sample 40 → I=40
+        // Group 0: input samples 16..19, center at index 2 within group → sample 18 → I=18
+        // Group 1: input samples 20..23, center at index 2 → sample 22 → I=22
         apply_reset;
         decimation_mode = 2'b00;
-        start_bin = 10'd16;
+        start_bin = 11'd16;
 
         start_capture;
-        // Feed 1024 + 16 = 1040 samples of ramp data
-        // But wait - the DUT expects exactly 1024 input bins worth of processing
-        // after skipping. We need to feed start_bin + OUTPUT_BINS*DECIMATION_FACTOR
-        // = 16 + 64*16 = 16 + 1024 = 1040 valid samples.
-        for (i = 0; i < 1040; i = i + 1) begin
+        // Feed start_bin + OUTPUT_BINS*DECIMATION_FACTOR
+        // = 16 + 512*4 = 16 + 2048 = 2064 valid samples.
+        for (i = 0; i < 2064; i = i + 1) begin
             range_i_in     = i[15:0];
             range_q_in     = 16'd0;
             range_valid_in = 1'b1;
@@ -657,25 +653,25 @@ module tb_range_bin_decimator;
         $display("  14a: start_bin=16, mode 00 ramp");
         $display("  Output count: %0d (expected %0d)", cap_count, OUTPUT_BINS);
         if (cap_count >= 2) begin
-            $display("  Bin 0: I=%0d (expect 24)", cap_i[0]);
-            $display("  Bin 1: I=%0d (expect 40)", cap_i[1]);
+            $display("  Bin 0: I=%0d (expect 18)", cap_i[0]);
+            $display("  Bin 1: I=%0d (expect 22)", cap_i[1]);
         end
-        check(cap_count == OUTPUT_BINS, "14a: start_bin=16 outputs 64 bins");
-        check(cap_count >= 1 && cap_i[0] == 16'sd24,
-              "14a: Bin 0 center = input 24 (skip 16 + center at 8)");
-        check(cap_count >= 2 && cap_i[1] == 16'sd40,
-              "14a: Bin 1 center = input 40");
+        check(cap_count == OUTPUT_BINS, "14a: start_bin=16 outputs 512 bins");
+        check(cap_count >= 1 && cap_i[0] == 16'sd18,
+              "14a: Bin 0 center = input 18 (skip 16 + center at 2)");
+        check(cap_count >= 2 && cap_i[1] == 16'sd22,
+              "14a: Bin 1 center = input 22");
 
         // 14b: start_bin=32, mode 01 (peak detection)
-        // Skip first 32 samples, then peak-detect groups of 16
+        // Skip first 32 samples, then peak-detect groups of 4
         // Feed peaked data where group G (starting from bin 32) has spike at
         // varying positions with value (G+1)*100
         apply_reset;
         decimation_mode = 2'b01;
-        start_bin = 10'd32;
+        start_bin = 11'd32;
 
         start_capture;
-        for (i = 0; i < 1056; i = i + 1) begin
+        for (i = 0; i < 2080; i = i + 1) begin
             if (i < 32) begin
                 // Skipped region — feed garbage
                 range_i_in = 16'sh7FFF;  // Max value — should be ignored
@@ -707,7 +703,7 @@ module tb_range_bin_decimator;
             $display("  Bin 0: I=%0d (expect 100)", cap_i[0]);
             $display("  Bin 1: I=%0d (expect 200)", cap_i[1]);
         end
-        check(cap_count == OUTPUT_BINS, "14b: start_bin=32 outputs 64 bins");
+        check(cap_count == OUTPUT_BINS, "14b: start_bin=32 outputs 512 bins");
         // The skipped max-value samples should NOT appear in output
         check(cap_count >= 1 && cap_i[0] == 16'sd100,
               "14b: Bin 0 peak = 100 (skipped garbage)");
@@ -717,31 +713,31 @@ module tb_range_bin_decimator;
         // 14c: start_bin=0 (verify default still works after using start_bin)
         apply_reset;
         decimation_mode = 2'b00;
-        start_bin = 10'd0;
+        start_bin = 11'd0;
 
         start_capture;
         feed_ramp;
         stop_capture;
 
         check(cap_count == OUTPUT_BINS, "14c: start_bin=0 still works");
-        check(cap_count >= 1 && cap_i[0] == 16'sd8,
-              "14c: Bin 0 = 8 (original behavior preserved)");
+        check(cap_count >= 1 && cap_i[0] == 16'sd2,
+              "14c: Bin 0 = 2 (original behavior preserved)");
 
         // ════════════════════════════════════════════════════════
         // TEST GROUP 15: Watchdog Timeout (Fix 5)
         // ════════════════════════════════════════════════════════
         $display("\n--- Test Group 15: Watchdog Timeout (Fix 5) ---");
 
-        // 15a: Stall in ST_PROCESS — feed 8 samples (half a group) then stop.
+        // 15a: Stall in ST_PROCESS — feed 2 samples (half a group) then stop.
         //      After 256 clocks of no valid, watchdog should fire and return to IDLE.
-        //      After that, a fresh full frame should still produce 64 outputs.
+        //      After that, a fresh full frame should still produce 512 outputs.
         $display("  15a: Stall mid-group in ST_PROCESS");
         apply_reset;
         wd_pulse_count = 0;
         decimation_mode = 2'b01;  // Peak mode
 
-        // Feed only 8 samples (partial group)
-        for (i = 0; i < 8; i = i + 1) begin
+        // Feed only 2 samples (partial group)
+        for (i = 0; i < 2; i = i + 1) begin
             range_i_in     = (i + 1) * 100;
             range_q_in     = 16'd0;
             range_valid_in = 1'b1;
@@ -754,14 +750,14 @@ module tb_range_bin_decimator;
         check(wd_pulse_count == 1, "15a: watchdog_timeout pulsed once");
 
         // Verify DUT returned to idle — feed a complete frame and check output
-        // Mode 01 (peak) with ramp: group 0 has values 0..15, peak = 15
+        // Mode 01 (peak) with ramp: group 0 has values 0..3, peak = 3
         start_capture;
         feed_ramp;
         stop_capture;
 
         $display("  15a: Output count after recovery: %0d", cap_count);
-        check(cap_count == OUTPUT_BINS, "15a: 64 outputs after watchdog recovery");
-        check(cap_count >= 1 && cap_i[0] == 16'sd15, "15a: Bin 0 = 15 (peak of 0..15) after recovery");
+        check(cap_count == OUTPUT_BINS, "15a: 512 outputs after watchdog recovery");
+        check(cap_count >= 1 && cap_i[0] == 16'sd3, "15a: Bin 0 = 3 (peak of 0..3) after recovery");
 
         // 15b: Stall in ST_SKIP — set start_bin=100, feed 50 samples then stop.
         //      DUT should be in ST_SKIP, watchdog fires after 256 idle clocks.
@@ -769,7 +765,7 @@ module tb_range_bin_decimator;
         apply_reset;
         wd_pulse_count = 0;
         decimation_mode = 2'b00;
-        start_bin = 10'd100;
+        start_bin = 11'd100;
 
         // Feed only 50 samples (not enough to finish skipping)
         for (i = 0; i < 50; i = i + 1) begin
@@ -785,11 +781,11 @@ module tb_range_bin_decimator;
         check(wd_pulse_count == 1, "15b: watchdog_timeout pulsed once in ST_SKIP");
 
         // Recovery: feed full frame with start_bin=0
-        start_bin = 10'd0;
+        start_bin = 11'd0;
         start_capture;
         feed_ramp;
         stop_capture;
-        check(cap_count == OUTPUT_BINS, "15b: 64 outputs after ST_SKIP watchdog recovery");
+        check(cap_count == OUTPUT_BINS, "15b: 512 outputs after ST_SKIP watchdog recovery");
 
         // 15c: Normal operation should NOT trigger watchdog.
         //      Short gaps (20 clocks) are well under the 256 limit.
@@ -797,7 +793,7 @@ module tb_range_bin_decimator;
         apply_reset;
         wd_pulse_count = 0;
         decimation_mode = 2'b01;
-        start_bin = 10'd0;
+        start_bin = 11'd0;
 
         start_capture;
         // Reuse the gap-feed pattern from Test Group 10: gaps of 20 cycles every 50 samples
@@ -824,7 +820,7 @@ module tb_range_bin_decimator;
         stop_capture;
 
         check(wd_pulse_count == 0, "15c: No watchdog timeout with 20-cycle gaps");
-        check(cap_count == OUTPUT_BINS, "15c: Still outputs 64 bins with gaps");
+        check(cap_count == OUTPUT_BINS, "15c: Still outputs 512 bins with gaps");
 
         // 15d: Watchdog does NOT fire in ST_IDLE (no false trigger when idle).
         $display("  15d: No false watchdog in ST_IDLE");

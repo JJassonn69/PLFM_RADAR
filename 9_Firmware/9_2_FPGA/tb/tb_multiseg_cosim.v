@@ -56,10 +56,8 @@ reg [5:0] chirp_counter;
 reg mc_new_chirp;
 reg mc_new_elevation;
 reg mc_new_azimuth;
-reg [15:0] long_chirp_real;
-reg [15:0] long_chirp_imag;
-reg [15:0] short_chirp_real;
-reg [15:0] short_chirp_imag;
+reg [15:0] ref_chirp_real;
+reg [15:0] ref_chirp_imag;
 reg mem_ready;
 
 wire signed [15:0] pc_i_w;
@@ -84,10 +82,8 @@ matched_filter_multi_segment dut (
     .mc_new_chirp(mc_new_chirp),
     .mc_new_elevation(mc_new_elevation),
     .mc_new_azimuth(mc_new_azimuth),
-    .long_chirp_real(long_chirp_real),
-    .long_chirp_imag(long_chirp_imag),
-    .short_chirp_real(short_chirp_real),
-    .short_chirp_imag(short_chirp_imag),
+    .ref_chirp_real(ref_chirp_real),
+    .ref_chirp_imag(ref_chirp_imag),
     .segment_request(segment_request),
     .sample_addr_out(sample_addr_out),
     .mem_request(mem_request),
@@ -123,11 +119,11 @@ end
 always @(posedge clk) begin
     if (mem_request) begin
         if (use_long_chirp) begin
-            long_chirp_real <= ref_mem_i[{segment_request, sample_addr_out}];
-            long_chirp_imag <= ref_mem_q[{segment_request, sample_addr_out}];
+            ref_chirp_real <= ref_mem_i[{segment_request, sample_addr_out}];
+            ref_chirp_imag <= ref_mem_q[{segment_request, sample_addr_out}];
         end else begin
-            short_chirp_real <= ref_mem_i[sample_addr_out];
-            short_chirp_imag <= ref_mem_q[sample_addr_out];
+            ref_chirp_real <= ref_mem_i[sample_addr_out];
+            ref_chirp_imag <= ref_mem_q[sample_addr_out];
         end
         mem_ready <= 1'b1;
     end else begin
@@ -176,10 +172,8 @@ task apply_reset;
         mc_new_chirp <= 1'b0;
         mc_new_elevation <= 1'b0;
         mc_new_azimuth <= 1'b0;
-        long_chirp_real <= 16'd0;
-        long_chirp_imag <= 16'd0;
-        short_chirp_real <= 16'd0;
-        short_chirp_imag <= 16'd0;
+        ref_chirp_real <= 16'd0;
+        ref_chirp_imag <= 16'd0;
         mem_ready <= 1'b0;
         repeat(10) @(posedge clk);
         reset_n <= 1'b1;

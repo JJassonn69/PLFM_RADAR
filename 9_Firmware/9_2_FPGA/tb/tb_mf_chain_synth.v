@@ -28,10 +28,8 @@ module tb_mf_chain_synth;
     reg  [15:0] adc_data_q;
     reg         adc_valid;
     reg  [5:0]  chirp_counter;
-    reg  [15:0] long_chirp_real;
-    reg  [15:0] long_chirp_imag;
-    reg  [15:0] short_chirp_real;
-    reg  [15:0] short_chirp_imag;
+    reg  [15:0] ref_chirp_real;
+    reg  [15:0] ref_chirp_imag;
     wire signed [15:0] range_profile_i;
     wire signed [15:0] range_profile_q;
     wire        range_profile_valid;
@@ -78,10 +76,8 @@ module tb_mf_chain_synth;
         .adc_data_q       (adc_data_q),
         .adc_valid        (adc_valid),
         .chirp_counter    (chirp_counter),
-        .long_chirp_real  (long_chirp_real),
-        .long_chirp_imag  (long_chirp_imag),
-        .short_chirp_real (short_chirp_real),
-        .short_chirp_imag (short_chirp_imag),
+        .ref_chirp_real  (ref_chirp_real),
+        .ref_chirp_imag  (ref_chirp_imag),
         .range_profile_i  (range_profile_i),
         .range_profile_q  (range_profile_q),
         .range_profile_valid (range_profile_valid),
@@ -130,10 +126,8 @@ module tb_mf_chain_synth;
             adc_data_i = 16'd0;
             adc_data_q = 16'd0;
             chirp_counter   = 6'd0;
-            long_chirp_real = 16'd0;
-            long_chirp_imag = 16'd0;
-            short_chirp_real = 16'd0;
-            short_chirp_imag = 16'd0;
+            ref_chirp_real = 16'd0;
+            ref_chirp_imag = 16'd0;
             cap_enable   = 0;
             cap_count    = 0;
             cap_max_abs  = 0;
@@ -177,10 +171,8 @@ module tb_mf_chain_synth;
             for (k = 0; k < FFT_SIZE; k = k + 1) begin
                 adc_data_i       = 16'sh1000;    // +4096
                 adc_data_q       = 16'sh0000;
-                long_chirp_real  = 16'sh1000;
-                long_chirp_imag  = 16'sh0000;
-                short_chirp_real = 16'd0;
-                short_chirp_imag = 16'd0;
+                ref_chirp_real  = 16'sh1000;
+                ref_chirp_imag  = 16'sh0000;
                 adc_valid        = 1'b1;
                 @(posedge clk);
                 #1;
@@ -199,10 +191,8 @@ module tb_mf_chain_synth;
                 angle = 6.28318530718 * tone_bin * k / (1.0 * FFT_SIZE);
                 adc_data_i      = $rtoi(8000.0 * $cos(angle));
                 adc_data_q      = $rtoi(8000.0 * $sin(angle));
-                long_chirp_real = $rtoi(8000.0 * $cos(angle));
-                long_chirp_imag = $rtoi(8000.0 * $sin(angle));
-                short_chirp_real = 16'd0;
-                short_chirp_imag = 16'd0;
+                ref_chirp_real = $rtoi(8000.0 * $cos(angle));
+                ref_chirp_imag = $rtoi(8000.0 * $sin(angle));
                 adc_valid       = 1'b1;
                 @(posedge clk);
                 #1;
@@ -219,16 +209,14 @@ module tb_mf_chain_synth;
                 if (k == 0) begin
                     adc_data_i      = 16'sh4000;   // 0.5 in Q15
                     adc_data_q      = 16'sh0000;
-                    long_chirp_real = 16'sh4000;
-                    long_chirp_imag = 16'sh0000;
+                    ref_chirp_real = 16'sh4000;
+                    ref_chirp_imag = 16'sh0000;
                 end else begin
                     adc_data_i      = 16'sh0000;
                     adc_data_q      = 16'sh0000;
-                    long_chirp_real = 16'sh0000;
-                    long_chirp_imag = 16'sh0000;
+                    ref_chirp_real = 16'sh0000;
+                    ref_chirp_imag = 16'sh0000;
                 end
-                short_chirp_real = 16'd0;
-                short_chirp_imag = 16'd0;
                 adc_valid       = 1'b1;
                 @(posedge clk);
                 #1;
@@ -309,10 +297,8 @@ module tb_mf_chain_synth;
         for (i = 0; i < FFT_SIZE; i = i + 1) begin
             adc_data_i       = 16'd0;
             adc_data_q       = 16'd0;
-            long_chirp_real  = 16'd0;
-            long_chirp_imag  = 16'd0;
-            short_chirp_real = 16'd0;
-            short_chirp_imag = 16'd0;
+            ref_chirp_real  = 16'd0;
+            ref_chirp_imag  = 16'd0;
             adc_valid        = 1'b1;
             @(posedge clk); #1;
         end
@@ -379,10 +365,8 @@ module tb_mf_chain_synth;
         for (i = 0; i < 512; i = i + 1) begin
             adc_data_i       = 16'sh1000;
             adc_data_q       = 16'sh0000;
-            long_chirp_real  = 16'sh1000;
-            long_chirp_imag  = 16'sh0000;
-            short_chirp_real = 16'd0;
-            short_chirp_imag = 16'd0;
+            ref_chirp_real  = 16'sh1000;
+            ref_chirp_imag  = 16'sh0000;
             adc_valid        = 1'b1;
             @(posedge clk); #1;
         end
@@ -439,10 +423,8 @@ module tb_mf_chain_synth;
         for (i = 0; i < FFT_SIZE; i = i + 1) begin
             adc_data_i      = $rtoi(8000.0 * $cos(6.28318530718 * 5 * i / 1024.0));
             adc_data_q      = $rtoi(8000.0 * $sin(6.28318530718 * 5 * i / 1024.0));
-            long_chirp_real = $rtoi(8000.0 * $cos(6.28318530718 * 10 * i / 1024.0));
-            long_chirp_imag = $rtoi(8000.0 * $sin(6.28318530718 * 10 * i / 1024.0));
-            short_chirp_real = 16'd0;
-            short_chirp_imag = 16'd0;
+            ref_chirp_real = $rtoi(8000.0 * $cos(6.28318530718 * 10 * i / 1024.0));
+            ref_chirp_imag = $rtoi(8000.0 * $sin(6.28318530718 * 10 * i / 1024.0));
             adc_valid       = 1'b1;
             @(posedge clk); #1;
         end
@@ -469,10 +451,8 @@ module tb_mf_chain_synth;
         for (i = 0; i < FFT_SIZE; i = i + 1) begin
             adc_data_i       = 16'sh7FFF;
             adc_data_q       = 16'sh7FFF;
-            long_chirp_real  = 16'sh7FFF;
-            long_chirp_imag  = 16'sh7FFF;
-            short_chirp_real = 16'd0;
-            short_chirp_imag = 16'd0;
+            ref_chirp_real  = 16'sh7FFF;
+            ref_chirp_imag  = 16'sh7FFF;
             adc_valid        = 1'b1;
             @(posedge clk); #1;
         end
@@ -495,10 +475,8 @@ module tb_mf_chain_synth;
         for (i = 0; i < FFT_SIZE; i = i + 1) begin
             adc_data_i       = 16'sh1000;
             adc_data_q       = 16'sh0000;
-            long_chirp_real  = 16'sh1000;
-            long_chirp_imag  = 16'sh0000;
-            short_chirp_real = 16'd0;
-            short_chirp_imag = 16'd0;
+            ref_chirp_real  = 16'sh1000;
+            ref_chirp_imag  = 16'sh0000;
             adc_valid        = 1'b1;
             @(posedge clk); #1;
 

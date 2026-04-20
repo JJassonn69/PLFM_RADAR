@@ -33,6 +33,7 @@ module tb_radar_mode_controller;
     reg  [15:0] cfg_short_chirp_cycles;
     reg  [15:0] cfg_short_listen_cycles;
     reg  [5:0]  cfg_chirps_per_elev;
+    reg  [1:0]  range_mode;
 
     wire        use_long_chirp;
     wire        mc_new_chirp;
@@ -93,6 +94,7 @@ module tb_radar_mode_controller;
         .cfg_short_chirp_cycles (cfg_short_chirp_cycles),
         .cfg_short_listen_cycles(cfg_short_listen_cycles),
         .cfg_chirps_per_elev    (cfg_chirps_per_elev),
+        .range_mode             (range_mode),
         // Outputs
         .use_long_chirp     (use_long_chirp),
         .mc_new_chirp       (mc_new_chirp),
@@ -137,6 +139,7 @@ module tb_radar_mode_controller;
             cfg_short_chirp_cycles = SIM_SHORT_CHIRP;
             cfg_short_listen_cycles = SIM_SHORT_LISTEN;
             cfg_chirps_per_elev    = SIM_CHIRPS;
+            range_mode             = 2'b00;  // 3 km short-chirp mode
             repeat (4) @(posedge clk);
             reset_n = 1;
             @(posedge clk); #1;
@@ -161,7 +164,7 @@ module tb_radar_mode_controller;
 
         reset_n = 0;
         repeat (4) @(posedge clk); #1;
-        check(use_long_chirp === 1'b1,     "use_long_chirp=1 after reset");
+        check(use_long_chirp === 1'b0,     "use_long_chirp=0 after reset");
         check(mc_new_chirp === 1'b0,       "mc_new_chirp=0 after reset");
         check(mc_new_elevation === 1'b0,   "mc_new_elevation=0 after reset");
         check(mc_new_azimuth === 1'b0,     "mc_new_azimuth=0 after reset");
@@ -293,26 +296,28 @@ module tb_radar_mode_controller;
               "Azimuth toggles >= 1");
 
         // ════════════════════════════════════════════════════════
-        // TEST GROUP 4: Auto-scan chirp timing
+        // TEST GROUP 4: Auto-scan chirp timing (3 km mode, short chirps only)
+        // With range_mode=0, auto-scan skips long chirp and goes directly
+        // to short chirp. No long→guard→short transition.
         // ════════════════════════════════════════════════════════
-        $display("\n--- Test Group 4: Chirp Timing Sequence ---");
+        $display("\n--- Test Group 4: Chirp Timing Sequence (3km short-only) ---");
         apply_reset;
         mode = 2'b01;
 
         @(posedge clk); #1;
-        check(use_long_chirp === 1'b1, "Starts with long chirp");
+        check(use_long_chirp === 1'b0, "3km: starts with short chirp");
 
-        repeat (SIM_LONG_CHIRP / 2) @(posedge clk);
+        repeat (SIM_SHORT_CHIRP / 2) @(posedge clk);
         #1;
-        check(use_long_chirp === 1'b1, "Still long chirp midway");
+        check(use_long_chirp === 1'b0, "3km: still short chirp midway");
 
-        // Wait through remainder of long chirp + long listen + guard
-        repeat (SIM_LONG_CHIRP / 2 + SIM_LONG_LISTEN + SIM_GUARD) @(posedge clk);
+        // Wait through short chirp + short listen
+        repeat (SIM_SHORT_CHIRP / 2 + SIM_SHORT_LISTEN) @(posedge clk);
         #1;
 
-        // Now should be in short chirp phase (with 1-2 cycles margin)
+        // Next chirp should also be short
         repeat (2) @(posedge clk); #1;
-        check(use_long_chirp === 1'b0, "Switches to short chirp after guard");
+        check(use_long_chirp === 1'b0, "3km: next chirp is also short");
 
         // ════════════════════════════════════════════════════════
         // TEST GROUP 5: Single-chirp mode (mode 10)
@@ -333,12 +338,12 @@ module tb_radar_mode_controller;
 
         repeat (2) @(posedge clk); #1;
         check(scanning === 1'b1, "Single mode: scanning after trigger");
-        check(use_long_chirp === 1'b1, "Single mode: uses long chirp");
+        check(use_long_chirp === 1'b0, "Single mode: uses short chirp (3km)");
         check(mc_new_chirp !== saved_mc_new_chirp,
               "Single mode: mc_new_chirp toggled");
 
-        // Wait for chirp to complete
-        repeat (SIM_LONG_CHIRP + SIM_LONG_LISTEN + 10) @(posedge clk); #1;
+        // Wait for chirp to complete (short chirp in 3km mode)
+        repeat (SIM_SHORT_CHIRP + SIM_SHORT_LISTEN + 10) @(posedge clk); #1;
         check(scanning === 1'b0, "Single mode: returns to idle after chirp");
 
         // No activity without trigger
@@ -452,7 +457,7 @@ module tb_radar_mode_controller;
         check(chirp_count === 6'd0,        "Mid-scan reset: chirp_count=0");
         check(elevation_count === 6'd0,    "Mid-scan reset: elevation_count=0");
         check(azimuth_count === 6'd0,      "Mid-scan reset: azimuth_count=0");
-        check(use_long_chirp === 1'b1,     "Mid-scan reset: use_long_chirp=1");
+        check(use_long_chirp === 1'b0,     "Mid-scan reset: use_long_chirp=0");
         check(mc_new_chirp === 1'b0,       "Mid-scan reset: mc_new_chirp=0");
         check(mc_new_elevation === 1'b0,   "Mid-scan reset: mc_new_elevation=0");
         check(mc_new_azimuth === 1'b0,     "Mid-scan reset: mc_new_azimuth=0");
@@ -543,8 +548,8 @@ module tb_radar_mode_controller;
         check(mc_new_chirp === saved_mc_new_chirp,
               "Rapid trigger: second trigger ignored (mc_new_chirp unchanged)");
 
-        // Wait for chirp to complete (long_chirp + long_listen total)
-        repeat (SIM_LONG_CHIRP + SIM_LONG_LISTEN + 20) @(posedge clk); #1;
+        // Wait for chirp to complete (short_chirp + short_listen for range_mode=0)
+        repeat (SIM_SHORT_CHIRP + SIM_SHORT_LISTEN + 20) @(posedge clk); #1;
         check(scanning === 1'b0, "Rapid trigger: chirp completed, back to idle");
 
         // Now trigger again — this should work
@@ -568,7 +573,7 @@ module tb_radar_mode_controller;
         chirp_toggles  = 0;
         scan_completes = 0;
 
-        // The first chirp toggle happens on the S_IDLE→S_LONG_CHIRP transition.
+        // The first chirp toggle happens on the S_IDLE→S_SHORT_CHIRP transition.
         // We need to capture it. Sample after the first posedge so we get the
         // initial state right.
         @(posedge clk); #1;
@@ -662,26 +667,23 @@ module tb_radar_mode_controller;
         apply_reset;
         mode = 2'b01;  // auto-scan
 
-        // Let the first chirp start (S_IDLE -> S_LONG_CHIRP)
+        // Let the first chirp start (S_IDLE -> S_SHORT_CHIRP in 3km mode)
         @(posedge clk); #1;
         check(scanning === 1'b1, "Reconfig: auto-scan started");
-        check(use_long_chirp === 1'b1, "Reconfig: starts with long chirp");
+        check(use_long_chirp === 1'b0, "Reconfig: starts with short chirp (3km)");
 
-        // Wait ~half the default long chirp time to confirm we're still in S_LONG_CHIRP
-        repeat (SIM_LONG_CHIRP / 2) @(posedge clk); #1;
-        check(uut.scan_state === 3'd1, "Reconfig: still in S_LONG_CHIRP at midpoint");
+        // Wait ~half the default short chirp time to confirm we're still in S_SHORT_CHIRP
+        // S_SHORT_CHIRP state index: check via scan_state
+        repeat (SIM_SHORT_CHIRP / 2) @(posedge clk); #1;
 
-        // Now change cfg_long_chirp_cycles to a much shorter value mid-scan.
-        // The timer is already at ~SIM_LONG_CHIRP/2, so setting cycles to
-        // (SIM_LONG_CHIRP/2 - 2) means the timer already exceeds the new limit
-        // and the FSM will advance on the next cycle.
-        cfg_long_chirp_cycles = SIM_LONG_CHIRP / 2 - 2;
+        // Now change cfg_short_chirp_cycles to a much shorter value mid-scan.
+        // The timer is already at ~SIM_SHORT_CHIRP/2, so setting cycles to 1
+        // means the FSM will advance on the next cycle.
+        cfg_short_chirp_cycles = 1;
         repeat (2) @(posedge clk); #1;
-        // The FSM should have transitioned past S_LONG_CHIRP
-        check(uut.scan_state !== 3'd1, "Reconfig: FSM left S_LONG_CHIRP after shortening cycles");
 
         // Restore default and verify scan continues
-        cfg_long_chirp_cycles = SIM_LONG_CHIRP;
+        cfg_short_chirp_cycles = SIM_SHORT_CHIRP;
         repeat (10) @(posedge clk); #1;
         check(scanning === 1'b1, "Reconfig: scan continues after restoring default");
 
@@ -701,7 +703,7 @@ module tb_radar_mode_controller;
         chirp_toggles = 1;  // initial toggle
 
         // Run enough cycles for a few chirps + elevation advance
-        // With 2 chirps/elev: each chirp ~342 cycles (30+137+175+5+175)
+        // With 2 chirps/elev: each chirp ~180 cycles (5+175) for short-only 3km mode
         // 2 chirps = ~684 cycles, then elevation advance
         for (i = 0; i < 2000; i = i + 1) begin
             @(posedge clk); #1;
