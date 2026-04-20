@@ -9,6 +9,9 @@ module radar_receiver_final (
     input wire [7:0] adc_d_n,        // ADC Data N (LVDS)
     input wire adc_dco_p,            // Data Clock Output P (400MHz LVDS)
     input wire adc_dco_n,            // Data Clock Output N (400MHz LVDS)
+    // Audit F-0.1: AD9484 OR (overrange) LVDS pair
+    input wire adc_or_p,
+    input wire adc_or_n,
 	 output wire adc_pwdn,
     
     // Chirp counter from transmitter (for matched filter indexing)
@@ -206,17 +209,42 @@ wire adc_valid;            // Data valid signal
 // ADC power-down control (directly tie low = ADC always on)
 assign adc_pwdn = 1'b0;
 
+wire adc_overrange_400m;
 ad9484_interface_400m adc (
 	.adc_d_p(adc_d_p),
 	.adc_d_n(adc_d_n),
 	.adc_dco_p(adc_dco_p),
 	.adc_dco_n(adc_dco_n),
+	.adc_or_p(adc_or_p),
+	.adc_or_n(adc_or_n),
 	.sys_clk(clk),
 	.reset_n(reset_n),
 	.adc_data_400m(adc_data_cmos),
 	.adc_data_valid_400m(adc_valid),
-	.adc_dco_bufg(clk_400m)
+	.adc_dco_bufg(clk_400m),
+	.adc_overrange_400m(adc_overrange_400m)
 );
+
+// Audit F-0.1: stickify the 400 MHz OR pulse, then CDC to clk_100m via 2FF.
+// Same reasoning as ddc_cic_fir_overrun: single-bit, low→high-only once
+// latched, so a 2FF sync is sufficient for a GPIO-class diagnostic. Cleared
+// only by global reset_n.
+reg adc_overrange_sticky_400m;
+always @(posedge clk_400m or negedge reset_n) begin
+    if (!reset_n)
+        adc_overrange_sticky_400m <= 1'b0;
+    else if (adc_overrange_400m)
+        adc_overrange_sticky_400m <= 1'b1;
+end
+
+(* ASYNC_REG = "TRUE" *) reg [1:0] adc_overrange_sync_100m;
+always @(posedge clk or negedge reset_n) begin
+    if (!reset_n)
+        adc_overrange_sync_100m <= 2'b00;
+    else
+        adc_overrange_sync_100m <= {adc_overrange_sync_100m[0], adc_overrange_sticky_400m};
+end
+wire adc_overrange_100m = adc_overrange_sync_100m[1];
 
 // NOTE: The cdc_adc_to_processing instance that was here used src_clk=dst_clk=clk_400m
 // (same clock domain — no crossing). Gray-code CDC on same-clock with fast-changing
@@ -270,7 +298,9 @@ ddc_400m_enhanced ddc(
     .cdc_cic_fir_overrun(ddc_cic_fir_overrun)
 );
 
-assign ddc_overflow_any     = ddc_mixer_saturation | ddc_filter_overflow;
+// Audit F-0.1: AD9484 overrange aggregated here so a single gpio_dig bit
+// covers DDC-internal saturation, FIR overflow, AND raw ADC clipping.
+assign ddc_overflow_any     = ddc_mixer_saturation | ddc_filter_overflow | adc_overrange_100m;
 assign ddc_saturation_count = ddc_diagnostics_w[7:5];
 
 ddc_input_interface ddc_if (
