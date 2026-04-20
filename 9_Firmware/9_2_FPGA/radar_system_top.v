@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+`include "radar_params.vh"
+
 /**
  * radar_system_top.v
  * 
@@ -125,7 +127,7 @@ module radar_system_top (
     output wire [31:0] dbg_doppler_data,
     output wire dbg_doppler_valid,
     output wire [4:0] dbg_doppler_bin,
-    output wire [5:0] dbg_range_bin,
+    output wire [`RP_RANGE_BIN_BITS-1:0] dbg_range_bin,
     
     // System status
     output wire [3:0] system_status,
@@ -179,9 +181,11 @@ wire tx_current_chirp_sync_valid;
 wire [31:0] rx_doppler_output;
 wire rx_doppler_valid;
 wire [4:0] rx_doppler_bin;
-wire [5:0] rx_range_bin;
+wire [`RP_RANGE_BIN_BITS-1:0] rx_range_bin;
 wire [31:0] rx_range_profile;
 wire rx_range_valid;
+wire [15:0] rx_range_profile_decimated;
+wire rx_range_profile_decimated_valid;
 wire [15:0] rx_doppler_real;
 wire [15:0] rx_doppler_imag;
 wire rx_doppler_data_valid;
@@ -239,7 +243,7 @@ wire [15:0] usb_cmd_value;
 reg [1:0]  host_radar_mode;
 reg        host_trigger_pulse;
 reg [15:0] host_detect_threshold;  // (was host_cfar_threshold)
-reg [2:0]  host_stream_control;
+reg [5:0]  host_stream_control;
 
 // Fix 3: Digital gain control register
 // [3]=direction: 0=amplify, 1=attenuate. [2:0]=shift amount 0..7.
@@ -266,13 +270,12 @@ reg        host_status_request;       // Opcode 0xFF (self-clearing pulse)
 localparam DOPPLER_FRAME_CHIRPS = 32; // Total chirps per Doppler frame
 reg        chirps_mismatch_error;     // Set if host tried to set chirps != FFT size
 
-// Fix 7: Range-mode register (opcode 0x20)
-// Future-proofing for 3km/10km antenna switching.
-//   2'b00 = Auto (default — system selects based on scene)
-//   2'b01 = Short-range (3km)
-//   2'b10 = Long-range (10km)
+// Range-mode register (opcode 0x20)
+// Controls chirp type selection in the mode controller:
+//   2'b00 = 3 km mode (all short chirps — long blind zone > max range)
+//   2'b01 = Long-range (dual chirp: first half long, second half short)
+//   2'b10 = Reserved
 //   2'b11 = Reserved
-// Currently a configuration store only — antenna/timing switching TBD.
 reg [1:0]  host_range_mode;
 
 // CFAR configuration registers (host-configurable via USB)
@@ -539,14 +542,16 @@ radar_receiver_final rx_inst (
     .doppler_bin(rx_doppler_bin),
     .range_bin(rx_range_bin),
     
-    // Matched filter range profile (for USB)
+    // Range-profile outputs
     .range_profile_i_out(rx_range_profile[15:0]),
     .range_profile_q_out(rx_range_profile[31:16]),
     .range_profile_valid_out(rx_range_valid),
+    .decimated_range_mag_out(rx_range_profile_decimated),
+    .decimated_range_valid_out(rx_range_profile_decimated_valid),
     
-    // Host command inputs (Gap 4: USB Read Path)
     .host_mode(host_radar_mode),
     .host_trigger(host_trigger_pulse),
+    .host_range_mode(host_range_mode),
     // Gap 2: Host-configurable chirp timing
     .host_long_chirp_cycles(host_long_chirp_cycles),
     .host_long_listen_cycles(host_long_listen_cycles),
@@ -624,7 +629,7 @@ assign dc_notch_active = (host_dc_notch_width != 3'd0) &&
 wire [31:0] notched_doppler_data  = dc_notch_active ? 32'd0 : rx_doppler_output;
 wire        notched_doppler_valid = rx_doppler_valid;
 wire [4:0]  notched_doppler_bin   = rx_doppler_bin;
-wire [5:0]  notched_range_bin     = rx_range_bin;
+wire [`RP_RANGE_BIN_BITS-1:0]  notched_range_bin     = rx_range_bin;
 
 // ============================================================================
 // CFAR DETECTOR (replaces simple threshold detector)
@@ -635,7 +640,7 @@ wire [5:0]  notched_range_bin     = rx_range_bin;
 
 wire cfar_detect_flag;
 wire cfar_detect_valid;
-wire [5:0]  cfar_detect_range;
+wire [`RP_RANGE_BIN_BITS-1:0]  cfar_detect_range;
 wire [4:0]  cfar_detect_doppler;
 wire [16:0] cfar_detect_magnitude;
 wire [16:0] cfar_detect_threshold;
@@ -726,9 +731,10 @@ end
 // DATA PACKING FOR USB
 // ============================================================================
 
-// Range profile from matched filter output (wired through radar_receiver_final)
-assign usb_range_profile = rx_range_profile;
-assign usb_range_valid = rx_range_valid;
+// USB range profile must match the advertised 512-bin frame payload, so source it
+// from the decimated range stream that feeds Doppler rather than raw MF samples.
+assign usb_range_profile = {16'd0, rx_range_profile_decimated};
+assign usb_range_valid = rx_range_profile_decimated_valid;
 
 assign usb_doppler_real = rx_doppler_real;
 assign usb_doppler_imag = rx_doppler_imag;
@@ -830,6 +836,11 @@ end else begin : gen_ft2232h
         .doppler_valid(usb_doppler_valid),
         .cfar_detection(usb_detect_flag),
         .cfar_valid(usb_detect_valid),
+
+        // Bulk frame protocol inputs
+        .range_bin_in(notched_range_bin),
+        .doppler_bin_in(notched_doppler_bin),
+        .frame_complete(rx_frame_complete),
 
         // FT2232H Interface
         .ft_data(ft_data),
@@ -952,7 +963,7 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
         host_radar_mode    <= 2'b01;   // Default: auto-scan
         host_trigger_pulse <= 1'b0;
         host_detect_threshold <= 16'd10000; // Default threshold
-        host_stream_control <= 3'b111;    // Default: all streams enabled
+        host_stream_control <= `RP_STREAM_CTRL_DEFAULT; // Default: all streams, mag-only mode
         host_gain_shift     <= 4'd0;      // Default: pass-through (no gain change)
         // Gap 2: chirp timing defaults (match radar_mode_controller parameters)
         host_long_chirp_cycles  <= 16'd3000;
@@ -963,7 +974,7 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
         host_chirps_per_elev    <= 6'd32;
         host_status_request     <= 1'b0;
         chirps_mismatch_error   <= 1'b0;
-        host_range_mode         <= 2'b00;     // Default: auto
+        host_range_mode         <= 2'b00;     // Default: 3 km mode (all short chirps)
         // CFAR defaults (disabled by default — backward-compatible)
         host_cfar_guard         <= 4'd2;      // 2 guard cells each side
         host_cfar_train         <= 5'd8;      // 8 training cells each side
@@ -990,7 +1001,7 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
                 8'h01: host_radar_mode     <= usb_cmd_value[1:0];
                 8'h02: host_trigger_pulse  <= 1'b1;
                 8'h03: host_detect_threshold <= usb_cmd_value;
-                8'h04: host_stream_control <= usb_cmd_value[2:0];
+                8'h04: host_stream_control <= usb_cmd_value[5:0];
                 // Gap 2: chirp timing configuration
                 8'h10: host_long_chirp_cycles  <= usb_cmd_value;
                 8'h11: host_long_listen_cycles <= usb_cmd_value;
@@ -1013,7 +1024,7 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
                     end
                 end
                 8'h16: host_gain_shift         <= usb_cmd_value[3:0];  // Fix 3: digital gain
-                8'h20: host_range_mode         <= usb_cmd_value[1:0];  // Fix 7: range mode
+                8'h20: host_range_mode         <= usb_cmd_value[1:0];  // Range mode
                 // CFAR configuration opcodes
                 8'h21: host_cfar_guard         <= usb_cmd_value[3:0];
                 8'h22: host_cfar_train         <= usb_cmd_value[4:0];

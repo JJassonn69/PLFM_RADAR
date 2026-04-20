@@ -265,10 +265,140 @@ run_lint_static() {
 }
 
 # ---------------------------------------------------------------------------
+# Helper: compile, run, and compare a matched-filter co-sim scenario
+#   run_mf_cosim <scenario_name> <define_flag>
+# ---------------------------------------------------------------------------
+run_mf_cosim() {
+    local name="$1"
+    local define="$2"
+    local vvp="tb/tb_mf_cosim_${name}.vvp"
+    local scenario_lower="$name"
+
+    printf "  %-45s " "MF Co-Sim ($name)"
+
+    # Compile — build command as string to handle optional define
+    local cmd="iverilog -g2001 -DSIMULATION"
+    if [[ -n "$define" ]]; then
+        cmd="$cmd $define"
+    fi
+    cmd="$cmd -o $vvp tb/tb_mf_cosim.v matched_filter_processing_chain.v fft_engine.v chirp_memory_loader_param.v"
+
+    if ! eval "$cmd" 2>/tmp/iverilog_err_$$; then
+        echo -e "${RED}COMPILE FAIL${NC}"
+        ERRORS="$ERRORS\n  MF Co-Sim ($name): compile error ($(head -1 /tmp/iverilog_err_$$))"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+
+    # Run TB
+    local output
+    output=$(timeout 120 vvp "$vvp" 2>&1) || true
+    rm -f "$vvp"
+
+    # Check TB internal pass/fail
+    local tb_fail
+    tb_fail=$(echo "$output" | grep -Ec '^\[FAIL' || true)
+    if [[ "$tb_fail" -gt 0 ]]; then
+        echo -e "${RED}FAIL${NC} (TB internal failure)"
+        ERRORS="$ERRORS\n  MF Co-Sim ($name): TB internal failure"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+
+    # Run Python compare
+    if command -v python3 >/dev/null 2>&1; then
+        local compare_out
+        local compare_rc=0
+        compare_out=$(python3 tb/cosim/compare_mf.py "$scenario_lower" 2>&1) || compare_rc=$?
+        if [[ "$compare_rc" -ne 0 ]]; then
+            echo -e "${RED}FAIL${NC} (compare_mf.py mismatch)"
+            ERRORS="$ERRORS\n  MF Co-Sim ($name): Python compare failed"
+            FAIL=$((FAIL + 1))
+            return
+        fi
+    else
+        echo -e "${YELLOW}SKIP${NC} (RTL passed, python3 not found — compare skipped)"
+        SKIP=$((SKIP + 1))
+        return
+    fi
+
+    echo -e "${GREEN}PASS${NC} (RTL + Python compare)"
+    PASS=$((PASS + 1))
+}
+
+# ---------------------------------------------------------------------------
+# Helper: compile, run, and compare a Doppler co-sim scenario
+#   run_doppler_cosim <scenario_name> <define_flag>
+# ---------------------------------------------------------------------------
+run_doppler_cosim() {
+    local name="$1"
+    local define="$2"
+    local vvp="tb/tb_doppler_cosim_${name}.vvp"
+
+    printf "  %-45s " "Doppler Co-Sim ($name)"
+
+    # Compile — build command as string to handle optional define
+    local cmd="iverilog -g2001 -DSIMULATION"
+    if [[ -n "$define" ]]; then
+        cmd="$cmd $define"
+    fi
+    cmd="$cmd -o $vvp tb/tb_doppler_cosim.v doppler_processor.v xfft_16.v fft_engine.v"
+
+    if ! eval "$cmd" 2>/tmp/iverilog_err_$$; then
+        echo -e "${RED}COMPILE FAIL${NC}"
+        ERRORS="$ERRORS\n  Doppler Co-Sim ($name): compile error ($(head -1 /tmp/iverilog_err_$$))"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+
+    # Run TB
+    local output
+    output=$(timeout 120 vvp "$vvp" 2>&1) || true
+    rm -f "$vvp"
+
+    # Check TB internal pass/fail
+    local tb_fail
+    tb_fail=$(echo "$output" | grep -Ec '^\[FAIL' || true)
+    if [[ "$tb_fail" -gt 0 ]]; then
+        echo -e "${RED}FAIL${NC} (TB internal failure)"
+        ERRORS="$ERRORS\n  Doppler Co-Sim ($name): TB internal failure"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+
+    # Run Python compare
+    if command -v python3 >/dev/null 2>&1; then
+        local compare_out
+        local compare_rc=0
+        compare_out=$(python3 tb/cosim/compare_doppler.py "$name" 2>&1) || compare_rc=$?
+        if [[ "$compare_rc" -ne 0 ]]; then
+            echo -e "${RED}FAIL${NC} (compare_doppler.py mismatch)"
+            ERRORS="$ERRORS\n  Doppler Co-Sim ($name): Python compare failed"
+            FAIL=$((FAIL + 1))
+            return
+        fi
+    else
+        echo -e "${YELLOW}SKIP${NC} (RTL passed, python3 not found — compare skipped)"
+        SKIP=$((SKIP + 1))
+        return
+    fi
+
+    echo -e "${GREEN}PASS${NC} (RTL + Python compare)"
+    PASS=$((PASS + 1))
+}
+
+# ---------------------------------------------------------------------------
 # Helper: compile and run a single testbench
 #   run_test <name> <vvp_path> <iverilog_args...>
 # ---------------------------------------------------------------------------
 run_test() {
+    # Optional: --timeout=N as first arg overrides default 120s
+    local timeout_secs=120
+    if [[ "$1" == --timeout=* ]]; then
+        timeout_secs="${1#--timeout=}"
+        shift
+    fi
+
     local name="$1"
     local vvp="$2"
     shift 2
@@ -286,7 +416,7 @@ run_test() {
 
     # Run
     local output
-    output=$(timeout 120 vvp "$vvp" 2>&1) || true
+    output=$(timeout "$timeout_secs" vvp "$vvp" 2>&1) || true
 
     # Count PASS/FAIL in output (testbenches use explicit [PASS]/[FAIL] markers)
     local test_pass test_fail
@@ -378,9 +508,9 @@ run_test "Chirp Contract" \
     tb/tb_chirp_ctr_reg.vvp \
     tb/tb_chirp_contract.v plfm_chirp_controller.v
 
-run_test "Doppler Processor (DSP48)" \
-    tb/tb_doppler_reg.vvp \
-    tb/tb_doppler_cosim.v doppler_processor.v xfft_16.v fft_engine.v
+run_doppler_cosim "stationary"   ""
+run_doppler_cosim "moving"       "-DSCENARIO_MOVING"
+run_doppler_cosim "two_targets"  "-DSCENARIO_TWO"
 
 run_test "Threshold Detector (detection bugs)" \
     tb/tb_threshold_detector.vvp \
@@ -427,15 +557,16 @@ run_test "Full-Chain Real-Data (decim→Doppler, exact match)" \
     doppler_processor.v xfft_16.v fft_engine.v
 
 if [[ "$QUICK" -eq 0 ]]; then
-    # Golden generate
-    run_test "Receiver (golden generate)" \
-        tb/tb_rx_golden_reg.vvp \
-        -DGOLDEN_GENERATE \
-        tb/tb_radar_receiver_final.v "${RECEIVER_RTL[@]}"
-
-    # Golden compare
-    run_test "Receiver (golden compare)" \
-        tb/tb_rx_compare_reg.vvp \
+    # Receiver integration (structural + bounds + pulse assertions).
+    # Replaces the earlier "Receiver golden generate/compare" pair, which was
+    # self-blessing (both passes ran identical RTL on identical stimulus, so
+    # it passed regardless of bugs). Real co-sim coverage is now provided by
+    # tb_doppler_realdata.v and tb_fullchain_realdata.v (Python goldens,
+    # exact match); this integration test exercises the full RX pipeline
+    # (ADC stub → DDC → MF → Decim → Doppler) and verifies that
+    # doppler_frame_done is a single-cycle pulse at module boundaries.
+    run_test --timeout=600 "Receiver Integration (tb_radar_receiver_final)" \
+        tb/tb_rx_final_reg.vvp \
         tb/tb_radar_receiver_final.v "${RECEIVER_RTL[@]}"
 
     # Full system top (monitoring-only, legacy)
@@ -459,9 +590,25 @@ if [[ "$QUICK" -eq 0 ]]; then
         -DUSB_MODE_1 \
         tb/tb_system_e2e.v "${SYSTEM_RTL[@]}"
 else
-    echo "  (skipped receiver golden + system top + E2E — use without --quick)"
-    SKIP=$((SKIP + 6))
+    echo "  (skipped receiver integration + system top + E2E + USB_MODE=1 variants — use without --quick)"
+    SKIP=$((SKIP + 5))
 fi
+
+echo ""
+
+# ===========================================================================
+# PHASE 2b: MATCHED FILTER CO-SIMULATION (RTL vs Python golden reference)
+# Runs tb_mf_cosim.v for 4 scenarios, then compare_mf.py validates output
+# against committed Python golden CSV files. In SIMULATION mode, thresholds
+# are generous (behavioral vs fixed-point twiddles differ) — validates
+# state machine mechanics, output count, and energy sanity.
+# ===========================================================================
+echo "--- PHASE 2b: Matched Filter Co-Sim ---"
+
+run_mf_cosim "chirp"   ""
+run_mf_cosim "dc"      "-DSCENARIO_DC"
+run_mf_cosim "impulse" "-DSCENARIO_IMPULSE"
+run_mf_cosim "tone5"   "-DSCENARIO_TONE5"
 
 echo ""
 
