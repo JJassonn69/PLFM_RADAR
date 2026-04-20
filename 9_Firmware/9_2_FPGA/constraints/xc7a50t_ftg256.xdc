@@ -290,6 +290,22 @@ set_input_delay -clock [get_clocks adc_dco_p] -min 0.2 [get_ports {adc_d_p[*]}]
 set_input_delay -clock [get_clocks adc_dco_p] -max 1.0 -clock_fall [get_ports {adc_d_p[*]}] -add_delay
 set_input_delay -clock [get_clocks adc_dco_p] -min 0.2 -clock_fall [get_ports {adc_d_p[*]}] -add_delay
 
+# --------------------------------------------------------------------------
+# Audit F-0.1: AD9484 OR (overrange) LVDS pair (Bank 14)
+# Schematic RADAR_Main_Board.sch: ADC_OR_P → U42 IO_L19P_T3_A10_D26_14 (M6)
+#                                  ADC_OR_N → U42 IO_L19N_T3_A09_D25_VREF_14 (N6)
+# DDR-sourced by adc_dco_p, same timing class as adc_d_p[*].
+# --------------------------------------------------------------------------
+set_property PACKAGE_PIN M6 [get_ports {adc_or_p}]
+set_property PACKAGE_PIN N6 [get_ports {adc_or_n}]
+set_property IOSTANDARD LVDS_25 [get_ports {adc_or_p}]
+set_property IOSTANDARD LVDS_25 [get_ports {adc_or_n}]
+set_property DIFF_TERM TRUE [get_ports {adc_or_p}]
+set_input_delay -clock [get_clocks adc_dco_p] -max 1.0 [get_ports {adc_or_p}]
+set_input_delay -clock [get_clocks adc_dco_p] -min 0.2 [get_ports {adc_or_p}]
+set_input_delay -clock [get_clocks adc_dco_p] -max 1.0 -clock_fall [get_ports {adc_or_p}] -add_delay
+set_input_delay -clock [get_clocks adc_dco_p] -min 0.2 -clock_fall [get_ports {adc_or_p}] -add_delay
+
 # ============================================================================
 # FT2232H USB 2.0 INTERFACE (Bank 35, VCCO=3.3V)
 # ============================================================================

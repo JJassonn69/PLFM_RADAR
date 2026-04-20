@@ -134,6 +134,22 @@ set_property IOSTANDARD LVDS_25 [get_ports {adc_d_p[*]}]
 set_property IOSTANDARD LVDS_25 [get_ports {adc_d_n[*]}]
 set_property DIFF_TERM TRUE [get_ports {adc_d_p[*]}]
 
+# --------------------------------------------------------------------------
+# Audit F-0.1: AD9484 OR (overrange) LVDS pair
+# The 50T main board schematic routes ADC_OR_P/N to bank-14 pins M6/N6 on
+# xc7a50t-ftg256. The 200T dev-board schematic has NOT been checked yet;
+# adc_or_p/n are declared as top-level ports so the 50T build anchors them
+# cleanly, but the 200T anchor below is a TODO placeholder — synth/impl will
+# error on unplaced IO until the 200T schematic is verified and the PACKAGE_PIN
+# values are set. IOSTANDARD/DIFF_TERM properties stay as-is (same class as
+# adc_d_p).
+# --------------------------------------------------------------------------
+set_property IOSTANDARD LVDS_25 [get_ports {adc_or_p}]
+set_property IOSTANDARD LVDS_25 [get_ports {adc_or_n}]
+set_property DIFF_TERM TRUE [get_ports {adc_or_p}]
+# TODO(F-0.1): set_property PACKAGE_PIN <?> [get_ports {adc_or_p}] after 200T schematic audit
+# TODO(F-0.1): set_property PACKAGE_PIN <?> [get_ports {adc_or_n}] after 200T schematic audit
+
 # ADC Power Down — single-ended, Bank 14 (LVCMOS25 matches bank VCCO)
 # Pin: P20 = IO_0_14
 set_property PACKAGE_PIN P20 [get_ports {adc_pwdn}]

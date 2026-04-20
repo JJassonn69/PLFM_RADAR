@@ -4,15 +4,23 @@ module ad9484_interface_400m (
     input wire [7:0] adc_d_n,        // ADC Data N
     input wire adc_dco_p,            // Data Clock Output P (400MHz)
     input wire adc_dco_n,            // Data Clock Output N (400MHz)
-    
+    // Audit F-0.1: AD9484 OR (overrange) LVDS pair, DDR like data.
+    // Routed on the 50T main board to bank 14 pins M6/N6. Asserts for any
+    // sample whose absolute value exceeds full-scale.
+    input wire adc_or_p,
+    input wire adc_or_n,
+
     // System Interface
     input wire sys_clk,              // 100MHz system clock (for control only)
     input wire reset_n,
-    
+
     // Output at 400MHz domain
     output wire [7:0] adc_data_400m, // ADC data at 400MHz
     output wire adc_data_valid_400m, // Valid at 400MHz
-    output wire adc_dco_bufg         // Buffered 400MHz DCO clock for downstream use
+    output wire adc_dco_bufg,        // Buffered 400MHz DCO clock for downstream use
+    // Audit F-0.1: OR flag, clk_400m domain. High on any sample in the
+    // current 400 MHz cycle where the ADC reports overrange.
+    output wire adc_overrange_400m
 );
 
 // LVDS to single-ended conversion
@@ -165,5 +173,55 @@ end
 
 assign adc_data_400m = adc_data_400m_reg;
 assign adc_data_valid_400m = adc_data_valid_400m_reg;
+
+// ============================================================================
+// Audit F-0.1: AD9484 OR (overrange) capture
+// OR is a DDR LVDS pair (same as data). Buffer it, capture both edges with an
+// IDDR in the BUFIO domain, then OR the two phases into a single clk_400m
+// flag. Register once for stability. No latching — downstream is expected to
+// stickify in its own domain.
+// ============================================================================
+wire adc_or_raw;
+IBUFDS #(
+    .DIFF_TERM("FALSE"),
+    .IOSTANDARD("DEFAULT")
+) ibufds_or (
+    .O(adc_or_raw),
+    .I(adc_or_p),
+    .IB(adc_or_n)
+);
+
+wire adc_or_rise;
+wire adc_or_fall;
+IDDR #(
+    .DDR_CLK_EDGE("SAME_EDGE_PIPELINED"),
+    .INIT_Q1(1'b0),
+    .INIT_Q2(1'b0),
+    .SRTYPE("SYNC")
+) iddr_or (
+    .Q1(adc_or_rise),
+    .Q2(adc_or_fall),
+    .C(adc_dco_bufio),
+    .CE(1'b1),
+    .D(adc_or_raw),
+    .R(1'b0),
+    .S(1'b0)
+);
+
+reg adc_or_rise_bufg;
+reg adc_or_fall_bufg;
+always @(posedge adc_dco_buffered) begin
+    adc_or_rise_bufg <= adc_or_rise;
+    adc_or_fall_bufg <= adc_or_fall;
+end
+
+reg adc_overrange_r;
+always @(posedge adc_dco_buffered or negedge reset_n_400m) begin
+    if (!reset_n_400m)
+        adc_overrange_r <= 1'b0;
+    else
+        adc_overrange_r <= adc_or_rise_bufg | adc_or_fall_bufg;
+end
+assign adc_overrange_400m = adc_overrange_r;
 
 endmodule

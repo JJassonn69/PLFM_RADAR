@@ -67,6 +67,9 @@ module radar_system_top (
     input wire [7:0] adc_d_n,            // ADC Data N (LVDS)
     input wire adc_dco_p,                 // Data Clock Output P (400MHz LVDS)
     input wire adc_dco_n,                 // Data Clock Output N (400MHz LVDS)
+    // Audit F-0.1: AD9484 OR (overrange) LVDS pair
+    input wire adc_or_p,
+    input wire adc_or_n,
     output wire adc_pwdn,                  // ADC Power Down
     
     // ========== STM32 CONTROL INTERFACES ==========
@@ -526,6 +529,8 @@ radar_receiver_final rx_inst (
     .adc_d_n(adc_d_n),
     .adc_dco_p(adc_dco_p),
     .adc_dco_n(adc_dco_n),
+    .adc_or_p(adc_or_p),
+    .adc_or_n(adc_or_n),
     .adc_pwdn(adc_pwdn),
     
     // Doppler Outputs
