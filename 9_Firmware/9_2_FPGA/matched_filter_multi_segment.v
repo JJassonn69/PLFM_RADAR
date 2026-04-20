@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 // matched_filter_multi_segment.v
+
+`include "radar_params.vh"
+
 module matched_filter_multi_segment (
     input wire clk,           // 100MHz
     input wire reset_n,
@@ -18,14 +21,13 @@ module matched_filter_multi_segment (
     input wire mc_new_elevation,    // Toggle for new elevation (32)
     input wire mc_new_azimuth,      // Toggle for new azimuth (50)
     
-    input wire [15:0] long_chirp_real,
-    input wire [15:0] long_chirp_imag,
-    input wire [15:0] short_chirp_real,
-    input wire [15:0] short_chirp_imag,
+    // Reference chirp (upstream memory loader selects long/short via use_long_chirp)
+    input wire [15:0] ref_chirp_real,
+    input wire [15:0] ref_chirp_imag,
     
     // Memory system interface
     output reg [1:0] segment_request,
-    output wire [9:0] sample_addr_out,  // Tell memory which sample we need
+    output wire [10:0] sample_addr_out,  // Tell memory which sample we need (11-bit for 2048)
     output reg mem_request,
     input wire mem_ready,
     
@@ -39,18 +41,18 @@ module matched_filter_multi_segment (
 );
 
 // ========== FIXED PARAMETERS ==========
-parameter BUFFER_SIZE = 1024;
-parameter LONG_CHIRP_SAMPLES = 3000;  // Still 3000 samples total
-parameter SHORT_CHIRP_SAMPLES = 50;   // 0.5�s @ 100MHz
-parameter OVERLAP_SAMPLES = 128;      // Standard for 1024-pt FFT
-parameter SEGMENT_ADVANCE = BUFFER_SIZE - OVERLAP_SAMPLES;  // 896 samples
-parameter DEBUG = 1;                  // Debug output control
+parameter BUFFER_SIZE = `RP_FFT_SIZE;              // 2048
+parameter LONG_CHIRP_SAMPLES = 3000;               // Still 3000 samples total
+parameter SHORT_CHIRP_SAMPLES = 50;                // 0.5 us @ 100MHz
+parameter OVERLAP_SAMPLES = `RP_OVERLAP_SAMPLES;   // 128
+parameter SEGMENT_ADVANCE = `RP_SEGMENT_ADVANCE;   // 2048 - 128 = 1920 samples
+parameter DEBUG = 1;                               // Debug output control
 
 // Calculate segments needed with overlap
-// For 3072 samples with 128 overlap: 
-// Segments = ceil((3072 - 128) / 896) = ceil(2944/896) = 4
-parameter LONG_SEGMENTS = 4;          // Now exactly 4 segments!
-parameter SHORT_SEGMENTS = 1;         // 50 samples padded to 1024
+// For 3000 samples with 128 overlap:
+// Segments = ceil((3000 - 2048) / 1920) + 1 = ceil(952/1920) + 1 = 2
+parameter LONG_SEGMENTS = `RP_LONG_SEGMENTS_3KM;   // 2 segments
+parameter SHORT_SEGMENTS = 1;                      // 50 samples padded to 2048
 
 // ========== FIXED INTERNAL SIGNALS ==========
 reg signed [31:0] pc_i, pc_q;
@@ -59,19 +61,19 @@ reg pc_valid;
 // Dual buffer for overlap-save — BRAM inferred for synthesis
 (* ram_style = "block" *) reg signed [15:0] input_buffer_i [0:BUFFER_SIZE-1];
 (* ram_style = "block" *) reg signed [15:0] input_buffer_q [0:BUFFER_SIZE-1];
-reg [10:0] buffer_write_ptr;
-reg [10:0] buffer_read_ptr;
+reg [11:0] buffer_write_ptr;    // 12-bit for 0..2048
+reg [11:0] buffer_read_ptr;     // 12-bit for 0..2048
 reg buffer_has_data;
 reg buffer_processing;
 reg [15:0] chirp_samples_collected;
 
 // BRAM write port signals
 reg        buf_we;
-reg [9:0]  buf_waddr;
+reg [10:0] buf_waddr;           // 11-bit for 0..2047
 reg signed [15:0] buf_wdata_i, buf_wdata_q;
 
 // BRAM read port signals
-reg [9:0]  buf_raddr;
+reg [10:0] buf_raddr;           // 11-bit for 0..2047
 reg signed [15:0] buf_rdata_i, buf_rdata_q;
 
 // State machine
@@ -94,15 +96,22 @@ reg chirp_complete;
 reg saw_chain_output;             // Flag: chain started producing output
 
 // Overlap cache — captured during ST_PROCESSING, written back in ST_OVERLAP_COPY
+// Uses sync-only write block to allow distributed RAM inference (not FFs).
+// 128 entries = distributed RAM (LUTRAM), NOT BRAM (too shallow).
 reg signed [15:0] overlap_cache_i [0:OVERLAP_SAMPLES-1];
 reg signed [15:0] overlap_cache_q [0:OVERLAP_SAMPLES-1];
 reg [7:0] overlap_copy_count;
 
+// Overlap cache write port signals (driven from FSM, used in sync-only block)
+reg        ov_we;
+reg [6:0]  ov_waddr;
+reg signed [15:0] ov_wdata_i, ov_wdata_q;
+
 // Microcontroller sync detection
 reg mc_new_chirp_prev, mc_new_elevation_prev, mc_new_azimuth_prev;
-wire chirp_start_pulse = mc_new_chirp && !mc_new_chirp_prev;
-wire elevation_change_pulse = mc_new_elevation && !mc_new_elevation_prev;
-wire azimuth_change_pulse = mc_new_azimuth && !mc_new_azimuth_prev;
+wire chirp_start_pulse = mc_new_chirp ^ mc_new_chirp_prev;           // Toggle-to-pulse (any edge)
+wire elevation_change_pulse = mc_new_elevation ^ mc_new_elevation_prev; // Toggle-to-pulse
+wire azimuth_change_pulse = mc_new_azimuth ^ mc_new_azimuth_prev;     // Toggle-to-pulse
 
 // Processing chain signals
 wire [15:0] fft_pc_i, fft_pc_q;
@@ -115,7 +124,7 @@ reg fft_input_valid;
 reg fft_start;
 
 // ========== SAMPLE ADDRESS OUTPUT ==========
-assign sample_addr_out = buffer_read_ptr;
+assign sample_addr_out = buffer_read_ptr[10:0];
 
 // ========== MICROCONTROLLER SYNC ==========
 always @(posedge clk or negedge reset_n) begin
@@ -152,6 +161,16 @@ always @(posedge clk) begin
     end
 end
 
+// ========== OVERLAP CACHE WRITE PORT (sync only — distributed RAM inference) ==========
+// Removing async reset from memory write path prevents Vivado from
+// synthesizing the 128x16 arrays as FFs + mux trees.
+always @(posedge clk) begin
+    if (ov_we) begin
+        overlap_cache_i[ov_waddr] <= ov_wdata_i;
+        overlap_cache_q[ov_waddr] <= ov_wdata_q;
+    end
+end
+
 // ========== BRAM READ PORT (synchronous, no async reset) ==========
 always @(posedge clk) begin
     buf_rdata_i <= input_buffer_i[buf_raddr];
@@ -183,12 +202,17 @@ always @(posedge clk or negedge reset_n) begin
         buf_wdata_i <= 0;
         buf_wdata_q <= 0;
         buf_raddr <= 0;
+        ov_we <= 0;
+        ov_waddr <= 0;
+        ov_wdata_i <= 0;
+        ov_wdata_q <= 0;
         overlap_copy_count <= 0;
     end else begin
         pc_valid <= 0;
         mem_request <= 0;
         fft_input_valid <= 0;
         buf_we <= 0;  // Default: no write
+        ov_we <= 0;   // Default: no overlap write
         
         case (state)
             ST_IDLE: begin
@@ -223,7 +247,7 @@ always @(posedge clk or negedge reset_n) begin
                 if (ddc_valid && buffer_write_ptr < BUFFER_SIZE) begin
                     // Store in buffer via BRAM write port
                     buf_we <= 1;
-                    buf_waddr <= buffer_write_ptr[9:0];
+                    buf_waddr <= buffer_write_ptr[10:0];
                     buf_wdata_i <= ddc_i[17:2] + ddc_i[1];
                     buf_wdata_q <= ddc_q[17:2] + ddc_q[1];
                     
@@ -244,6 +268,7 @@ always @(posedge clk or negedge reset_n) begin
                     if (!use_long_chirp) begin
                         if (chirp_samples_collected >= SHORT_CHIRP_SAMPLES - 1) begin
                             state <= ST_ZERO_PAD;
+                            chirp_complete <= 1;  // Bug A fix: mark chirp done so ST_OUTPUT exits to IDLE
                             `ifdef SIMULATION
                             $display("[MULTI_SEG_FIXED] Short chirp: collected %d samples, starting zero-pad",
                                      chirp_samples_collected + 1);
@@ -257,8 +282,8 @@ always @(posedge clk or negedge reset_n) begin
                 // missing the transition when buffer_write_ptr updates via
                 // non-blocking assignment one cycle after the last write.
                 //
-                // Overlap-save fix: fill the FULL 1024-sample buffer before
-                // processing.  For segment 0 this means 1024 fresh samples.
+                // Overlap-save fix: fill the FULL FFT_SIZE-sample buffer before
+                // processing.  For segment 0 this means FFT_SIZE fresh samples.
                 // For segments 1+, write_ptr starts at OVERLAP_SAMPLES (128)
                 // so we collect 896 new samples to fill the buffer.
                 if (use_long_chirp) begin
@@ -295,7 +320,7 @@ always @(posedge clk or negedge reset_n) begin
             ST_ZERO_PAD: begin
                 // Zero-pad remaining buffer via BRAM write port
                 buf_we <= 1;
-                buf_waddr <= buffer_write_ptr[9:0];
+                buf_waddr <= buffer_write_ptr[10:0];
                 buf_wdata_i <= 16'd0;
                 buf_wdata_q <= 16'd0;
                 buffer_write_ptr <= buffer_write_ptr + 1;
@@ -315,7 +340,7 @@ always @(posedge clk or negedge reset_n) begin
             
             ST_WAIT_REF: begin
                 // Wait for memory to provide reference coefficients
-                buf_raddr <= 10'd0;  // Pre-present addr 0 so buf_rdata is ready next cycle
+                buf_raddr <= 11'd0;  // Pre-present addr 0 so buf_rdata is ready next cycle
                 if (mem_ready) begin
                     // Start processing — buf_rdata[0] will be valid on FIRST clock of ST_PROCESSING
                     buffer_processing <= 1;
@@ -344,10 +369,12 @@ always @(posedge clk or negedge reset_n) begin
                     // 2. Request corresponding reference sample
                     mem_request <= 1'b1;
                     
-                    // 3. Cache tail samples for overlap-save
+                    // 3. Cache tail samples for overlap-save (via sync-only write port)
                     if (buffer_read_ptr >= SEGMENT_ADVANCE) begin
-                        overlap_cache_i[buffer_read_ptr - SEGMENT_ADVANCE] <= buf_rdata_i;
-                        overlap_cache_q[buffer_read_ptr - SEGMENT_ADVANCE] <= buf_rdata_q;
+                        ov_we <= 1;
+                        ov_waddr <= buffer_read_ptr - SEGMENT_ADVANCE;  // 0..OVERLAP-1
+                        ov_wdata_i <= buf_rdata_i;
+                        ov_wdata_q <= buf_rdata_q;
                     end
                     
                     // Debug every 100 samples
@@ -361,7 +388,7 @@ always @(posedge clk or negedge reset_n) begin
                     end
                     
                     // Present NEXT read address (for next cycle)
-                    buf_raddr <= buffer_read_ptr[9:0] + 10'd1;
+                    buf_raddr <= buffer_read_ptr[10:0] + 11'd1;
                     buffer_read_ptr <= buffer_read_ptr + 1;
                     
                 end else if (buffer_read_ptr >= BUFFER_SIZE) begin
@@ -382,7 +409,7 @@ always @(posedge clk or negedge reset_n) begin
             
             ST_WAIT_FFT: begin
                 // Wait for the processing chain to complete ALL outputs.
-                // The chain streams 1024 samples (fft_pc_valid=1 for 1024 clocks),
+                // The chain streams FFT_SIZE samples (fft_pc_valid=1 for FFT_SIZE clocks),
                 // then transitions to ST_DONE (9) -> ST_IDLE (0).
                 // We track when output starts (saw_chain_output) and only
                 // proceed once the chain returns to idle after outputting.
@@ -454,7 +481,7 @@ always @(posedge clk or negedge reset_n) begin
             ST_OVERLAP_COPY: begin
                 // Write one cached overlap sample per cycle to BRAM
                 buf_we <= 1;
-                buf_waddr <= {{2{1'b0}}, overlap_copy_count};
+                buf_waddr <= {{3{1'b0}}, overlap_copy_count};
                 buf_wdata_i <= overlap_cache_i[overlap_copy_count];
                 buf_wdata_q <= overlap_cache_q[overlap_copy_count];
                 
@@ -500,11 +527,9 @@ matched_filter_processing_chain m_f_p_c(
     // Chirp Selection
     .chirp_counter(chirp_counter),
     
-    // Reference Chirp Memory Interfaces
-    .long_chirp_real(long_chirp_real),
-    .long_chirp_imag(long_chirp_imag),
-    .short_chirp_real(short_chirp_real),
-    .short_chirp_imag(short_chirp_imag),
+    // Reference Chirp Memory Interface (single pair — upstream selects long/short)
+    .ref_chirp_real(ref_chirp_real),
+    .ref_chirp_imag(ref_chirp_imag),
     
     // Output
     .range_profile_i(fft_pc_i),

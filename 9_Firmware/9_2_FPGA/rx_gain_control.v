@@ -54,7 +54,7 @@ module rx_gain_control (
     input  wire [3:0]  agc_decay,      // 0x2B: amplification step when weak (default 1)
     input  wire [3:0]  agc_holdoff,    // 0x2C: frames to wait before gain-up (default 4)
 
-    // Frame boundary pulse (1 clk cycle, from Doppler frame_complete)
+    // Frame boundary pulse (1 clk cycle, from edge detector in radar_receiver_final)
     input  wire        frame_boundary,
 
     // Data output (to matched filter)

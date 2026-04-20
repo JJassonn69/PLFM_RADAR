@@ -28,13 +28,16 @@
  * Clock domain: single clock (clk), active-low async reset (reset_n).
  */
 
+// Include single source of truth for default parameters
+`include "radar_params.vh"
+
 module fft_engine #(
-    parameter N            = 1024,
-    parameter LOG2N        = 10,
+    parameter N            = `RP_FFT_SIZE,       // 2048
+    parameter LOG2N        = `RP_LOG2_FFT_SIZE,  // 11
     parameter DATA_W       = 16,
     parameter INTERNAL_W   = 32,
     parameter TWIDDLE_W    = 16,
-    parameter TWIDDLE_FILE = "fft_twiddle_1024.mem"
+    parameter TWIDDLE_FILE = "fft_twiddle_2048.mem"
 )(
     input wire clk,
     input wire reset_n,

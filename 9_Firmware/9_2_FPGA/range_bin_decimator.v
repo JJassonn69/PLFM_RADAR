@@ -3,7 +3,7 @@
 /**
  * range_bin_decimator.v
  *
- * Reduces 1024 range bins from the matched filter output down to 64 bins
+ * Reduces 2048 range bins from the matched filter output down to 512 bins
  * for the Doppler processor. Supports multiple decimation modes:
  *
  *   Mode 2'b00: Simple decimation (take every Nth sample)
@@ -11,29 +11,31 @@
  *   Mode 2'b10: Averaging (sum group and divide by N)
  *   Mode 2'b11: Reserved
  *
- * Interface contract (from radar_receiver_final.v line 229):
+ * Interface contract (from radar_receiver_final.v):
  *   .clk, .reset_n
- *   .range_i_in, .range_q_in, .range_valid_in   ← from matched_filter output
- *   .range_i_out, .range_q_out, .range_valid_out → to Doppler processor
- *   .range_bin_index                             → 6-bit output bin index
- *   .decimation_mode                             ← 2-bit mode select
- *   .start_bin                                   ← 10-bit start offset
+ *   .range_i_in, .range_q_in, .range_valid_in   <- from matched_filter output
+ *   .range_i_out, .range_q_out, .range_valid_out -> to Doppler processor
+ *   .range_bin_index                             -> 9-bit output bin index
+ *   .decimation_mode                             <- 2-bit mode select
+ *   .start_bin                                   <- 11-bit start offset
  *
  * start_bin usage:
  *   When start_bin > 0, the decimator skips the first 'start_bin' valid
  *   input samples before beginning decimation. This allows selecting a
- *   region of interest within the 1024 range bins (e.g., to focus on
+ *   region of interest within the 2048 range bins (e.g., to focus on
  *   near-range or far-range targets). When start_bin = 0 (default),
- *   all 1024 bins are processed starting from bin 0.
+ *   all 2048 bins are processed starting from bin 0.
  *
  * Clock domain: clk (100 MHz)
- * Decimation: 1024 → 64 (factor of 16)
+ * Decimation: 2048 -> 512 (factor of 4)
  */
 
+`include "radar_params.vh"
+
 module range_bin_decimator #(
-    parameter INPUT_BINS        = 1024,
-    parameter OUTPUT_BINS       = 64,
-    parameter DECIMATION_FACTOR = 16
+    parameter INPUT_BINS        = `RP_FFT_SIZE,          // 2048
+    parameter OUTPUT_BINS       = `RP_NUM_RANGE_BINS,    // 512
+    parameter DECIMATION_FACTOR = `RP_DECIMATION_FACTOR  // 4
 ) (
     input wire clk,
     input wire reset_n,
@@ -47,11 +49,11 @@ module range_bin_decimator #(
     output reg signed [15:0] range_i_out,
     output reg signed [15:0] range_q_out,
     output reg range_valid_out,
-    output reg [5:0] range_bin_index,
+    output reg [`RP_RANGE_BIN_BITS-1:0] range_bin_index,  // 9-bit
 
     // Configuration
     input wire [1:0] decimation_mode,  // 00=decimate, 01=peak, 10=average
-    input wire [9:0] start_bin,        // First input bin to process
+    input wire [10:0] start_bin,       // First input bin to process (11-bit for 2048)
 
     // Diagnostics
     output reg watchdog_timeout        // Pulses high for 1 cycle on watchdog reset
@@ -59,10 +61,10 @@ module range_bin_decimator #(
 `ifdef FORMAL
     ,
     output wire [2:0]  fv_state,
-    output wire [9:0]  fv_in_bin_count,
-    output wire [3:0]  fv_group_sample_count,
-    output wire [5:0]  fv_output_bin_count,
-    output wire [9:0]  fv_skip_count
+    output wire [10:0] fv_in_bin_count,
+    output wire [1:0]  fv_group_sample_count,
+    output wire [8:0]  fv_output_bin_count,
+    output wire [10:0] fv_skip_count
 `endif
 );
 
@@ -75,12 +77,12 @@ localparam WATCHDOG_LIMIT = 10'd256;
 // INTERNAL SIGNALS
 // ============================================================================
 
-// Input bin counter (0..1023)
-reg [9:0] in_bin_count;
+// Input bin counter (0..2047)
+reg [10:0] in_bin_count;
 
 // Group tracking
-reg [3:0] group_sample_count;  // 0..15 within current group of 16
-reg [5:0] output_bin_count;    // 0..63 output bin index
+reg [1:0] group_sample_count;   // 0..3 within current group of 4
+reg [8:0] output_bin_count;     // 0..511 output bin index
 
 // State machine
 reg [2:0] state;
@@ -91,7 +93,7 @@ localparam ST_EMIT    = 3'd3;
 localparam ST_DONE    = 3'd4;
 
 // Skip counter for start_bin
-reg [9:0] skip_count;
+reg [10:0] skip_count;
 
 // Watchdog counter — counts consecutive clocks with no range_valid_in
 reg [9:0] watchdog_count;
@@ -107,7 +109,7 @@ assign fv_skip_count         = skip_count;
 // ============================================================================
 // PEAK DETECTION (Mode 01)
 // ============================================================================
-// Track the sample with the largest magnitude in the current group of 16
+// Track the sample with the largest magnitude in the current group of 4
 reg signed [15:0] peak_i, peak_q;
 reg [16:0] peak_mag;  // |I| + |Q| approximation
 wire [16:0] cur_mag;
@@ -120,8 +122,8 @@ assign cur_mag = {1'b0, abs_i} + {1'b0, abs_q};
 // ============================================================================
 // AVERAGING (Mode 10)
 // ============================================================================
-// Accumulate I and Q separately, then divide by DECIMATION_FACTOR (>>4)
-reg signed [19:0] sum_i, sum_q;  // 16 + 4 guard bits for sum of 16 values
+// Accumulate I and Q separately, then divide by DECIMATION_FACTOR (>>2)
+reg signed [17:0] sum_i, sum_q;  // 16 + 2 guard bits for sum of 4 values
 
 // ============================================================================
 // SIMPLE DECIMATION (Mode 00)
@@ -135,21 +137,21 @@ reg signed [15:0] decim_i, decim_q;
 always @(posedge clk or negedge reset_n) begin
     if (!reset_n) begin
         state             <= ST_IDLE;
-        in_bin_count      <= 10'd0;
-        group_sample_count <= 4'd0;
-        output_bin_count  <= 6'd0;
-        skip_count        <= 10'd0;
+        in_bin_count      <= 11'd0;
+        group_sample_count <= 2'd0;
+        output_bin_count  <= 9'd0;
+        skip_count        <= 11'd0;
         watchdog_count    <= 10'd0;
         watchdog_timeout  <= 1'b0;
         range_valid_out   <= 1'b0;
         range_i_out       <= 16'd0;
         range_q_out       <= 16'd0;
-        range_bin_index   <= 6'd0;
+        range_bin_index   <= {`RP_RANGE_BIN_BITS{1'b0}};
         peak_i            <= 16'd0;
         peak_q            <= 16'd0;
         peak_mag          <= 17'd0;
-        sum_i             <= 20'd0;
-        sum_q             <= 20'd0;
+        sum_i             <= 18'd0;
+        sum_q             <= 18'd0;
         decim_i           <= 16'd0;
         decim_q           <= 16'd0;
     end else begin
@@ -162,33 +164,33 @@ always @(posedge clk or negedge reset_n) begin
         // IDLE: Wait for first valid input
         // ================================================================
         ST_IDLE: begin
-            in_bin_count       <= 10'd0;
-            group_sample_count <= 4'd0;
-            output_bin_count   <= 6'd0;
-            skip_count         <= 10'd0;
+            in_bin_count       <= 11'd0;
+            group_sample_count <= 2'd0;
+            output_bin_count   <= 9'd0;
+            skip_count         <= 11'd0;
             watchdog_count     <= 10'd0;
             peak_i             <= 16'd0;
             peak_q             <= 16'd0;
             peak_mag           <= 17'd0;
-            sum_i              <= 20'd0;
-            sum_q              <= 20'd0;
+            sum_i              <= 18'd0;
+            sum_q              <= 18'd0;
 
             if (range_valid_in) begin
-                in_bin_count <= 10'd1;
+                in_bin_count <= 11'd1;
 
-                if (start_bin > 10'd0) begin
+                if (start_bin > 11'd0) begin
                     // Need to skip 'start_bin' samples first
-                    skip_count <= 10'd1;
+                    skip_count <= 11'd1;
                     state      <= ST_SKIP;
                 end else begin
                     // No skip — process first sample immediately
                     state              <= ST_PROCESS;
-                    group_sample_count <= 4'd1;
+                    group_sample_count <= 2'd1;
 
                     // Mode-specific first sample handling
                     case (decimation_mode)
                     2'b00: begin  // Simple decimation — check if center sample
-                        if (4'd0 == (DECIMATION_FACTOR / 2)) begin
+                        if (2'd0 == (DECIMATION_FACTOR / 2)) begin
                             decim_i <= range_i_in;
                             decim_q <= range_q_in;
                         end
@@ -199,8 +201,8 @@ always @(posedge clk or negedge reset_n) begin
                         peak_mag <= cur_mag;
                     end
                     2'b10: begin  // Averaging
-                        sum_i <= {{4{range_i_in[15]}}, range_i_in};
-                        sum_q <= {{4{range_q_in[15]}}, range_q_in};
+                        sum_i <= {{2{range_i_in[15]}}, range_i_in};
+                        sum_q <= {{2{range_q_in[15]}}, range_q_in};
                     end
                     default: ;
                     endcase
@@ -219,11 +221,11 @@ always @(posedge clk or negedge reset_n) begin
                 if (skip_count >= start_bin) begin
                     // Done skipping — this sample is the first to process
                     state              <= ST_PROCESS;
-                    group_sample_count <= 4'd1;
+                    group_sample_count <= 2'd1;
 
                     case (decimation_mode)
                     2'b00: begin
-                        if (4'd0 == (DECIMATION_FACTOR / 2)) begin
+                        if (2'd0 == (DECIMATION_FACTOR / 2)) begin
                             decim_i <= range_i_in;
                             decim_q <= range_q_in;
                         end
@@ -234,8 +236,8 @@ always @(posedge clk or negedge reset_n) begin
                         peak_mag <= cur_mag;
                     end
                     2'b10: begin
-                        sum_i <= {{4{range_i_in[15]}}, range_i_in};
-                        sum_q <= {{4{range_q_in[15]}}, range_q_in};
+                        sum_i <= {{2{range_i_in[15]}}, range_i_in};
+                        sum_q <= {{2{range_q_in[15]}}, range_q_in};
                     end
                     default: ;
                     endcase
@@ -281,8 +283,8 @@ always @(posedge clk or negedge reset_n) begin
                     end
                 end
                 2'b10: begin  // Averaging
-                    sum_i <= sum_i + {{4{range_i_in[15]}}, range_i_in};
-                    sum_q <= sum_q + {{4{range_q_in[15]}}, range_q_in};
+                    sum_i <= sum_i + {{2{range_i_in[15]}}, range_i_in};
+                    sum_q <= sum_q + {{2{range_q_in[15]}}, range_q_in};
                 end
                 default: ;
                 endcase
@@ -291,7 +293,7 @@ always @(posedge clk or negedge reset_n) begin
                 if (group_sample_count == DECIMATION_FACTOR - 1) begin
                     // Group complete — emit output
                     state <= ST_EMIT;
-                    group_sample_count <= 4'd0;
+                    group_sample_count <= 2'd0;
                 end else if (in_bin_count >= INPUT_BINS - 1) begin
                     // Overflow guard: consumed all input bins but group
                     // is not yet complete. Stop to prevent corruption of
@@ -331,9 +333,9 @@ always @(posedge clk or negedge reset_n) begin
                 range_i_out <= peak_i;
                 range_q_out <= peak_q;
             end
-            2'b10: begin  // Averaging (sum >> 4 = divide by 16)
-                range_i_out <= sum_i[19:4];
-                range_q_out <= sum_q[19:4];
+            2'b10: begin  // Averaging (sum >> 2 = divide by 4)
+                range_i_out <= sum_i[17:2];
+                range_q_out <= sum_q[17:2];
             end
             default: begin
                 range_i_out <= 16'd0;
@@ -345,8 +347,8 @@ always @(posedge clk or negedge reset_n) begin
             peak_i   <= 16'd0;
             peak_q   <= 16'd0;
             peak_mag <= 17'd0;
-            sum_i    <= 20'd0;
-            sum_q    <= 20'd0;
+            sum_i    <= 18'd0;
+            sum_q    <= 18'd0;
 
             // Advance output bin
             output_bin_count <= output_bin_count + 1;
@@ -358,12 +360,12 @@ always @(posedge clk or negedge reset_n) begin
                 // If we already have valid input waiting, process it immediately
                 if (range_valid_in) begin
                     state              <= ST_PROCESS;
-                    group_sample_count <= 4'd1;
+                    group_sample_count <= 2'd1;
                     in_bin_count       <= in_bin_count + 1;
 
                     case (decimation_mode)
                     2'b00: begin
-                        if (4'd0 == (DECIMATION_FACTOR / 2)) begin
+                        if (2'd0 == (DECIMATION_FACTOR / 2)) begin
                             decim_i <= range_i_in;
                             decim_q <= range_q_in;
                         end
@@ -374,20 +376,20 @@ always @(posedge clk or negedge reset_n) begin
                         peak_mag <= cur_mag;
                     end
                     2'b10: begin
-                        sum_i <= {{4{range_i_in[15]}}, range_i_in};
-                        sum_q <= {{4{range_q_in[15]}}, range_q_in};
+                        sum_i <= {{2{range_i_in[15]}}, range_i_in};
+                        sum_q <= {{2{range_q_in[15]}}, range_q_in};
                     end
                     default: ;
                     endcase
                 end else begin
                     state <= ST_PROCESS;
-                    group_sample_count <= 4'd0;
+                    group_sample_count <= 2'd0;
                 end
             end
         end
 
         // ================================================================
-        // DONE: All 64 output bins emitted, return to idle
+        // DONE: All 512 output bins emitted, return to idle
         // ================================================================
         ST_DONE: begin
             state <= ST_IDLE;

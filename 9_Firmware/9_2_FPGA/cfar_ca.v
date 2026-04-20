@@ -16,9 +16,9 @@
  *
  *   Phase 2 (CFAR): After frame_complete pulse from Doppler processor,
  *     process each Doppler column independently:
- *     a) Read 64 magnitudes from BRAM for one Doppler bin (ST_COL_LOAD)
+ *     a) Read 512 magnitudes from BRAM for one Doppler bin (ST_COL_LOAD)
  *     b) Compute initial sliding window sums (ST_CFAR_INIT)
- *     c) Slide CUT through all 64 range bins:
+ *     c) Slide CUT through all 512 range bins:
  *        - 3 sub-cycles per CUT:
  *          ST_CFAR_THR: register noise_sum (mode select + cross-multiply)
  *          ST_CFAR_MUL: compute alpha * noise_sum_reg in DSP
@@ -47,21 +47,23 @@
  *   typically clutter).
  *
  * Timing:
- *   Phase 2 takes ~(66 + T + 3*64) * 32 ≈ 8500 cycles per frame @ 100 MHz
- *   = 85 µs. Frame period @ PRF=1932 Hz, 32 chirps = 16.6 ms. Fits easily.
+ *   Phase 2 takes ~(514 + T + 3*512) * 32 ≈ 55000 cycles per frame @ 100 MHz
+ *   = 0.55 ms. Frame period @ PRF=1932 Hz, 32 chirps = 16.6 ms. Fits easily.
  *   (3 cycles per CUT due to pipeline: THR → MUL → CMP)
  *
  * Resources:
- *   - 1 BRAM18K for magnitude buffer (2048 x 17 bits)
+ *   - 1 BRAM36K for magnitude buffer (16384 x 17 bits)
  *   - 1 DSP48 for alpha multiply
  *   - ~300 LUTs for FSM + sliding window + comparators
  *
  * Clock domain: clk (100 MHz, same as Doppler processor)
  */
 
+`include "radar_params.vh"
+
 module cfar_ca #(
-    parameter NUM_RANGE_BINS   = 64,
-    parameter NUM_DOPPLER_BINS = 32,
+    parameter NUM_RANGE_BINS   = `RP_NUM_RANGE_BINS,    // 512
+    parameter NUM_DOPPLER_BINS = `RP_NUM_DOPPLER_BINS,  // 32
     parameter MAG_WIDTH        = 17,
     parameter ALPHA_WIDTH      = 8,
     parameter MAX_GUARD        = 8,
@@ -74,7 +76,7 @@ module cfar_ca #(
     input wire [31:0] doppler_data,
     input wire        doppler_valid,
     input wire [4:0]  doppler_bin_in,
-    input wire [5:0]  range_bin_in,
+    input wire [`RP_RANGE_BIN_BITS-1:0] range_bin_in,  // 9-bit
     input wire        frame_complete,
 
     // ========== CONFIGURATION ==========
@@ -88,7 +90,7 @@ module cfar_ca #(
     // ========== DETECTION OUTPUTS ==========
     output reg        detect_flag,
     output reg        detect_valid,
-    output reg [5:0]  detect_range,
+    output reg [`RP_RANGE_BIN_BITS-1:0] detect_range,  // 9-bit
     output reg [4:0]  detect_doppler,
     output reg [MAG_WIDTH-1:0] detect_magnitude,
     output reg [MAG_WIDTH-1:0] detect_threshold,
@@ -103,11 +105,11 @@ module cfar_ca #(
 // INTERNAL PARAMETERS
 // ============================================================================
 localparam TOTAL_CELLS = NUM_RANGE_BINS * NUM_DOPPLER_BINS;
-localparam ADDR_WIDTH  = 11;
+localparam ADDR_WIDTH  = `RP_CFAR_MAG_ADDR_W;  // 14
 localparam COL_BITS    = 5;
-localparam ROW_BITS    = 6;
-localparam SUM_WIDTH   = MAG_WIDTH + 6;  // 23 bits: sum of up to 64 magnitudes
-localparam PROD_WIDTH  = SUM_WIDTH + ALPHA_WIDTH;  // 31 bits
+localparam ROW_BITS    = `RP_RANGE_BIN_BITS;    // 9
+localparam SUM_WIDTH   = MAG_WIDTH + ROW_BITS;  // 26 bits: sum of up to 512 magnitudes
+localparam PROD_WIDTH  = SUM_WIDTH + ALPHA_WIDTH;  // 34 bits
 localparam ALPHA_FRAC_BITS = 4;  // Q4.4
 
 // ============================================================================
@@ -136,7 +138,7 @@ wire [15:0] abs_q = dop_q[15] ? (~dop_q + 16'd1) : dop_q;
 wire [MAG_WIDTH-1:0] cur_mag = {1'b0, abs_i} + {1'b0, abs_q};
 
 // ============================================================================
-// MAGNITUDE BRAM (2048 x 17 bits)
+// MAGNITUDE BRAM (16384 x 17 bits)
 // ============================================================================
 reg                    mag_we;
 reg [ADDR_WIDTH-1:0]   mag_waddr;
@@ -153,7 +155,7 @@ always @(posedge clk) begin
 end
 
 // ============================================================================
-// COLUMN LINE BUFFER (64 x 17 bits — distributed RAM)
+// COLUMN LINE BUFFER (512 x 17 bits — BRAM)
 // ============================================================================
 reg [MAG_WIDTH-1:0] col_buf [0:NUM_RANGE_BINS-1];
 reg [ROW_BITS:0] col_load_idx;
@@ -206,20 +208,31 @@ wire lead_rem_valid = (lead_rem_idx >= 0) && (lead_rem_idx < NUM_RANGE_BINS);
 wire lag_rem_valid  = (lag_rem_idx  >= 0) && (lag_rem_idx  < NUM_RANGE_BINS);
 wire lag_add_valid  = (lag_add_idx  >= 0) && (lag_add_idx  < NUM_RANGE_BINS);
 
-// Safe col_buf read with bounds checking (combinational)
+// Safe col_buf read with bounds checking (combinational — feeds pipeline regs)
 wire [MAG_WIDTH-1:0] lead_add_val = lead_add_valid ? col_buf[lead_add_idx[ROW_BITS-1:0]] : {MAG_WIDTH{1'b0}};
 wire [MAG_WIDTH-1:0] lead_rem_val = lead_rem_valid ? col_buf[lead_rem_idx[ROW_BITS-1:0]] : {MAG_WIDTH{1'b0}};
 wire [MAG_WIDTH-1:0] lag_rem_val  = lag_rem_valid  ? col_buf[lag_rem_idx[ROW_BITS-1:0]]  : {MAG_WIDTH{1'b0}};
 wire [MAG_WIDTH-1:0] lag_add_val  = lag_add_valid  ? col_buf[lag_add_idx[ROW_BITS-1:0]]  : {MAG_WIDTH{1'b0}};
 
-// Net deltas
-wire signed [SUM_WIDTH:0] lead_delta = (lead_add_valid ? $signed({1'b0, lead_add_val}) : 0)
-                                      - (lead_rem_valid ? $signed({1'b0, lead_rem_val}) : 0);
-wire signed [1:0] lead_cnt_delta = (lead_add_valid ? 1 : 0) - (lead_rem_valid ? 1 : 0);
+// ============================================================================
+// PIPELINE REGISTERS: Break col_buf mux tree out of ST_CFAR_CMP critical path
+// ============================================================================
+// Captured in ST_CFAR_THR (col_buf indices depend only on cut_idx/r_guard/r_train,
+// all stable during THR). Used in ST_CFAR_CMP for delta/sum computation.
+// This removes ~6-8 logic levels (9-level mux tree) from the CMP critical path.
+reg [MAG_WIDTH-1:0] lead_add_val_r, lead_rem_val_r;
+reg [MAG_WIDTH-1:0] lag_rem_val_r,  lag_add_val_r;
+reg                 lead_add_valid_r, lead_rem_valid_r;
+reg                 lag_rem_valid_r,  lag_add_valid_r;
 
-wire signed [SUM_WIDTH:0] lag_delta = (lag_add_valid ? $signed({1'b0, lag_add_val}) : 0)
-                                     - (lag_rem_valid ? $signed({1'b0, lag_rem_val}) : 0);
-wire signed [1:0] lag_cnt_delta = (lag_add_valid ? 1 : 0) - (lag_rem_valid ? 1 : 0);
+// Net deltas (computed from registered col_buf values — combinational in CMP)
+wire signed [SUM_WIDTH:0] lead_delta = (lead_add_valid_r ? $signed({1'b0, lead_add_val_r}) : 0)
+                                      - (lead_rem_valid_r ? $signed({1'b0, lead_rem_val_r}) : 0);
+wire signed [1:0] lead_cnt_delta = (lead_add_valid_r ? 1 : 0) - (lead_rem_valid_r ? 1 : 0);
+
+wire signed [SUM_WIDTH:0] lag_delta = (lag_add_valid_r ? $signed({1'b0, lag_add_val_r}) : 0)
+                                     - (lag_rem_valid_r ? $signed({1'b0, lag_rem_val_r}) : 0);
+wire signed [1:0] lag_cnt_delta = (lag_add_valid_r ? 1 : 0) - (lag_rem_valid_r ? 1 : 0);
 
 // ============================================================================
 // NOISE ESTIMATE COMPUTATION (combinational for CFAR mode selection)
@@ -267,7 +280,7 @@ always @(posedge clk or negedge reset_n) begin
         state          <= ST_IDLE;
         detect_flag    <= 1'b0;
         detect_valid   <= 1'b0;
-        detect_range   <= 6'd0;
+        detect_range   <= {ROW_BITS{1'b0}};
         detect_doppler <= 5'd0;
         detect_magnitude <= {MAG_WIDTH{1'b0}};
         detect_threshold <= {MAG_WIDTH{1'b0}};
@@ -288,6 +301,14 @@ always @(posedge clk or negedge reset_n) begin
         noise_sum_reg  <= 0;
         noise_product  <= 0;
         adaptive_thr   <= 0;
+        lead_add_val_r <= 0;
+        lead_rem_val_r <= 0;
+        lag_rem_val_r  <= 0;
+        lag_add_val_r  <= 0;
+        lead_add_valid_r <= 0;
+        lead_rem_valid_r <= 0;
+        lag_rem_valid_r  <= 0;
+        lag_add_valid_r  <= 0;
         r_guard        <= 4'd2;
         r_train        <= 5'd8;
         r_alpha        <= 8'h30;
@@ -364,7 +385,7 @@ always @(posedge clk or negedge reset_n) begin
                 if (r_enable) begin
                     col_idx      <= 0;
                     col_load_idx <= 0;
-                    mag_raddr    <= {6'd0, 5'd0};
+                    mag_raddr    <= {{ROW_BITS{1'b0}}, 5'd0};
                     state        <= ST_COL_LOAD;
                 end else begin
                     state <= ST_DONE;
@@ -382,14 +403,14 @@ always @(posedge clk or negedge reset_n) begin
 
             if (col_load_idx == 0) begin
                 // First address already presented, advance to range=1
-                mag_raddr    <= {6'd1, col_idx};
+                mag_raddr    <= {{{(ROW_BITS-1){1'b0}}, 1'b1}, col_idx};
                 col_load_idx <= 1;
             end else if (col_load_idx <= NUM_RANGE_BINS) begin
                 // Capture previous read
                 col_buf[col_load_idx - 1] <= mag_rdata;
 
                 if (col_load_idx < NUM_RANGE_BINS) begin
-                    mag_raddr <= {col_load_idx[ROW_BITS-1:0] + 6'd1, col_idx};
+                    mag_raddr <= {col_load_idx[ROW_BITS-1:0] + {{(ROW_BITS-1){1'b0}}, 1'b1}, col_idx};
                 end
 
                 col_load_idx <= col_load_idx + 1;
@@ -441,6 +462,19 @@ always @(posedge clk or negedge reset_n) begin
             cfar_status <= {4'd4, 1'b0, col_idx[2:0]};
 
             noise_sum_reg <= noise_sum_comb;
+
+            // Pipeline: register col_buf reads for next CUT's window update.
+            // Indices depend only on cut_idx/r_guard/r_train (all stable here).
+            // Breaks the 9-level col_buf mux tree out of ST_CFAR_CMP.
+            lead_add_val_r   <= lead_add_val;
+            lead_rem_val_r   <= lead_rem_val;
+            lag_rem_val_r    <= lag_rem_val;
+            lag_add_val_r    <= lag_add_val;
+            lead_add_valid_r <= lead_add_valid;
+            lead_rem_valid_r <= lead_rem_valid;
+            lag_rem_valid_r  <= lag_rem_valid;
+            lag_add_valid_r  <= lag_add_valid;
+
             state <= ST_CFAR_MUL;
         end
 
@@ -513,7 +547,7 @@ always @(posedge clk or negedge reset_n) begin
             if (col_idx < NUM_DOPPLER_BINS - 1) begin
                 col_idx      <= col_idx + 1;
                 col_load_idx <= 0;
-                mag_raddr    <= {6'd0, col_idx + 5'd1};
+                mag_raddr    <= {{ROW_BITS{1'b0}}, col_idx + 5'd1};
                 state        <= ST_COL_LOAD;
             end else begin
                 state <= ST_DONE;

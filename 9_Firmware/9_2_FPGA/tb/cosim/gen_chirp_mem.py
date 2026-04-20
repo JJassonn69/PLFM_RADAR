@@ -2,34 +2,22 @@
 """
 gen_chirp_mem.py — Generate all chirp .mem files for AERIS-10 FPGA.
 
-Generates the 10 chirp .mem files used by chirp_memory_loader_param.v:
-  - long_chirp_seg{0,1,2,3}_{i,q}.mem  (8 files, 1024 lines each)
-  - short_chirp_{i,q}.mem              (2 files, 50 lines each)
+Generates the 6 chirp .mem files used by chirp_memory_loader_param.v:
+  - long_chirp_seg{0,1}_{i,q}.mem  (4 files, 2048 lines each)
+  - short_chirp_{i,q}.mem          (2 files, 50 lines each)
 
 Long chirp:
   The 3000-sample baseband chirp (30 us at 100 MHz system clock) is
-  segmented into 4 blocks of 1024 samples.  Each segment covers a
+  segmented into 2 blocks of 2048 samples.  Each segment covers a
   different time window of the chirp:
-    seg0: samples   0 .. 1023
-    seg1: samples 1024 .. 2047
-    seg2: samples 2048 .. 3071  (only 952 valid chirp samples; 72 zeros)
-    seg3: all zeros (seg3 starts at sample 3072, past chirp end at 3000)
+    seg0: samples    0 .. 2047
+    seg1: samples 2048 .. 4095  (only 952 valid chirp samples; 1096 zeros)
 
-  Wait — actually the memory loader stores 4*1024 = 4096 contiguous
-  samples indexed by {segment_select[1:0], sample_addr[9:0]}.  The
-  long chirp has 3000 samples, so:
-    seg0: chirp[0..1023]
-    seg1: chirp[1024..2047]
-    seg2: chirp[2048..2999] + 24 zeros  (samples 2048..3071 but chirp
-          ends at 2999, so indices 3000..3071 relative to full chirp
-          => mem indices 952..1023 in seg2 file are zero)
-
-  Wait, let me re-count.  seg2 covers global indices 2048..3071.
-  The chirp has samples 0..2999 (3000 samples).  So seg2 has valid
-  data at global indices 2048..2999 = 952 valid samples (seg2 file
-  indices 0..951), then zeros at file indices 952..1023 (72 zeros).
-
-  seg3 covers global indices 3072..4095, all past chirp end => all zeros.
+  The memory loader stores 2*2048 = 4096 contiguous samples indexed
+  by {segment_select[0], sample_addr[10:0]}.  The long chirp has
+  3000 samples, so:
+    seg0: chirp[0..2047] — all valid data
+    seg1: chirp[2048..2999] + 1096 zeros (samples past chirp end)
 
 Short chirp:
   50 samples (0.5 us at 100 MHz), same chirp formula with
@@ -56,10 +44,10 @@ CHIRP_BW = 20e6           # 20 MHz sweep bandwidth
 FS_SYS = 100e6            # System clock (100 MHz, post-CIC)
 T_LONG_CHIRP = 30e-6      # 30 us long chirp duration
 T_SHORT_CHIRP = 0.5e-6    # 0.5 us short chirp duration
-FFT_SIZE = 1024
+FFT_SIZE = 2048
 LONG_CHIRP_SAMPLES = int(T_LONG_CHIRP * FS_SYS)   # 3000
 SHORT_CHIRP_SAMPLES = int(T_SHORT_CHIRP * FS_SYS)  # 50
-LONG_SEGMENTS = 4
+LONG_SEGMENTS = 2
 SCALE = 0.9               # Q15 scaling factor (matches radar_scene.py)
 Q15_MAX = 32767
 
@@ -187,13 +175,14 @@ def main():
     # Check magnitude envelope
     max(math.sqrt(i*i + q*q) for i, q in zip(long_i, long_q, strict=False))
 
-    # Check seg3 zero padding
-    seg3_i_path = os.path.join(MEM_DIR, 'long_chirp_seg3_i.mem')
-    with open(seg3_i_path) as f:
-        seg3_lines = [line.strip() for line in f if line.strip()]
-    nonzero_seg3 = sum(1 for line in seg3_lines if line != '0000')
+    # Check seg1 zero padding (samples 3000-4095 should be zero)
+    seg1_i_path = os.path.join(MEM_DIR, 'long_chirp_seg1_i.mem')
+    with open(seg1_i_path) as f:
+        seg1_lines = [line.strip() for line in f if line.strip()]
+    # Indices 952..2047 in seg1 (global 3000..4095) should be zero
+    nonzero_tail = sum(1 for line in seg1_lines[952:] if line != '0000')
 
-    if nonzero_seg3 == 0:
+    if nonzero_tail == 0:
         pass
     else:
         pass

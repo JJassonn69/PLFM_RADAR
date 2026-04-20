@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+`include "radar_params.vh"
+
 /**
  * radar_mode_controller.v
  *
@@ -18,12 +20,18 @@
  *   - 32 chirps per elevation
  *   - 31 elevations per azimuth
  *   - 50 azimuths per full scan
- *   - Each chirp: Long chirp → Listen → Guard → Short chirp → Listen
  *
- * Modes of operation:
+ * Chirp sequence depends on range_mode (host_range_mode, opcode 0x20):
+ *   range_mode 2'b00 (3 km):  All short chirps only. Long chirp blind zone
+ *     (4500 m) exceeds 3 km max range, so long chirps are useless.
+ *   range_mode 2'b01 (long-range): Dual chirp — Long chirp → Listen → Guard
+ *     → Short chirp → Listen. First half of chirps_per_elev are long, second
+ *     half are short (blind-zone fill).
+ *
+ * Modes of operation (host_radar_mode, opcode 0x01):
  *   mode[1:0]:
  *     2'b00 = STM32-driven (pass through stm32 toggle signals)
- *     2'b01 = Free-running auto-scan (internal timing)
+ *     2'b01 = Free-running auto-scan (internal timing, short chirps only)
  *     2'b10 = Single-chirp (fire one chirp per trigger, for debug)
  *     2'b11 = Reserved
  *
@@ -31,9 +39,9 @@
  */
 
 module radar_mode_controller #(
-    parameter CHIRPS_PER_ELEVATION = 32,
+    parameter CHIRPS_PER_ELEVATION  = `RP_DEF_CHIRPS_PER_ELEV,
     parameter ELEVATIONS_PER_AZIMUTH = 31,
-    parameter AZIMUTHS_PER_SCAN = 50,
+    parameter AZIMUTHS_PER_SCAN     = 50,
 
     // Timing in 100 MHz clock cycles
     // Long chirp: 30us = 3000 cycles at 100 MHz
@@ -41,17 +49,23 @@ module radar_mode_controller #(
     // Guard: 175.4us = 17540 cycles
     // Short chirp: 0.5us = 50 cycles
     // Short listen: 174.5us = 17450 cycles
-    parameter LONG_CHIRP_CYCLES   = 3000,
-    parameter LONG_LISTEN_CYCLES  = 13700,
-    parameter GUARD_CYCLES        = 17540,
-    parameter SHORT_CHIRP_CYCLES  = 50,
-    parameter SHORT_LISTEN_CYCLES = 17450
+    parameter LONG_CHIRP_CYCLES   = `RP_DEF_LONG_CHIRP_CYCLES,
+    parameter LONG_LISTEN_CYCLES  = `RP_DEF_LONG_LISTEN_CYCLES,
+    parameter GUARD_CYCLES        = `RP_DEF_GUARD_CYCLES,
+    parameter SHORT_CHIRP_CYCLES  = `RP_DEF_SHORT_CHIRP_CYCLES,
+    parameter SHORT_LISTEN_CYCLES = `RP_DEF_SHORT_LISTEN_CYCLES
 ) (
     input wire clk,
     input wire reset_n,
 
-    // Mode selection
+    // Mode selection (host_radar_mode, opcode 0x01)
     input wire [1:0] mode,          // 00=STM32, 01=auto, 10=single, 11=rsvd
+
+    // Range mode (host_range_mode, opcode 0x20)
+    // Determines chirp type selection in pass-through and auto-scan modes.
+    //   2'b00 = 3 km  (all short chirps — long blind zone > max range)
+    //   2'b01 = Long-range (dual chirp: first half long, second half short)
+    input wire [1:0] range_mode,
 
     // STM32 pass-through inputs (active in mode 00)
     input wire stm32_new_chirp,
@@ -61,10 +75,8 @@ module radar_mode_controller #(
     // Single-chirp trigger (active in mode 10)
     input wire trigger,
 
-    // Gap 2: Runtime-configurable timing inputs from host USB commands.
+    // Runtime-configurable timing inputs from host USB commands.
     // When connected, these override the compile-time parameters.
-    // When left at default (tied to parameter values at instantiation),
-    // behavior is identical to pre-Gap-2.
     input wire [15:0] cfg_long_chirp_cycles,
     input wire [15:0] cfg_long_listen_cycles,
     input wire [15:0] cfg_guard_cycles,
@@ -156,7 +168,7 @@ always @(posedge clk or negedge reset_n) begin
     if (!reset_n) begin
         scan_state      <= S_IDLE;
         timer           <= 18'd0;
-        use_long_chirp  <= 1'b1;
+        use_long_chirp  <= 1'b0;  // Default short chirp (safe for 3 km mode)
         mc_new_chirp    <= 1'b0;
         mc_new_elevation <= 1'b0;
         mc_new_azimuth  <= 1'b0;
@@ -172,7 +184,12 @@ always @(posedge clk or negedge reset_n) begin
         // ================================================================
         // MODE 00: STM32-driven pass-through
         // The STM32 firmware controls timing; we just detect toggle edges
-        // and forward them to the receiver chain.
+        // and forward them to the receiver chain. Chirp type is determined
+        // by range_mode:
+        //   range_mode 00 (3 km):  ALL chirps are short (long blind zone
+        //     4500 m exceeds 3072 m max range, so long chirps are useless).
+        //   range_mode 01 (long-range): First half of chirps_per_elev are
+        //     long, second half are short (blind-zone fill).
         // ================================================================
         2'b00: begin
             // Reset auto-scan state
@@ -182,9 +199,29 @@ always @(posedge clk or negedge reset_n) begin
             // Pass through toggle signals
             if (stm32_chirp_toggle) begin
                 mc_new_chirp <= ~mc_new_chirp;  // Toggle output
-                use_long_chirp <= 1'b1;         // Default to long chirp
 
-                // Track chirp count (Gap 2: use runtime cfg_chirps_per_elev)
+                // Determine chirp type based on range_mode
+                case (range_mode)
+                `RP_RANGE_MODE_3KM: begin
+                    // 3 km mode: all short chirps
+                    use_long_chirp <= 1'b0;
+                end
+                `RP_RANGE_MODE_LONG: begin
+                    // Long-range: first half long, second half short.
+                    // chirps_per_elev is typically 32 (16 long + 16 short).
+                    // Use cfg_chirps_per_elev[5:1] as the halfway point.
+                    if (chirp_count < {1'b0, cfg_chirps_per_elev[5:1]})
+                        use_long_chirp <= 1'b1;
+                    else
+                        use_long_chirp <= 1'b0;
+                end
+                default: begin
+                    // Reserved modes: default to short chirp (safe)
+                    use_long_chirp <= 1'b0;
+                end
+                endcase
+
+                // Track chirp count
                 if (chirp_count < cfg_chirps_per_elev - 1)
                     chirp_count <= chirp_count + 1;
                 else
@@ -217,21 +254,33 @@ always @(posedge clk or negedge reset_n) begin
         // ================================================================
         // MODE 01: Free-running auto-scan
         // Internally generates chirp timing matching the transmitter.
+        // For 3 km mode (range_mode 00): short chirps only. The long chirp
+        // blind zone (4500 m) exceeds the 3072 m max range, making long
+        // chirps useless. State machine skips S_LONG_CHIRP/LISTEN/GUARD.
+        // For long-range mode (range_mode 01): full dual-chirp sequence.
+        // NOTE: Auto-scan is primarily for bench testing without STM32.
         // ================================================================
         2'b01: begin
             case (scan_state)
             S_IDLE: begin
                 // Start first chirp immediately
-                scan_state     <= S_LONG_CHIRP;
-                timer          <= 18'd0;
-                use_long_chirp <= 1'b1;
-                mc_new_chirp   <= ~mc_new_chirp;  // Toggle to start chirp
-                chirp_count    <= 6'd0;
+                timer           <= 18'd0;
+                chirp_count     <= 6'd0;
                 elevation_count <= 6'd0;
-                azimuth_count  <= 6'd0;
+                azimuth_count   <= 6'd0;
+                mc_new_chirp    <= ~mc_new_chirp;  // Toggle to start chirp
+
+                // For 3 km mode, skip directly to short chirp
+                if (range_mode == `RP_RANGE_MODE_3KM) begin
+                    scan_state     <= S_SHORT_CHIRP;
+                    use_long_chirp <= 1'b0;
+                end else begin
+                    scan_state     <= S_LONG_CHIRP;
+                    use_long_chirp <= 1'b1;
+                end
 
                 `ifdef SIMULATION
-                $display("[MODE_CTRL] Auto-scan starting");
+                $display("[MODE_CTRL] Auto-scan starting, range_mode=%0d", range_mode);
                 `endif
             end
 
@@ -285,13 +334,19 @@ always @(posedge clk or negedge reset_n) begin
 
             S_ADVANCE: begin
                 // Advance chirp/elevation/azimuth counters
-                // (Gap 2: use runtime cfg_chirps_per_elev)
                 if (chirp_count < cfg_chirps_per_elev - 1) begin
                     // Next chirp in current elevation
                     chirp_count  <= chirp_count + 1;
                     mc_new_chirp <= ~mc_new_chirp;
-                    scan_state   <= S_LONG_CHIRP;
-                    use_long_chirp <= 1'b1;
+
+                    // For 3 km mode: short chirps only, skip long phases
+                    if (range_mode == `RP_RANGE_MODE_3KM) begin
+                        scan_state     <= S_SHORT_CHIRP;
+                        use_long_chirp <= 1'b0;
+                    end else begin
+                        scan_state     <= S_LONG_CHIRP;
+                        use_long_chirp <= 1'b1;
+                    end
                 end else begin
                     chirp_count <= 6'd0;
 
@@ -300,8 +355,14 @@ always @(posedge clk or negedge reset_n) begin
                         elevation_count  <= elevation_count + 1;
                         mc_new_chirp     <= ~mc_new_chirp;
                         mc_new_elevation <= ~mc_new_elevation;
-                        scan_state       <= S_LONG_CHIRP;
-                        use_long_chirp   <= 1'b1;
+
+                        if (range_mode == `RP_RANGE_MODE_3KM) begin
+                            scan_state     <= S_SHORT_CHIRP;
+                            use_long_chirp <= 1'b0;
+                        end else begin
+                            scan_state     <= S_LONG_CHIRP;
+                            use_long_chirp <= 1'b1;
+                        end
                     end else begin
                         elevation_count <= 6'd0;
 
@@ -311,8 +372,14 @@ always @(posedge clk or negedge reset_n) begin
                             mc_new_chirp     <= ~mc_new_chirp;
                             mc_new_elevation <= ~mc_new_elevation;
                             mc_new_azimuth   <= ~mc_new_azimuth;
-                            scan_state       <= S_LONG_CHIRP;
-                            use_long_chirp   <= 1'b1;
+
+                            if (range_mode == `RP_RANGE_MODE_3KM) begin
+                                scan_state     <= S_SHORT_CHIRP;
+                                use_long_chirp <= 1'b0;
+                            end else begin
+                                scan_state     <= S_LONG_CHIRP;
+                                use_long_chirp <= 1'b1;
+                            end
                         end else begin
                             // Full scan complete — restart
                             azimuth_count   <= 6'd0;
@@ -320,8 +387,14 @@ always @(posedge clk or negedge reset_n) begin
                             mc_new_chirp    <= ~mc_new_chirp;
                             mc_new_elevation <= ~mc_new_elevation;
                             mc_new_azimuth  <= ~mc_new_azimuth;
-                            scan_state      <= S_LONG_CHIRP;
-                            use_long_chirp  <= 1'b1;
+
+                            if (range_mode == `RP_RANGE_MODE_3KM) begin
+                                scan_state     <= S_SHORT_CHIRP;
+                                use_long_chirp <= 1'b0;
+                            end else begin
+                                scan_state     <= S_LONG_CHIRP;
+                                use_long_chirp <= 1'b1;
+                            end
 
                             `ifdef SIMULATION
                             $display("[MODE_CTRL] Full scan complete, restarting");
@@ -337,16 +410,27 @@ always @(posedge clk or negedge reset_n) begin
 
         // ================================================================
         // MODE 10: Single-chirp (debug mode)
-        // Fire one long chirp per trigger pulse, no scanning.
+        // Fire one chirp per trigger pulse, no scanning.
+        // Chirp type depends on range_mode:
+        //   3 km:  short chirp only
+        //   Long-range: long chirp (for testing long-chirp path)
         // ================================================================
         2'b10: begin
             case (scan_state)
             S_IDLE: begin
                 if (trigger_pulse) begin
-                    scan_state     <= S_LONG_CHIRP;
-                    timer          <= 18'd0;
-                    use_long_chirp <= 1'b1;
-                    mc_new_chirp   <= ~mc_new_chirp;
+                    timer        <= 18'd0;
+                    mc_new_chirp <= ~mc_new_chirp;
+
+                    if (range_mode == `RP_RANGE_MODE_3KM) begin
+                        // 3 km: fire short chirp
+                        scan_state     <= S_SHORT_CHIRP;
+                        use_long_chirp <= 1'b0;
+                    end else begin
+                        // Long-range: fire long chirp
+                        scan_state     <= S_LONG_CHIRP;
+                        use_long_chirp <= 1'b1;
+                    end
                 end
             end
 
@@ -363,7 +447,27 @@ always @(posedge clk or negedge reset_n) begin
                 if (timer < cfg_long_listen_cycles - 1)
                     timer <= timer + 1;
                 else begin
-                    // Single chirp done, return to idle
+                    // Single long chirp done, return to idle
+                    timer      <= 18'd0;
+                    scan_state <= S_IDLE;
+                end
+            end
+
+            S_SHORT_CHIRP: begin
+                use_long_chirp <= 1'b0;
+                if (timer < cfg_short_chirp_cycles - 1)
+                    timer <= timer + 1;
+                else begin
+                    timer <= 18'd0;
+                    scan_state <= S_SHORT_LISTEN;
+                end
+            end
+
+            S_SHORT_LISTEN: begin
+                if (timer < cfg_short_listen_cycles - 1)
+                    timer <= timer + 1;
+                else begin
+                    // Single short chirp done, return to idle
                     timer      <= 18'd0;
                     scan_state <= S_IDLE;
                 end

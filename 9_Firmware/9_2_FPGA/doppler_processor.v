@@ -32,13 +32,15 @@
 //     w[n] = 0.54 - 0.46 * cos(2*pi*n/15), n=0..15
 // ============================================================================
 
+`include "radar_params.vh"
+
 module doppler_processor_optimized #(
-    parameter DOPPLER_FFT_SIZE   = 16,     // FFT size per sub-frame (was 32)
-    parameter RANGE_BINS         = 64,
-    parameter CHIRPS_PER_FRAME   = 32,     // Total chirps in frame (16+16)
-    parameter CHIRPS_PER_SUBFRAME = 16,    // Chirps per sub-frame
+    parameter DOPPLER_FFT_SIZE   = `RP_DOPPLER_FFT_SIZE,    // 16
+    parameter RANGE_BINS         = `RP_NUM_RANGE_BINS,      // 512
+    parameter CHIRPS_PER_FRAME   = `RP_CHIRPS_PER_FRAME,    // 32
+    parameter CHIRPS_PER_SUBFRAME = `RP_CHIRPS_PER_SUBFRAME, // 16
     parameter WINDOW_TYPE        = 0,      // 0=Hamming, 1=Rectangular
-    parameter DATA_WIDTH         = 16
+    parameter DATA_WIDTH         = `RP_DATA_WIDTH           // 16
 )(
     input wire clk,
     input wire reset_n,
@@ -48,7 +50,7 @@ module doppler_processor_optimized #(
     output reg [31:0] doppler_output,
     output reg doppler_valid,
     output reg [4:0] doppler_bin,      // {sub_frame, bin[3:0]}
-    output reg [5:0] range_bin,
+    output reg [`RP_RANGE_BIN_BITS-1:0] range_bin,  // 9-bit
     output reg sub_frame,              // 0=long PRI, 1=short PRI
     output wire processing_active,
     output wire frame_complete,
@@ -57,16 +59,16 @@ module doppler_processor_optimized #(
 `ifdef FORMAL
     ,
     output wire [2:0]  fv_state,
-    output wire [10:0] fv_mem_write_addr,
-    output wire [10:0] fv_mem_read_addr,
-    output wire [5:0]  fv_write_range_bin,
+    output wire [`RP_DOPPLER_MEM_ADDR_W-1:0] fv_mem_write_addr,
+    output wire [`RP_DOPPLER_MEM_ADDR_W-1:0] fv_mem_read_addr,
+    output wire [`RP_RANGE_BIN_BITS-1:0]     fv_write_range_bin,
     output wire [4:0]  fv_write_chirp_index,
-    output wire [5:0]  fv_read_range_bin,
+    output wire [`RP_RANGE_BIN_BITS-1:0]     fv_read_range_bin,
     output wire [4:0]  fv_read_doppler_index,
     output wire [9:0]  fv_processing_timeout,
     output wire        fv_frame_buffer_full,
     output wire        fv_mem_we,
-    output wire [10:0] fv_mem_waddr_r
+    output wire [`RP_DOPPLER_MEM_ADDR_W-1:0] fv_mem_waddr_r
 `endif
 );
 
@@ -115,9 +117,9 @@ localparam MEM_DEPTH = RANGE_BINS * CHIRPS_PER_FRAME;
 // ==============================================
 // Control Registers
 // ==============================================
-reg [5:0] write_range_bin;
+reg [`RP_RANGE_BIN_BITS-1:0] write_range_bin;
 reg [4:0] write_chirp_index;
-reg [5:0] read_range_bin;
+reg [`RP_RANGE_BIN_BITS-1:0] read_range_bin;
 reg [4:0] read_doppler_index;
 reg frame_buffer_full;
 reg [9:0] chirps_received;
@@ -147,8 +149,8 @@ wire fft_output_last;
 // ==============================================
 // Addressing
 // ==============================================
-wire [10:0] mem_write_addr;
-wire [10:0] mem_read_addr;
+wire [`RP_DOPPLER_MEM_ADDR_W-1:0] mem_write_addr;
+wire [`RP_DOPPLER_MEM_ADDR_W-1:0] mem_read_addr;
 
 assign mem_write_addr = (write_chirp_index * RANGE_BINS) + write_range_bin;
 assign mem_read_addr = (read_doppler_index * RANGE_BINS) + read_range_bin;
@@ -180,7 +182,7 @@ reg [9:0] processing_timeout;
 
 // Memory write enable and data signals
 reg mem_we;
-reg [10:0] mem_waddr_r;
+reg [`RP_DOPPLER_MEM_ADDR_W-1:0] mem_waddr_r;
 reg [DATA_WIDTH-1:0] mem_wdata_i, mem_wdata_q;
 
 // Memory read data
@@ -531,6 +533,11 @@ xfft_16 fft_inst (
 // Status Outputs
 // ==============================================
 assign processing_active = (state != S_IDLE);
+// NOTE: frame_complete is a LEVEL, not a pulse. It is high whenever the
+// doppler processor is idle with no buffered frame. radar_receiver_final.v
+// converts this to a single-cycle rising-edge pulse before routing to
+// downstream consumers (USB FT2232H, AGC, CFAR). Do NOT connect this
+// level output directly to modules that expect a pulse.
 assign frame_complete = (state == S_IDLE && frame_buffer_full == 0);
 
 endmodule

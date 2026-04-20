@@ -15,25 +15,27 @@
  *   .clk, .reset_n
  *   .adc_data_i, .adc_data_q, .adc_valid      <- from input buffer
  *   .chirp_counter                              <- 6-bit frame counter
- *   .long_chirp_real/imag, .short_chirp_real/imag <- reference (time-domain)
+ *   .ref_chirp_real/imag                     <- reference (time-domain)
  *   .range_profile_i, .range_profile_q, .range_profile_valid -> output
  *   .chain_state                                -> 4-bit status
  *
  * Clock domain: clk (100 MHz system clock)
  * Data format:  16-bit signed (Q15 fixed-point)
- * FFT size:     1024 points
+ * FFT size:     2048 points (parameterized via radar_params.vh)
  *
  * Pipeline states:
- *   IDLE -> FWD_FFT (collect 1024 samples + bit-reverse copy)
+ *   IDLE -> FWD_FFT (collect 2048 samples + bit-reverse copy)
  *        -> FWD_BUTTERFLY (forward FFT of signal)
  *        -> REF_BITREV (bit-reverse copy reference into work arrays)
  *        -> REF_BUTTERFLY (forward FFT of reference)
  *        -> MULTIPLY (conjugate multiply in freq domain)
  *        -> INV_BITREV (bit-reverse copy product)
  *        -> INV_BUTTERFLY (inverse FFT + 1/N scaling)
- *        -> OUTPUT (stream 1024 samples)
+ *        -> OUTPUT (stream 2048 samples)
  *        -> DONE -> IDLE
  */
+
+`include "radar_params.vh"
 
 module matched_filter_processing_chain (
     input wire clk,
@@ -48,10 +50,10 @@ module matched_filter_processing_chain (
     input wire [5:0] chirp_counter,
 
     // Reference chirp (time-domain, latency-aligned by upstream buffer)
-    input wire [15:0] long_chirp_real,
-    input wire [15:0] long_chirp_imag,
-    input wire [15:0] short_chirp_real,
-    input wire [15:0] short_chirp_imag,
+    // Upstream chirp_memory_loader_param selects long/short reference
+    // via use_long_chirp — this single pair carries whichever is active.
+    input wire [15:0] ref_chirp_real,
+    input wire [15:0] ref_chirp_imag,
 
     // Output: range profile (pulse-compressed)
     output wire signed [15:0] range_profile_i,
@@ -66,8 +68,8 @@ module matched_filter_processing_chain (
 // ============================================================================
 // PARAMETERS
 // ============================================================================
-localparam FFT_SIZE   = 1024;
-localparam ADDR_BITS  = 10;    // log2(1024)
+localparam FFT_SIZE   = `RP_FFT_SIZE;    // 2048
+localparam ADDR_BITS  = `RP_LOG2_FFT_SIZE; // log2(2048) = 11
 
 // State encoding (4-bit, up to 16 states)
 localparam [3:0] ST_IDLE           = 4'd0;
@@ -87,8 +89,8 @@ reg [3:0] state;
 // SIGNAL BUFFERS
 // ============================================================================
 // Input sample counter
-reg [ADDR_BITS:0] fwd_in_count;     // 0..1024
-reg fwd_frame_done;                  // All 1024 samples received
+reg [ADDR_BITS:0] fwd_in_count;     // 0..FFT_SIZE
+reg fwd_frame_done;                  // All FFT_SIZE samples received
 
 // Signal time-domain buffer
 reg signed [15:0] fwd_buf_i [0:FFT_SIZE-1];
@@ -175,7 +177,7 @@ always @(posedge clk or negedge reset_n) begin
 
         case (state)
         // ================================================================
-        // IDLE: Wait for valid ADC data, start collecting 1024 samples
+        // IDLE: Wait for valid ADC data, start collecting 2048 samples
         // ================================================================
         ST_IDLE: begin
             fwd_in_count   <= 0;
@@ -189,8 +191,8 @@ always @(posedge clk or negedge reset_n) begin
                 // Store first sample (signal + reference)
                 fwd_buf_i[0] <= $signed(adc_data_i);
                 fwd_buf_q[0] <= $signed(adc_data_q);
-                ref_buf_i[0] <= $signed(long_chirp_real);
-                ref_buf_q[0] <= $signed(long_chirp_imag);
+                ref_buf_i[0] <= $signed(ref_chirp_real);
+                ref_buf_q[0] <= $signed(ref_chirp_imag);
                 fwd_in_count <= 1;
                 state        <= ST_FWD_FFT;
             end
@@ -198,6 +200,7 @@ always @(posedge clk or negedge reset_n) begin
 
         // ================================================================
         // FWD_FFT: Collect remaining samples, then bit-reverse copy signal
+        // (2048 samples total)
         // ================================================================
         ST_FWD_FFT: begin
             if (!fwd_frame_done) begin
@@ -205,8 +208,8 @@ always @(posedge clk or negedge reset_n) begin
                 if (adc_valid && fwd_in_count < FFT_SIZE) begin
                     fwd_buf_i[fwd_in_count] <= $signed(adc_data_i);
                     fwd_buf_q[fwd_in_count] <= $signed(adc_data_q);
-                    ref_buf_i[fwd_in_count] <= $signed(long_chirp_real);
-                    ref_buf_q[fwd_in_count] <= $signed(long_chirp_imag);
+                    ref_buf_i[fwd_in_count] <= $signed(ref_chirp_real);
+                    ref_buf_q[fwd_in_count] <= $signed(ref_chirp_imag);
                     fwd_in_count <= fwd_in_count + 1;
                 end
 
@@ -437,7 +440,7 @@ always @(posedge clk or negedge reset_n) begin
                 end
             end
 
-            // Scale by 1/N (right shift by log2(1024) = 10) and store
+            // Scale by 1/N (right shift by log2(2048) = 11) and store
             for (i = 0; i < FFT_SIZE; i = i + 1) begin : ifft_scale
                 reg signed [31:0] scaled_re, scaled_im;
                 scaled_re = work_re[i] >>> ADDR_BITS;
@@ -467,7 +470,7 @@ always @(posedge clk or negedge reset_n) begin
         end
 
         // ================================================================
-        // OUTPUT: Stream out 1024 range profile samples, one per clock
+        // OUTPUT: Stream out 2048 range profile samples, one per clock
         // ================================================================
         ST_OUTPUT: begin
             if (out_count < FFT_SIZE) begin
@@ -531,16 +534,16 @@ end
 // ============================================================================
 // SYNTHESIS IMPLEMENTATION — Radix-2 DIT FFT via fft_engine
 // ============================================================================
-// Uses a single fft_engine instance (1024-pt) reused 3 times:
+// Uses a single fft_engine instance (2048-pt) reused 3 times:
 //   1. Forward FFT of signal
 //   2. Forward FFT of reference
 //   3. Inverse FFT of conjugate product
 // Conjugate multiply done via frequency_matched_filter (4-stage pipeline).
 //
 // Buffer scheme (BRAM-inferrable):
-//   sig_buf[1024]:  ADC input -> signal FFT output
-//   ref_buf[1024]:  Reference input -> reference FFT output
-//   prod_buf[1024]: Conjugate multiply output -> IFFT output
+//   sig_buf[2048]:  ADC input -> signal FFT output
+//   ref_buf[2048]:  Reference input -> reference FFT output
+//   prod_buf[2048]: Conjugate multiply output -> IFFT output
 //
 // Memory access is INSIDE always @(posedge clk) blocks (no async reset)
 // using local blocking variables. This eliminates NBA race conditions
@@ -552,12 +555,12 @@ end
 //   out_primed   — for output streaming
 // ============================================================================
 
-localparam FFT_SIZE  = 1024;
-localparam ADDR_BITS = 10;
+localparam FFT_SIZE  = `RP_FFT_SIZE;    // 2048
+localparam ADDR_BITS = `RP_LOG2_FFT_SIZE; // 11
 
 // State encoding
 localparam [3:0] ST_IDLE     = 4'd0,
-                 ST_COLLECT  = 4'd1,   // Collect 1024 ADC + ref samples
+                 ST_COLLECT  = 4'd1,   // Collect FFT_SIZE ADC + ref samples
                  ST_SIG_FFT  = 4'd2,   // Forward FFT of signal
                  ST_SIG_CAP  = 4'd3,   // Capture signal FFT output
                  ST_REF_FFT  = 4'd4,   // Forward FFT of reference
@@ -565,7 +568,7 @@ localparam [3:0] ST_IDLE     = 4'd0,
                  ST_MULTIPLY = 4'd6,   // Conjugate multiply (pipelined)
                  ST_INV_FFT  = 4'd7,   // Inverse FFT of product
                  ST_INV_CAP  = 4'd8,   // Capture IFFT output
-                 ST_OUTPUT   = 4'd9,   // Stream 1024 results
+                 ST_OUTPUT   = 4'd9,   // Stream FFT_SIZE results
                  ST_DONE     = 4'd10;
 
 reg [3:0] state;
@@ -588,11 +591,11 @@ reg signed [15:0] prod_rdata_i, prod_rdata_q;
 // ============================================================================
 // COUNTERS
 // ============================================================================
-reg [ADDR_BITS:0] collect_count;   // 0..1024 for sample collection
-reg [ADDR_BITS:0] feed_count;      // 0..1024 for feeding FFT engine
-reg [ADDR_BITS:0] cap_count;       // 0..1024 for capturing FFT output
-reg [ADDR_BITS:0] mult_count;      // 0..1024 for multiply feeding
-reg [ADDR_BITS:0] out_count;       // 0..1024 for output streaming
+reg [ADDR_BITS:0] collect_count;   // 0..FFT_SIZE for sample collection
+reg [ADDR_BITS:0] feed_count;      // 0..FFT_SIZE for feeding FFT engine
+reg [ADDR_BITS:0] cap_count;       // 0..FFT_SIZE for capturing FFT output
+reg [ADDR_BITS:0] mult_count;      // 0..FFT_SIZE for multiply feeding
+reg [ADDR_BITS:0] out_count;       // 0..FFT_SIZE for output streaming
 
 // BRAM read latency pipeline flags
 reg feed_primed;   // 1 = BRAM rdata valid for feed operations
@@ -617,7 +620,7 @@ fft_engine #(
     .DATA_W(16),
     .INTERNAL_W(32),
     .TWIDDLE_W(16),
-    .TWIDDLE_FILE("fft_twiddle_1024.mem")
+    .TWIDDLE_FILE("fft_twiddle_2048.mem")
 ) fft_inst (
     .clk(clk),
     .reset_n(reset_n),
@@ -775,16 +778,16 @@ always @(posedge clk) begin : ref_bram_port
         if (adc_valid) begin
             we      = 1'b1;
             addr    = 0;
-            wdata_i = $signed(long_chirp_real);
-            wdata_q = $signed(long_chirp_imag);
+            wdata_i = $signed(ref_chirp_real);
+            wdata_q = $signed(ref_chirp_imag);
         end
     end
     ST_COLLECT: begin
         if (adc_valid && collect_count < FFT_SIZE) begin
             we      = 1'b1;
             addr    = collect_count[ADDR_BITS-1:0];
-            wdata_i = $signed(long_chirp_real);
-            wdata_q = $signed(long_chirp_imag);
+            wdata_i = $signed(ref_chirp_real);
+            wdata_q = $signed(ref_chirp_imag);
         end
     end
     ST_REF_FFT: begin
@@ -968,7 +971,7 @@ always @(posedge clk or negedge reset_n) begin
         end
 
         // ================================================================
-        // COLLECT: Gather 1024 ADC + reference samples
+        // COLLECT: Gather 2048 ADC + reference samples
         // Writes happen in sig/ref BRAM ports (they see state==ST_COLLECT)
         // ================================================================
         ST_COLLECT: begin
@@ -977,7 +980,7 @@ always @(posedge clk or negedge reset_n) begin
             end
 
             if (collect_count == FFT_SIZE) begin
-                // All 1024 samples collected — start signal FFT
+                // All 2048 samples collected — start signal FFT
                 state       <= ST_SIG_FFT;
                 fft_start   <= 1'b1;
                 fft_inverse <= 1'b0;  // Forward FFT
@@ -1091,7 +1094,7 @@ always @(posedge clk or negedge reset_n) begin
         // ================================================================
         // MULTIPLY: Stream sig FFT and ref FFT through freq_matched_filter
         // Both sig_buf and ref_buf are read simultaneously (separate BRAM
-        // ports). Pipeline latency = 4 clocks. Feed 1024 pairs, then flush.
+        // ports). Pipeline latency = 4 clocks. Feed 2048 pairs, then flush.
         // ================================================================
         ST_MULTIPLY: begin
             if (mult_count < FFT_SIZE) begin
@@ -1180,7 +1183,7 @@ always @(posedge clk or negedge reset_n) begin
         end
 
         // ================================================================
-        // OUTPUT: Stream 1024 range profile samples
+        // OUTPUT: Stream 2048 range profile samples
         // BRAM read latency: present address, data valid next cycle.
         // ================================================================
         ST_OUTPUT: begin
