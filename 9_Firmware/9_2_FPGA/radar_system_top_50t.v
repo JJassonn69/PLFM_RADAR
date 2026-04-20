@@ -71,7 +71,7 @@ module radar_system_top_50t (
     input wire stm32_mixers_enable,
 
     // ===== FT2232H USB 2.0 Interface (Bank 35: 3.3V) =====
-    input wire ft_clkout,             // 60 MHz from FT2232H CLKOUT (MRCC pin C4)
+    input wire ft_clkout,             // 60 MHz from FT2232H CLKOUT (SRCC pin C4 — not MRCC)
     inout wire [7:0] ft_data,         // 8-bit bidirectional data bus
     input wire ft_rxf_n,              // RX FIFO not empty (active low)
     input wire ft_txe_n,              // TX FIFO not full (active low)
@@ -85,6 +85,25 @@ module radar_system_top_50t (
     output wire gpio_dig6,            // DIG_6 (G12→PD14): reserved
     output wire gpio_dig7             // DIG_7 (H12→PD15): reserved
 );
+
+    // ===== FT2232H clock buffering — IBUF → BUFIO → BUFR =====
+    // C4 is SRCC (IS_CLK_CAPABLE=1, IS_MASTER=0). SRCC cannot drive BUFG
+    // with dedicated routing, but can drive BUFIO → BUFR regionally. All
+    // ft_clkout-domain logic fits in Bank 35's clock region. All three
+    // primitives must live in the same hierarchical scope so Vivado can
+    // shape-pack IBUF↔BUFIO correctly — that's why this lives here in the
+    // wrapper and not inside u_core.
+    wire ft_clkout_ibuf;
+    wire ft_clkout_bufio;
+    wire ft_clkout_bufr;
+    IBUF     ibuf_ft   (.I(ft_clkout),       .O(ft_clkout_ibuf));
+    BUFIO    bufio_ft  (.I(ft_clkout_ibuf),  .O(ft_clkout_bufio));
+    BUFR #(.BUFR_DIVIDE("BYPASS"), .SIM_DEVICE("7SERIES")) bufr_ft (
+        .I(ft_clkout_bufio),
+        .O(ft_clkout_bufr),
+        .CE(1'b1),
+        .CLR(1'b0)
+    );
 
     // ===== Tie-off wires for unconstrained FT601 inputs (inactive with USB_MODE=1) =====
     wire        ft601_txe_tied    = 1'b0;
@@ -123,7 +142,7 @@ module radar_system_top_50t (
         // ----- Clocks & Reset -----
         .clk_100m               (clk_100m),
         .clk_120m_dac           (clk_120m_dac),
-        .ft601_clk_in           (ft_clkout),         // FT2232H 60 MHz CLKOUT → shared USB clock port
+        .ft601_clk_in           (ft_clkout_bufr),    // Pre-buffered via IBUF+BUFIO+BUFR above (SRCC fix)
         .reset_n                (reset_n),
 
         // ----- DAC -----
