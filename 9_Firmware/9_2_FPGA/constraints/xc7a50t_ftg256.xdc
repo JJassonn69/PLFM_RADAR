@@ -359,40 +359,46 @@ set_property DRIVE 8 [get_ports {ft_data[*]}]
 # --------------------------------------------------------------------------
 # FT2232H Source-Synchronous Timing Constraints
 # --------------------------------------------------------------------------
-# FT2232H 245 Synchronous FIFO mode timing (60 MHz, period = 16.667 ns):
+# FT2232H 245 Synchronous FIFO mode timing (60 MHz, period = 16.667 ns).
+# Values per FTDI TN_167 "FT2232H Synchronous FIFO Bus Bridge" — verify
+# against the exact app-note revision before shipping.
 #
-# FPGA Read Path (FT2232H drives data, FPGA samples):
-#   - Data valid before CLKOUT rising edge: t_vr(max) = 7.0 ns
-#   - Data hold after CLKOUT rising edge:   t_hr(min) = 0.0 ns
-#   - Input delay max = period - t_vr = 16.667 - 7.0 = 9.667 ns
-#   - Input delay min = t_hr = 0.0 ns
+# FPGA Read Path (FT2232H drives data/RXF#/TXE#, FPGA samples on CLKOUT↑):
+#   - t_co  (CLKOUT↑ → data valid)   max = 10.0 ns
+#   - t_coh (CLKOUT↑ → data hold)    min = 0.5 ns
+#   - set_input_delay -max = t_co,  -min = t_coh
 #
-# FPGA Write Path (FPGA drives data, FT2232H samples):
-#   - Data setup before next CLKOUT rising: t_su = 5.0 ns
-#   - Data hold after CLKOUT rising:        t_hd = 0.0 ns
-#   - Output delay max = period - t_su = 16.667 - 5.0 = 11.667 ns
-#   - Output delay min = t_hd = 0.0 ns
+# FPGA Write Path (FPGA drives data/WR#/RD#/OE#, FT2232H samples on CLKOUT↑):
+#   - t_su  (data setup before CLKOUT↑)  min = 3.5 ns  (NOT 5 ns — prior
+#           constraint used a synthetic period-based back-calculation)
+#   - t_h   (data hold after CLKOUT↑)    min = 1.0 ns  (NOT 0 — a 0 ns hold
+#           constraint produced no hold check at all)
+#   - set_output_delay -max = t_su, -min = -t_h (Vivado convention)
+#
+# Audit F-2026-04-20 Option B: the previous output_delay = 11.667 ns
+# (= period − 5) over-constrained launch by ~8 ns vs the actual datasheet
+# figure. Relaxing to 3.5 ns matches the chip's real setup requirement.
 # --------------------------------------------------------------------------
 
 # Input delays: FT2232H → FPGA (data bus and status signals)
-set_input_delay -clock [get_clocks ft_clkout] -max 9.667 [get_ports {ft_data[*]}]
-set_input_delay -clock [get_clocks ft_clkout] -min 0.0   [get_ports {ft_data[*]}]
-set_input_delay -clock [get_clocks ft_clkout] -max 9.667 [get_ports {ft_rxf_n}]
-set_input_delay -clock [get_clocks ft_clkout] -min 0.0   [get_ports {ft_rxf_n}]
-set_input_delay -clock [get_clocks ft_clkout] -max 9.667 [get_ports {ft_txe_n}]
-set_input_delay -clock [get_clocks ft_clkout] -min 0.0   [get_ports {ft_txe_n}]
+set_input_delay -clock [get_clocks ft_clkout] -max 10.0 [get_ports {ft_data[*]}]
+set_input_delay -clock [get_clocks ft_clkout] -min 0.5  [get_ports {ft_data[*]}]
+set_input_delay -clock [get_clocks ft_clkout] -max 10.0 [get_ports {ft_rxf_n}]
+set_input_delay -clock [get_clocks ft_clkout] -min 0.5  [get_ports {ft_rxf_n}]
+set_input_delay -clock [get_clocks ft_clkout] -max 10.0 [get_ports {ft_txe_n}]
+set_input_delay -clock [get_clocks ft_clkout] -min 0.5  [get_ports {ft_txe_n}]
 
 # Output delays: FPGA → FT2232H (control strobes and data bus when writing)
-set_output_delay -clock [get_clocks ft_clkout] -max 11.667 [get_ports {ft_data[*]}]
-set_output_delay -clock [get_clocks ft_clkout] -min 0.0    [get_ports {ft_data[*]}]
-set_output_delay -clock [get_clocks ft_clkout] -max 11.667 [get_ports {ft_rd_n}]
-set_output_delay -clock [get_clocks ft_clkout] -min 0.0    [get_ports {ft_rd_n}]
-set_output_delay -clock [get_clocks ft_clkout] -max 11.667 [get_ports {ft_wr_n}]
-set_output_delay -clock [get_clocks ft_clkout] -min 0.0    [get_ports {ft_wr_n}]
-set_output_delay -clock [get_clocks ft_clkout] -max 11.667 [get_ports {ft_oe_n}]
-set_output_delay -clock [get_clocks ft_clkout] -min 0.0    [get_ports {ft_oe_n}]
-set_output_delay -clock [get_clocks ft_clkout] -max 11.667 [get_ports {ft_siwu}]
-set_output_delay -clock [get_clocks ft_clkout] -min 0.0    [get_ports {ft_siwu}]
+set_output_delay -clock [get_clocks ft_clkout] -max 3.5  [get_ports {ft_data[*]}]
+set_output_delay -clock [get_clocks ft_clkout] -min -1.0 [get_ports {ft_data[*]}]
+set_output_delay -clock [get_clocks ft_clkout] -max 3.5  [get_ports {ft_rd_n}]
+set_output_delay -clock [get_clocks ft_clkout] -min -1.0 [get_ports {ft_rd_n}]
+set_output_delay -clock [get_clocks ft_clkout] -max 3.5  [get_ports {ft_wr_n}]
+set_output_delay -clock [get_clocks ft_clkout] -min -1.0 [get_ports {ft_wr_n}]
+set_output_delay -clock [get_clocks ft_clkout] -max 3.5  [get_ports {ft_oe_n}]
+set_output_delay -clock [get_clocks ft_clkout] -min -1.0 [get_ports {ft_oe_n}]
+set_output_delay -clock [get_clocks ft_clkout] -max 3.5  [get_ports {ft_siwu}]
+set_output_delay -clock [get_clocks ft_clkout] -min -1.0 [get_ports {ft_siwu}]
 
 # ============================================================================
 # STATUS / DEBUG OUTPUTS — NO PHYSICAL CONNECTIONS
