@@ -302,7 +302,16 @@ return Micros; //Clock TIM1 -> AHB/APB1 is set to 72MHz/presc+1   presc = 71
 //////////////////////////////////////////////
 
 void delay_us(volatile uint32_t us){
-__HAL_TIM_SET_COUNTER(&htim1,0);  // set the counter value a
+// MCU-N4: chunk requests larger than the TIM1 ARR (0xffff-1 = 65534 ticks
+// at 1 MHz = ~65 ms). Without this, GET_COUNTER never reaches `us` once
+// it wraps and the loop spins forever — a hazard with the PA energized.
+const uint32_t ARR_TICKS = 0xffff - 1;
+while (us > ARR_TICKS) {
+    __HAL_TIM_SET_COUNTER(&htim1, 0);
+    while (__HAL_TIM_GET_COUNTER(&htim1) < ARR_TICKS);
+    us -= ARR_TICKS;
+}
+__HAL_TIM_SET_COUNTER(&htim1, 0);  // set the counter value a
 while (__HAL_TIM_GET_COUNTER(&htim1) < us);  // //Clock TIMx -> AHB/APB1 is set to 72MHz/presc+1   presc = 71
 }
 

@@ -67,7 +67,7 @@ class Opcode(IntEnum):
     RADAR_MODE          = 0x01  # 2-bit mode select
     TRIGGER_PULSE       = 0x02  # self-clearing one-shot trigger
     DETECT_THRESHOLD    = 0x03  # 16-bit detection threshold value
-    STREAM_CONTROL      = 0x04  # 3-bit stream enable mask
+    STREAM_CONTROL      = 0x04  # 6-bit stream enable mask (FPGA: usb_cmd_value[5:0])
 
     # --- Digital gain (0x16) ---
     GAIN_SHIFT          = 0x16  # 4-bit digital gain shift
