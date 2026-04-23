@@ -338,9 +338,13 @@ module tb_matched_filter_processing_chain;
             // not "behavioral noise". See project memory ledger entry RX-NEW-1.
             $display("[FAIL-INFO] Autocorrelation peak at bin %0d (expected 0) — fft_engine bug, see RX-NEW-1", cap_peak_bin);
         end
-        // Behavioral Q15 FFT scatters the peak, so we cannot assert bin
-        // location — but the peak MUST dominate the mean magnitude. This
-        // catches an all-zero/flat output that the old tautology allowed.
+        // RX-NEW-2: For autocorrelation of a *single complex tone*, the time-
+        // domain output is a rotating phasor of constant complex magnitude.
+        // Its |I|+|Q| envelope therefore stays bounded in [|X|^2, sqrt(2)*|X|^2]
+        // — peak/mean is mathematically ~1.0..1.41x, never >2x. The earlier
+        // ">2x" assertion was unsatisfiable regardless of FFT precision.
+        // Correct invariant: output is non-zero and approximately constant-
+        // magnitude (peak/mean <= 2x), which still catches flat-zero output.
         begin : p2m_grp3
             integer k, sum_abs, mean_abs;
             sum_abs = 0;
@@ -353,8 +357,8 @@ module tb_matched_filter_processing_chain;
             $display("  Peak-to-mean |out|: peak=%0d mean=%0d ratio~%0dx",
                      cap_max_abs, mean_abs,
                      (mean_abs == 0) ? 999999 : cap_max_abs / mean_abs);
-            check(cap_max_abs > mean_abs * 2,
-                  "Autocorrelation peak dominates mean (>2x)");
+            check(mean_abs > 0 && cap_max_abs <= mean_abs * 2,
+                  "Tone autocorr: non-zero, approx constant-magnitude (ratio<=2x)");
         end
         check(cap_max_abs > 0, "Peak magnitude > 0");
 
@@ -502,6 +506,9 @@ module tb_matched_filter_processing_chain;
         if (!(cap_peak_bin <= 128 || cap_peak_bin >= FFT_SIZE - 128)) begin
             $display("[FAIL-INFO] Case 1: peak at bin %0d (expected 0) — fft_engine bug, see RX-NEW-1", cap_peak_bin);
         end
+        // RX-NEW-2: DC autocorrelation produces a constant-magnitude output
+        // in the time domain (peak == mean by definition). Use a flatness
+        // bound (peak/mean <= 2x) instead of an unsatisfiable ">2x" check.
         begin : p2m_case1
             integer k, sum_abs, mean_abs;
             sum_abs = 0;
@@ -511,8 +518,8 @@ module tb_matched_filter_processing_chain;
                     + (cap_out_q[k][15] ? -cap_out_q[k] : cap_out_q[k]);
             end
             mean_abs = sum_abs / FFT_SIZE;
-            check(cap_max_abs > mean_abs * 2,
-                  "Case 1: Peak dominates mean (>2x, catches flat/zero output)");
+            check(mean_abs > 0 && cap_max_abs <= mean_abs * 2,
+                  "Case 1: DC autocorr non-zero, approx constant (ratio<=2x)");
         end
         check(cap_max_abs > 0, "Case 1: Peak magnitude > 0");
 
@@ -544,6 +551,8 @@ module tb_matched_filter_processing_chain;
         if (!(cap_peak_bin <= 128 || cap_peak_bin >= FFT_SIZE - 128)) begin
             $display("[FAIL-INFO] Case 2: peak at bin %0d (expected near 0) — fft_engine bug, see RX-NEW-1", cap_peak_bin);
         end
+        // RX-NEW-2: Tone autocorrelation is a rotating phasor — see Group 3
+        // comment. peak/mean cannot exceed sqrt(2)x mathematically.
         begin : p2m_case2
             integer k, sum_abs, mean_abs;
             sum_abs = 0;
@@ -553,8 +562,8 @@ module tb_matched_filter_processing_chain;
                     + (cap_out_q[k][15] ? -cap_out_q[k] : cap_out_q[k]);
             end
             mean_abs = sum_abs / FFT_SIZE;
-            check(cap_max_abs > mean_abs * 2,
-                  "Case 2: Peak dominates mean (>2x, catches flat/zero output)");
+            check(mean_abs > 0 && cap_max_abs <= mean_abs * 2,
+                  "Case 2: Tone autocorr non-zero, approx constant (ratio<=2x)");
         end
         check(cap_max_abs > 0, "Case 2: Peak magnitude > 0");
 
