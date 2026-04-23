@@ -84,7 +84,15 @@ class RadarDataWorker(QThread):
         self._recorder = recorder
         self._gps = gps_data_ref
         self._settings = settings or RadarSettings()
+        # GUI-C3: derive range/velocity resolution from waveform parameters
+        # rather than the RadarSettings placeholders (1.0 m/s velocity was
+        # ~5.3x off for the 167us PRI / 16-chirp sub-frame at 10.5 GHz).
+        from .models import WaveformConfig
+        self._waveform = WaveformConfig()
         self._running = False
+
+    def set_waveform(self, wf) -> None:
+        self._waveform = wf
 
         # Frame queue for production RadarAcquisition → this thread
         self._frame_queue: queue.Queue = queue.Queue(maxsize=4)
@@ -180,8 +188,8 @@ class RadarDataWorker(QThread):
 
         # Extract detections from FPGA CFAR flags
         det_indices = np.argwhere(frame.detections > 0)
-        r_res = self._settings.range_resolution
-        v_res = self._settings.velocity_resolution
+        r_res = self._waveform.range_resolution_m
+        v_res = self._waveform.velocity_resolution_mps
 
         for idx in det_indices:
             rbin, dbin = idx
