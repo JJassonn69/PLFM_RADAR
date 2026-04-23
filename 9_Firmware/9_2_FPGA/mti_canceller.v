@@ -160,11 +160,38 @@ end
 reg has_previous;
 
 // Waveform of the chirp whose profile currently lives in prev_i/prev_q.
-// Latched at end-of-chirp when we mark has_previous=1. Compared against
-// the incoming chirp's waveform at its first bin (range_bin_d1 == 0) to
-// detect a long↔short transition and re-mute.
+// Latched on every range_valid_d1 (use_long_chirp_d1 is constant within a
+// chirp, so this stays consistent inside a chirp; at the first sample of
+// the *next* chirp the OLD value is still present for the combinational
+// `waveform_changed` compare, then updates this cycle to the new value).
+// Updating per-cycle (rather than only at the last bin) keeps the tag
+// correct when range_bin_decimator early-terminates a chirp before
+// `range_bin_d1` ever reaches NUM_RANGE_BINS - 1 (RX-F).
 reg prev_chirp_was_long;
-wire waveform_changed = has_previous
+
+// ============================================================================
+// CHIRP BOUNDARY DETECTION (RX-F: end-of-chirp without depending on the
+// last bin index)
+// ============================================================================
+// `saw_nonzero_bin_in_chirp` is set on the first non-zero bin of the current
+// chirp and cleared on the next bin-0. A bin-0 arrival WITH this flag set
+// = "previous chirp ended, new chirp begins" = chirp_boundary. This works
+// even when the decimator emits only K < NUM_RANGE_BINS bins per chirp
+// (overflow guard at range_bin_decimator.v:306, watchdog at :314).
+reg saw_nonzero_bin_in_chirp;
+
+wire chirp_boundary = range_valid_d1
+                   && (range_bin_d1 == 0)
+                   && saw_nonzero_bin_in_chirp;
+
+// effective_has_previous lifts has_previous=1 *for this cycle* whenever a
+// chirp boundary fires, so MTI can immediately exit mute on the bin-0 of
+// the next chirp instead of waiting for the (potentially never-arriving)
+// last-bin arming. has_previous itself is also set at chirp_boundary so
+// subsequent bins of this chirp see it directly.
+wire effective_has_previous = has_previous || chirp_boundary;
+
+wire waveform_changed = effective_has_previous
                       && (use_long_chirp_d1 != prev_chirp_was_long);
 
 // ============================================================================
@@ -204,18 +231,19 @@ wire diff_q_overflow = (diff_q_full[DATA_WIDTH] != diff_q_full[DATA_WIDTH-1]);
 // ============================================================================
 always @(posedge clk or negedge reset_n) begin
     if (!reset_n) begin
-        range_i_out          <= {DATA_WIDTH{1'b0}};
-        range_q_out          <= {DATA_WIDTH{1'b0}};
-        range_valid_out      <= 1'b0;
-        range_bin_out        <= {`RP_RANGE_BIN_WIDTH_MAX{1'b0}};
-        has_previous         <= 1'b0;
-        mti_first_chirp      <= 1'b1;
-        prev_chirp_was_long  <= 1'b0;
-        mti_saturation_count <= 8'd0;
+        range_i_out              <= {DATA_WIDTH{1'b0}};
+        range_q_out              <= {DATA_WIDTH{1'b0}};
+        range_valid_out          <= 1'b0;
+        range_bin_out            <= {`RP_RANGE_BIN_WIDTH_MAX{1'b0}};
+        has_previous             <= 1'b0;
+        mti_first_chirp          <= 1'b1;
+        prev_chirp_was_long      <= 1'b0;
+        mti_saturation_count     <= 8'd0;
+        saw_nonzero_bin_in_chirp <= 1'b0;
     end else begin
         // Count saturated MTI-active samples (F-6.3). Clamp at 0xFF.
         // Uses d1 pipeline stage to align with diff_i_full/diff_q_full.
-        if (range_valid_d1 && mti_enable_d1 && has_previous
+        if (range_valid_d1 && mti_enable_d1 && effective_has_previous
             && (diff_i_overflow || diff_q_overflow)
             && (mti_saturation_count != 8'hFF)) begin
             mti_saturation_count <= mti_saturation_count + 8'd1;
@@ -224,6 +252,27 @@ always @(posedge clk or negedge reset_n) begin
         range_valid_out <= 1'b0;
 
         if (range_valid_d1) begin
+            // Track non-zero bins so chirp_boundary can fire on the next
+            // bin-0 (RX-F): set on any non-zero bin, clear on bin-0.
+            saw_nonzero_bin_in_chirp <= (range_bin_d1 != 0);
+
+            // Refresh the waveform tag on every valid sample. Within a chirp
+            // this is a no-op (constant). At chirp_boundary the OLD value is
+            // still visible to the combinational `waveform_changed` compare
+            // (read-before-write semantics), then updates this cycle to the
+            // new chirp's value.
+            prev_chirp_was_long <= use_long_chirp_d1;
+
+            // Arm has_previous on either the original last-bin trigger OR a
+            // chirp_boundary (RX-F). After this cycle, prev_i/prev_q holds
+            // a (possibly partial) profile we can subtract against.
+            // Pass-through branch below overrides this back to 0 — last
+            // non-blocking assignment wins.
+            if (range_bin_d1 == NUM_RANGE_BINS - 1 || chirp_boundary) begin
+                has_previous    <= 1'b1;
+                mti_first_chirp <= 1'b0;
+            end
+
             // Output path — range_bin is from the delayed pipeline
             range_bin_out <= range_bin_d1;
 
@@ -232,42 +281,29 @@ always @(posedge clk or negedge reset_n) begin
                 range_i_out     <= range_i_d1;
                 range_q_out     <= range_q_d1;
                 range_valid_out <= 1'b1;
-                // Reset first-chirp state when MTI is disabled
-                has_previous    <= 1'b0;
-                mti_first_chirp <= 1'b1;
-            end else if (!has_previous || waveform_changed) begin
+                // Reset first-chirp state when MTI is disabled — this also
+                // clears saw_nonzero_bin_in_chirp so the first MTI-enabled
+                // chirp after a pass-through run is correctly treated as
+                // "first chirp" and muted (T7).
+                has_previous             <= 1'b0;
+                mti_first_chirp          <= 1'b1;
+                saw_nonzero_bin_in_chirp <= 1'b0;
+            end else if (!effective_has_previous || waveform_changed) begin
                 // No valid previous chirp to subtract from — either the very
                 // first chirp after reset/enable, or the long↔short boundary
                 // in range_mode=01 where the prev buffer holds a different
                 // waveform's profile. Mute output (emit zeros with valid=1
                 // so Doppler still sees the expected chirp count), overwrite
-                // prev_i/prev_q as this chirp streams through the write port,
-                // then re-arm at end-of-chirp with the CURRENT waveform tag.
+                // prev_i/prev_q as this chirp streams through the write port.
                 range_i_out     <= {DATA_WIDTH{1'b0}};
                 range_q_out     <= {DATA_WIDTH{1'b0}};
                 range_valid_out <= 1'b1;
                 mti_first_chirp <= 1'b1;
-
-                // After last range bin of this chirp, the prev buffer now
-                // holds a full copy of THIS chirp's profile — arm for the
-                // next chirp and remember which waveform was written.
-                if (range_bin_d1 == NUM_RANGE_BINS - 1) begin
-                    has_previous        <= 1'b1;
-                    mti_first_chirp     <= 1'b0;
-                    prev_chirp_was_long <= use_long_chirp_d1;
-                end
             end else begin
                 // Normal MTI: subtract previous from current
                 range_i_out     <= diff_i_sat;
                 range_q_out     <= diff_q_sat;
                 range_valid_out <= 1'b1;
-
-                // Refresh the waveform tag at end-of-chirp so the compare
-                // on the next chirp stays correct (same-waveform runs are
-                // the common case and the tag must track them).
-                if (range_bin_d1 == NUM_RANGE_BINS - 1) begin
-                    prev_chirp_was_long <= use_long_chirp_d1;
-                end
             end
         end
     end

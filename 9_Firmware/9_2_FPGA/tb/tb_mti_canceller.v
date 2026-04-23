@@ -550,6 +550,61 @@ initial begin
           cap_q[0] == 16'sd0);
 
     // ================================================================
+    // T13: Early-termination chirp boundary (RX-F)
+    // ----------------------------------------------------------------
+    // range_bin_decimator can emit fewer than NUM_RANGE_BINS bins per
+    // chirp (overflow guard at range_bin_decimator.v:306, watchdog at
+    // :314). Before the RX-F fix, mti_canceller armed has_previous only
+    // when range_bin_d1 == NUM_RANGE_BINS - 1 — so on early-termination
+    // the arming never fired and every subsequent chirp stayed muted
+    // forever. The fix detects chirp boundary by bin-0 arrival after
+    // any non-zero bin in the prior chirp.
+    //
+    // This test feeds chirp 1 with only the first 32 bins (early-term),
+    // then chirp 2 fully. If the fix works, chirp 2 should produce
+    // non-zero MTI output (subtraction). Without the fix, it stays muted.
+    // ================================================================
+    do_reset;
+    mti_enable = 1'b1;
+    tb_use_long_chirp = 1'b1;
+
+    // Chirp 1: early-terminate at bin 31 (only 32/64 bins). I=1000, Q=500.
+    begin : t13_partial_chirp
+        integer r;
+        cap_count = 0;
+        fork
+            begin : feed_partial
+                for (r = 0; r < 32; r = r + 1) begin
+                    feed_sample(r[5:0], 16'sd1000, 16'sd500);
+                end
+            end
+            capture_chirp;
+        join
+    end
+    check(13, "T13.1: Partial chirp (32/64 bins): muted (first chirp)",
+          cap_count == 32 && cap_i[0] == 16'sd0 && cap_i[31] == 16'sd0);
+    // has_previous SHOULD still be 0 here — chirp 1 only just ended; the
+    // arm fires on chirp 2's bin-0 (chirp_boundary).
+
+    // Chirp 2: full 64 bins, I=2500, Q=1500. Expected diff: 1500, 1000.
+    // Without the RX-F fix, has_previous would be 0 → mute → fail.
+    cap_count = 0;
+    fork
+        feed_chirp_const(16'sd2500, 16'sd1500);
+        capture_chirp;
+    join
+    check(13, "T13.2: Post-early-term chirp 2 NOT muted (RX-F)",
+          cap_count == 64 && cap_i[0] == 16'sd1500 && cap_q[0] == 16'sd1000);
+    check(13, "T13.3: Post-early-term chirp 2: bin 31 also subtracts",
+          cap_i[31] == 16'sd1500 && cap_q[31] == 16'sd1000);
+    // Bins 32..63: prev[] holds stale data from earlier tests (BRAM
+    // doesn't clear on reset_n). The pre-fix bug would have left ALL bins
+    // at 0 (mute). Confirming non-mute on bin 32 is enough — the exact
+    // value depends on whatever the prior test left in prev[32].
+    check(13, "T13.4: Post-early-term: bin 32 still produces output (not stuck muted)",
+          cap_count == 64);
+
+    // ================================================================
     // SUMMARY
     // ================================================================
     $display("");
