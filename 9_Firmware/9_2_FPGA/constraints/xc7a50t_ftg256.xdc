@@ -457,6 +457,33 @@ set_false_path -from [get_cells -hierarchical -filter {NAME =~ *reset_sync*_reg*
 set_false_path -from [get_clocks clk_100m] -to [get_clocks adc_dco_p]
 set_false_path -from [get_clocks adc_dco_p] -to [get_clocks clk_100m]
 
+# --------------------------------------------------------------------------
+# CIC comb stages — multicycle path (4-cycle setup / 3-cycle hold)
+# --------------------------------------------------------------------------
+# Comb registers (cic_*/comb_reg[*], cic_*/comb_delay_reg[*][*],
+# cic_*/comb_0_c_reg, cic_*/comb_0_ab_reg, cic_*/comb_0_p_reg) are clocked at
+# adc_dco_p (400 MHz) but their CE pins are driven by data_valid_comb_pipe /
+# data_valid_comb_0_out, which fire once every 4 cycles after the 4× decimator.
+# Effective throughput is 100 MHz, so STA can budget 4·2.5 ns = 10 ns of setup
+# slack instead of 2.5 ns. This frees the DSP48E1s these stages previously
+# occupied (5 per channel × 2 channels = 10 DSPs) and lets fabric carry-chain
+# subtracts close timing comfortably. See cic_decimator_4x_enhanced.v header
+# comment on the comb array declaration.
+set_multicycle_path 4 -setup \
+  -from [get_cells -hierarchical -filter {NAME =~ *cic_*/comb_*reg*}] \
+  -to   [get_cells -hierarchical -filter {NAME =~ *cic_*/comb_*reg*}]
+set_multicycle_path 3 -hold \
+  -from [get_cells -hierarchical -filter {NAME =~ *cic_*/comb_*reg*}] \
+  -to   [get_cells -hierarchical -filter {NAME =~ *cic_*/comb_*reg*}]
+# Also relax the launch path from integrator_sampled_comb (fed by integrator_4
+# DSP48E1 at decimated rate) into comb_0_c_reg.
+set_multicycle_path 4 -setup \
+  -from [get_cells -hierarchical -filter {NAME =~ *cic_*/integrator_sampled_comb_reg*}] \
+  -to   [get_cells -hierarchical -filter {NAME =~ *cic_*/comb_*reg*}]
+set_multicycle_path 3 -hold \
+  -from [get_cells -hierarchical -filter {NAME =~ *cic_*/integrator_sampled_comb_reg*}] \
+  -to   [get_cells -hierarchical -filter {NAME =~ *cic_*/comb_*reg*}]
+
 # clk_100m ↔ clk_120m_dac: CDC via synchronizers in radar_system_top
 set_false_path -from [get_clocks clk_100m] -to [get_clocks clk_120m_dac]
 set_false_path -from [get_clocks clk_120m_dac] -to [get_clocks clk_100m]
