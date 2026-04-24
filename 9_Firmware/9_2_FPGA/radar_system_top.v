@@ -802,6 +802,7 @@ if (USB_MODE == 0) begin : gen_ft601
         .status_short_listen(host_short_listen_cycles),
         .status_chirps_per_elev(host_chirps_per_elev),
         .status_range_mode(host_range_mode),
+        .status_chirps_mismatch(chirps_mismatch_error),
 
         // Self-test status readback
         .status_self_test_flags(self_test_flags_latched),
@@ -874,6 +875,7 @@ end else begin : gen_ft2232h
         .status_short_listen(host_short_listen_cycles),
         .status_chirps_per_elev(host_chirps_per_elev),
         .status_range_mode(host_range_mode),
+        .status_chirps_mismatch(chirps_mismatch_error),
 
         // Self-test status readback
         .status_self_test_flags(self_test_flags_latched),

@@ -131,6 +131,7 @@ module usb_data_interface_ft2232h (
     input wire [15:0] status_short_listen,
     input wire [5:0]  status_chirps_per_elev,
     input wire [1:0]  status_range_mode,
+    input wire        status_chirps_mismatch,  // TX-G: host requested chirps != Doppler FFT size
 
     // Self-test status readback
     input wire [4:0]  status_self_test_flags,
@@ -671,12 +672,13 @@ always @(posedge ft_clk or negedge ft_effective_reset_n) begin
             status_words[1] <= {status_long_chirp, status_long_listen};
             status_words[2] <= {status_guard, status_short_chirp};
             status_words[3] <= {status_short_listen, 10'd0, status_chirps_per_elev};
-            status_words[4] <= {status_agc_current_gain,
-                                status_agc_peak_magnitude,
-                                status_agc_saturation_count,
-                                status_agc_enable,
-                                9'd0,
-                                status_range_mode};
+            status_words[4] <= {status_agc_current_gain,        // [31:28]
+                                status_agc_peak_magnitude,      // [27:20]
+                                status_agc_saturation_count,    // [19:12]
+                                status_agc_enable,              // [11]
+                                status_chirps_mismatch,         // [10] TX-G mismatch flag
+                                8'd0,                           // [9:2] reserved
+                                status_range_mode};             // [1:0]
             status_words[5] <= {7'd0, status_self_test_busy,
                                 8'd0, status_self_test_detail,
                                 3'd0, status_self_test_flags};

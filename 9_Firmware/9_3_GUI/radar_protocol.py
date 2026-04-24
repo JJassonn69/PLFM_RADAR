@@ -147,6 +147,7 @@ class StatusResponse:
     agc_peak_magnitude: int = 0  # 8-bit peak magnitude [7:0]
     agc_saturation_count: int = 0  # 8-bit saturation count [7:0]
     agc_enable: int = 0          # 1-bit AGC enable readback
+    chirps_mismatch: int = 0     # TX-G: 1 if FPGA clamped/rejected host chirps_per_elev
 
 
 # ============================================================================
@@ -247,9 +248,9 @@ class RadarProtocol:
         # Word 3: {short_listen[31:16], 10'd0, chirps_per_elev[5:0]}
         sr.chirps_per_elev = words[3] & 0x3F
         sr.short_listen = (words[3] >> 16) & 0xFFFF
-        # Word 4: {agc_current_gain[31:28], agc_peak_magnitude[27:20],
-        #          agc_saturation_count[19:12], agc_enable[11], 9'd0, range_mode[1:0]}
+        # Word 4 layout: gain[31:28] peak[27:20] sat[19:12] agc_en[11] mismatch[10] mode[1:0]
         sr.range_mode = words[4] & 0x03
+        sr.chirps_mismatch = (words[4] >> 10) & 0x01
         sr.agc_enable = (words[4] >> 11) & 0x01
         sr.agc_saturation_count = (words[4] >> 12) & 0xFF
         sr.agc_peak_magnitude = (words[4] >> 20) & 0xFF

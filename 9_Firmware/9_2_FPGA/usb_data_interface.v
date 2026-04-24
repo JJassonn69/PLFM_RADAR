@@ -92,6 +92,7 @@ module usb_data_interface (
     input wire [15:0] status_short_listen,     // Current short listen cycles
     input wire [5:0]  status_chirps_per_elev,  // Current chirps per elevation
     input wire [1:0]  status_range_mode,       // Fix 7: Current range mode (0x20)
+    input wire        status_chirps_mismatch,  // TX-G: host requested chirps != Doppler FFT size
 
     // Self-test status readback (opcode 0x31 / included in 0xFF status packet)
     input wire [4:0]  status_self_test_flags,  // Per-test PASS(1)/FAIL(0) latched
@@ -376,7 +377,8 @@ always @(posedge ft601_clk_in or negedge ft601_effective_reset_n) begin
                                 status_agc_peak_magnitude,      // [27:20]
                                 status_agc_saturation_count,    // [19:12] 8-bit saturation count
                                 status_agc_enable,              // [11]
-                                9'd0,                           // [10:2] reserved
+                                status_chirps_mismatch,         // [10] TX-G mismatch flag
+                                8'd0,                           // [9:2] reserved
                                 status_range_mode};             // [1:0]
             // Word 5: Self-test results {reserved[6:0], busy, reserved[7:0], detail[7:0], reserved[2:0], flags[4:0]}
             status_words[5] <= {7'd0, status_self_test_busy,

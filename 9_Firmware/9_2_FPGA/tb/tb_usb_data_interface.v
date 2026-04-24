@@ -69,6 +69,7 @@ module tb_usb_data_interface;
     reg  [15:0] status_short_listen;
     reg  [5:0]  status_chirps_per_elev;
     reg  [1:0]  status_range_mode;
+    reg         status_chirps_mismatch;
 
     // Self-test status readback inputs
     reg  [4:0]  status_self_test_flags;
@@ -132,6 +133,7 @@ module tb_usb_data_interface;
         .status_short_listen   (status_short_listen),
         .status_chirps_per_elev(status_chirps_per_elev),
         .status_range_mode     (status_range_mode),
+        .status_chirps_mismatch(status_chirps_mismatch),
 
         // Self-test status readback
         .status_self_test_flags (status_self_test_flags),
@@ -199,6 +201,7 @@ module tb_usb_data_interface;
             status_short_listen   = 16'd17450;
             status_chirps_per_elev = 6'd32;
             status_range_mode     = 2'b00;
+            status_chirps_mismatch = 1'b0;
             status_self_test_flags  = 5'b00000;
             status_self_test_detail = 8'd0;
             status_self_test_busy   = 1'b0;
@@ -921,6 +924,7 @@ module tb_usb_data_interface;
         status_short_listen    = 16'd17450;
         status_chirps_per_elev = 6'd32;
         status_range_mode      = 2'b10;  // Long-range for status test
+        status_chirps_mismatch = 1'b1;   // TX-G: exercise the new bit too
         // Self-test status: all 5 tests passed, detail=0xA5, not busy
         status_self_test_flags  = 5'b11111;
         status_self_test_detail = 8'hA5;
@@ -964,8 +968,8 @@ module tb_usb_data_interface;
               "Status readback: word 2 = {guard, short_chirp}");
         check(uut.status_words[3] === {16'd17450, 10'd0, 6'd32},
               "Status readback: word 3 = {short_listen, 0, chirps_per_elev}");
-        check(uut.status_words[4] === {4'd5, 8'd180, 8'd12, 1'b1, 9'd0, 2'b10},
-              "Status readback: word 4 = {agc_gain=5, peak=180, sat=12, en=1, range_mode=2}");
+        check(uut.status_words[4] === {4'd5, 8'd180, 8'd12, 1'b1, 1'b1, 8'd0, 2'b10},
+              "Status readback: word 4 = {agc_gain=5, peak=180, sat=12, en=1, mismatch=1, range_mode=2}");
         // status_words[5] = {7'd0, busy, 8'd0, detail[7:0], 3'd0, flags[4:0]}
         // = {7'd0, 1'b0, 8'd0, 8'hA5, 3'd0, 5'b11111}
         check(uut.status_words[5] === {7'd0, 1'b0, 8'd0, 8'hA5, 3'd0, 5'b11111},

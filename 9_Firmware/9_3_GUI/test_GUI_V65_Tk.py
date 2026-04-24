@@ -126,7 +126,8 @@ class TestRadarProtocol(unittest.TestCase):
                             guard=17540, short_chirp=50,
                             short_listen=17450, chirps=32, range_mode=0,
                             st_flags=0, st_detail=0, st_busy=0,
-                            agc_gain=0, agc_peak=0, agc_sat=0, agc_enable=0):
+                            agc_gain=0, agc_peak=0, agc_sat=0, agc_enable=0,
+                            chirps_mismatch=0):
         """Build a 26-byte status response matching FPGA format (Build 26)."""
         pkt = bytearray()
         pkt.append(STATUS_HEADER_BYTE)
@@ -148,9 +149,11 @@ class TestRadarProtocol(unittest.TestCase):
         pkt += struct.pack(">I", w3)
 
         # Word 4: {agc_current_gain[3:0], agc_peak_magnitude[7:0],
-        #          agc_saturation_count[7:0], agc_enable, 9'd0, range_mode[1:0]}
+        #          agc_saturation_count[7:0], agc_enable,
+        #          chirps_mismatch[10], 8'd0, range_mode[1:0]}
         w4 = (((agc_gain & 0x0F) << 28) | ((agc_peak & 0xFF) << 20) |
               ((agc_sat & 0xFF) << 12) | ((agc_enable & 0x01) << 11) |
+              ((chirps_mismatch & 0x01) << 10) |
               (range_mode & 0x03))
         pkt += struct.pack(">I", w4)
 
@@ -176,10 +179,19 @@ class TestRadarProtocol(unittest.TestCase):
         self.assertEqual(sr.short_listen, 17450)
         self.assertEqual(sr.chirps_per_elev, 32)
         self.assertEqual(sr.range_mode, 0)
+        self.assertEqual(sr.chirps_mismatch, 0)
 
     def test_parse_status_range_mode(self):
         raw = self._make_status_packet(range_mode=2)
         sr = RadarProtocol.parse_status_packet(raw)
+        self.assertEqual(sr.range_mode, 2)
+
+    def test_parse_status_chirps_mismatch(self):
+        # TX-G: bit 10 of word 4 must round-trip without disturbing neighbours.
+        raw = self._make_status_packet(chirps_mismatch=1, agc_enable=1, range_mode=2)
+        sr = RadarProtocol.parse_status_packet(raw)
+        self.assertEqual(sr.chirps_mismatch, 1)
+        self.assertEqual(sr.agc_enable, 1)
         self.assertEqual(sr.range_mode, 2)
 
     def test_parse_status_too_short(self):
