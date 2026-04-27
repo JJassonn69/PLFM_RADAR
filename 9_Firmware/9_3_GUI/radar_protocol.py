@@ -679,16 +679,26 @@ class DataRecorder:
     def record_frame(self, frame: RadarFrame):
         if not self._recording or self._file is None:
             return
+        # GUI-S2: snapshot the arrays before handing them to h5py. The same
+        # frame object is also queued for the display consumer, and h5py
+        # releases the GIL during gzip compression — without this copy, any
+        # in-place mutation by the consumer (or a future scaling/normalization
+        # step) would tear the on-disk frame.
         try:
+            mag  = np.asarray(frame.magnitude).copy()
+            rdi  = np.asarray(frame.range_doppler_i).copy()
+            rdq  = np.asarray(frame.range_doppler_q).copy()
+            det  = np.asarray(frame.detections).copy()
+            rprf = np.asarray(frame.range_profile).copy()
             fg = self._grp.create_group(f"frame_{self._frame_count:06d}")
             fg.attrs["timestamp"] = frame.timestamp
             fg.attrs["frame_number"] = frame.frame_number
             fg.attrs["detection_count"] = frame.detection_count
-            fg.create_dataset("magnitude", data=frame.magnitude, compression="gzip")
-            fg.create_dataset("range_doppler_i", data=frame.range_doppler_i, compression="gzip")
-            fg.create_dataset("range_doppler_q", data=frame.range_doppler_q, compression="gzip")
-            fg.create_dataset("detections", data=frame.detections, compression="gzip")
-            fg.create_dataset("range_profile", data=frame.range_profile, compression="gzip")
+            fg.create_dataset("magnitude", data=mag, compression="gzip")
+            fg.create_dataset("range_doppler_i", data=rdi, compression="gzip")
+            fg.create_dataset("range_doppler_q", data=rdq, compression="gzip")
+            fg.create_dataset("detections", data=det, compression="gzip")
+            fg.create_dataset("range_profile", data=rprf, compression="gzip")
             self._frame_count += 1
         except (OSError, ValueError, TypeError) as e:
             log.error(f"Recording error: {e}")

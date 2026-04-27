@@ -425,6 +425,49 @@ class TestDataRecorder(unittest.TestCase):
             mag = f["frames/frame_000001/magnitude"][:]
             self.assertEqual(mag.shape, (NUM_RANGE_BINS, NUM_DOPPLER_BINS))
 
+    @unittest.skipUnless(
+        (lambda: (
+            __import__("importlib.util")
+            and __import__("importlib").util.find_spec("h5py") is not None
+        ))(),
+        "h5py not installed"
+    )
+    def test_record_frame_isolates_from_post_call_mutation(self):
+        # GUI-S2: the recorder must snapshot the frame's arrays so a
+        # consumer (or future in-place scaling) mutating the same RadarFrame
+        # after record_frame returns cannot tear the on-disk record.
+        import h5py
+        rec = DataRecorder()
+        rec.start(self.filepath)
+
+        frame = RadarFrame()
+        frame.frame_number = 42
+        frame.timestamp = 123.456
+        frame.magnitude = np.full((NUM_RANGE_BINS, NUM_DOPPLER_BINS), 7.0)
+        frame.range_profile = np.full(NUM_RANGE_BINS, 3.0)
+        frame.detections[0, 0] = 1
+        frame.range_doppler_i[1, 1] = 100
+        frame.range_doppler_q[2, 2] = -50
+
+        rec.record_frame(frame)
+
+        # Mutate every array in place AFTER recording — must not bleed into HDF5.
+        frame.magnitude.fill(0.0)
+        frame.range_profile.fill(0.0)
+        frame.detections.fill(0)
+        frame.range_doppler_i.fill(0)
+        frame.range_doppler_q.fill(0)
+
+        rec.stop()
+
+        with h5py.File(self.filepath, "r") as f:
+            fg = f["frames/frame_000000"]
+            self.assertTrue(np.all(fg["magnitude"][:] == 7.0))
+            self.assertTrue(np.all(fg["range_profile"][:] == 3.0))
+            self.assertEqual(fg["detections"][0, 0], 1)
+            self.assertEqual(fg["range_doppler_i"][1, 1], 100)
+            self.assertEqual(fg["range_doppler_q"][2, 2], -50)
+
 
 class TestRadarAcquisition(unittest.TestCase):
     """Test acquisition thread with mock connection."""
