@@ -207,6 +207,63 @@ class TestRadarProtocol(unittest.TestCase):
         raw[25] = 0x00  # corrupt footer (was at index 21 in old 5-word format)
         self.assertIsNone(RadarProtocol.parse_status_packet(bytes(raw)))
 
+    def test_parse_status_word4_layout_co_spec(self):
+        """GUI-S3: pin status word 4 bit positions to the FPGA word builder.
+
+        Canonical layout per usb_data_interface.v:376-380 and
+        usb_data_interface_ft2232h.v:675-679 — exactly one source of truth
+        in this test, so any future drift between FPGA and GUI trips here:
+
+            [31:28] agc_current_gain     (4-bit)
+            [27:20] agc_peak_magnitude   (8-bit)
+            [19:12] agc_saturation_count (8-bit)
+            [11]    agc_enable           (1-bit)
+            [10]    chirps_mismatch      (1-bit, TX-G)
+            [9:2]   reserved             (8 bits, must be zero from builder)
+            [1:0]   range_mode           (2-bit)
+
+        For each field we set ONLY that field to its max, build the packet,
+        parse, and assert (a) the field reads back correctly and (b) every
+        other field reads back zero. Catches both LSB drift and width drift
+        on either side of the wire.
+        """
+        layout = [
+            # (field_name, builder_kwarg, lsb, width, parsed_attr)
+            ("agc_current_gain",     "agc_gain",        28, 4, "agc_current_gain"),
+            ("agc_peak_magnitude",   "agc_peak",        20, 8, "agc_peak_magnitude"),
+            ("agc_saturation_count", "agc_sat",         12, 8, "agc_saturation_count"),
+            ("agc_enable",           "agc_enable",      11, 1, "agc_enable"),
+            ("chirps_mismatch",      "chirps_mismatch", 10, 1, "chirps_mismatch"),
+            ("range_mode",           "range_mode",       0, 2, "range_mode"),
+        ]
+        # Sanity: layout fields + reserved [9:2] must cover exactly 32 bits.
+        used = sum(width for _, _, _, width, _ in layout)
+        self.assertEqual(used + 8, 32,
+            "word 4 layout (incl. reserved [9:2]) must total 32 bits")
+
+        # No two fields may overlap.
+        occupied = set()
+        for name, _, lsb, width, _ in layout:
+            bits = set(range(lsb, lsb + width))
+            self.assertFalse(occupied & bits,
+                f"{name} bits {sorted(bits)} overlap previously-allocated bits")
+            occupied |= bits
+
+        other_attrs = [attr for _, _, _, _, attr in layout]
+
+        for name, kwarg, _lsb, width, attr in layout:
+            max_val = (1 << width) - 1
+            raw = self._make_status_packet(**{kwarg: max_val})
+            sr = RadarProtocol.parse_status_packet(raw)
+            self.assertIsNotNone(sr, f"{name}: parse failed")
+            self.assertEqual(getattr(sr, attr), max_val,
+                f"{name}: round-trip mismatch (set={max_val}, got={getattr(sr, attr)})")
+            for other in other_attrs:
+                if other == attr:
+                    continue
+                self.assertEqual(getattr(sr, other), 0,
+                    f"{name} max value bled into {other} -- bit-position drift?")
+
     def test_parse_status_self_test_all_pass(self):
         """Status with all self-test flags set (all tests pass)."""
         raw = self._make_status_packet(st_flags=0x1F, st_detail=0xA5, st_busy=0)
@@ -558,12 +615,15 @@ class TestRadarFrameDefaults(unittest.TestCase):
     """Test RadarFrame default initialization."""
 
     def test_default_shapes(self):
+        # Stale literals (64,32)/(64,) predated the GUI-C1 / Q3 alignment that
+        # bumped NUM_RANGE_BINS 64 -> 512 to match FPGA truth. Reference the
+        # constants so any future bin-count change updates the assertion too.
         f = RadarFrame()
-        self.assertEqual(f.range_doppler_i.shape, (64, 32))
-        self.assertEqual(f.range_doppler_q.shape, (64, 32))
-        self.assertEqual(f.magnitude.shape, (64, 32))
-        self.assertEqual(f.detections.shape, (64, 32))
-        self.assertEqual(f.range_profile.shape, (64,))
+        self.assertEqual(f.range_doppler_i.shape, (NUM_RANGE_BINS, NUM_DOPPLER_BINS))
+        self.assertEqual(f.range_doppler_q.shape, (NUM_RANGE_BINS, NUM_DOPPLER_BINS))
+        self.assertEqual(f.magnitude.shape, (NUM_RANGE_BINS, NUM_DOPPLER_BINS))
+        self.assertEqual(f.detections.shape, (NUM_RANGE_BINS, NUM_DOPPLER_BINS))
+        self.assertEqual(f.range_profile.shape, (NUM_RANGE_BINS,))
         self.assertEqual(f.detection_count, 0)
 
     def test_default_zeros(self):
