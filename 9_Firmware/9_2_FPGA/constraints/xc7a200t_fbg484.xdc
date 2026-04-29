@@ -24,12 +24,12 @@
 #
 # Pin Count Summary:
 #   Bank 13: 17 used / 35 available (18 spare)
-#   Bank 14: 19 used / 50 available (31 spare)
+#   Bank 14: 21 used / 50 available (29 spare)
 #   Bank 15: 27 used / 50 available (23 spare)
 #   Bank 16: 50 used / 50 available (0 spare)
 #   Bank 34: 19 used / 50 available (31 spare)
 #   Bank 35: 50 used / 50 available (0 spare)
-#   TOTAL:  182 used / 285 available
+#   TOTAL:  184 used / 285 available
 #
 # Key Differences from Upstream (XC7A50T-FTG256):
 #   1. ADC uses LVDS_25 (2.5V VCCO) instead of LVDS_33 (better signal quality)
@@ -135,20 +135,23 @@ set_property IOSTANDARD LVDS_25 [get_ports {adc_d_n[*]}]
 set_property DIFF_TERM TRUE [get_ports {adc_d_p[*]}]
 
 # --------------------------------------------------------------------------
-# Audit F-0.1: AD9484 OR (overrange) LVDS pair
-# The 50T main board schematic routes ADC_OR_P/N to bank-14 pins M6/N6 on
-# xc7a50t-ftg256. The 200T dev-board schematic has NOT been checked yet;
-# adc_or_p/n are declared as top-level ports so the 50T build anchors them
-# cleanly, but the 200T anchor below is a TODO placeholder — synth/impl will
-# error on unplaced IO until the 200T schematic is verified and the PACKAGE_PIN
-# values are set. IOSTANDARD/DIFF_TERM properties stay as-is (same class as
-# adc_d_p).
+# Audit F-0.1 / C-15: AD9484 OR (overrange) LVDS pair
+# Pins: U20/V20 = IO_L11P/L11N_T1_SRCC_14 (same T1 clock tile as adc_dco on
+# L12_MRCC at W19/W20). Co-locating OR in T1 keeps the IBUFDS→BUFIO→IDDR
+# capture topology identical to adc_d_p[*] (data is the same DDR class).
+# This is the FPGA-team RECOMMENDATION for the production PCB (NEW design);
+# the PCB designer must route AD9484 OR+ → U20 and OR− → V20.
+# AD9484 datasheet: pin 23 = OR+ (LVDS_OUTPUT_OR_P), pin 24 = OR− (LVDS_OUTPUT_OR_N).
+# (50T board uses M6/N6 = L19_T3 on FTG256 — different package, different
+# tile, but same end-to-end IBUFDS→BUFIO→IDDR topology in RTL.
+# Hold false_path on adc_or_p is applied in adc_clk_mmcm.xdc.)
 # --------------------------------------------------------------------------
+set_property PACKAGE_PIN U20 [get_ports {adc_or_p}]
+set_property PACKAGE_PIN V20 [get_ports {adc_or_n}]
 set_property IOSTANDARD LVDS_25 [get_ports {adc_or_p}]
 set_property IOSTANDARD LVDS_25 [get_ports {adc_or_n}]
 set_property DIFF_TERM TRUE [get_ports {adc_or_p}]
-# TODO(F-0.1): set_property PACKAGE_PIN <?> [get_ports {adc_or_p}] after 200T schematic audit
-# TODO(F-0.1): set_property PACKAGE_PIN <?> [get_ports {adc_or_n}] after 200T schematic audit
+set_property DIFF_TERM TRUE [get_ports {adc_or_n}]
 
 # ADC Power Down — single-ended, Bank 14 (LVCMOS25 matches bank VCCO)
 # Pin: P20 = IO_0_14
@@ -669,6 +672,13 @@ set_input_delay -clock [get_clocks adc_dco_p] -min 0.200 [get_ports {adc_d_p[*]}
 # DDR falling edge captures
 set_input_delay -clock [get_clocks adc_dco_p] -max 1.000 -clock_fall [get_ports {adc_d_p[*]}] -add_delay
 set_input_delay -clock [get_clocks adc_dco_p] -min 0.200 -clock_fall [get_ports {adc_d_p[*]}] -add_delay
+
+# AD9484 OR (overrange): same source-synchronous capture as adc_d_p[*] —
+# IBUFDS → BUFIO → IDDR. Mirror the adc_d_p timing exactly.
+set_input_delay -clock [get_clocks adc_dco_p] -max 1.000 [get_ports {adc_or_p}]
+set_input_delay -clock [get_clocks adc_dco_p] -min 0.200 [get_ports {adc_or_p}]
+set_input_delay -clock [get_clocks adc_dco_p] -max 1.000 -clock_fall [get_ports {adc_or_p}] -add_delay
+set_input_delay -clock [get_clocks adc_dco_p] -min 0.200 -clock_fall [get_ports {adc_or_p}] -add_delay
 
 # Hold waiver for BUFIO source-synchronous interface:
 # Vivado models BUFIO with ~2.8 ns clock insertion delay for STA purposes,
