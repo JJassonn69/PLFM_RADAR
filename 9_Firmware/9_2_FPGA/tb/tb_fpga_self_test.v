@@ -77,8 +77,12 @@ task check;
     end
 endtask
 
-// ADC data generator: provides synthetic samples when capture is active
+// ADC data generator: provides synthetic samples when capture is active.
+// `adc_stuck_mode` (driven from main test) forces every sample to a constant
+// value, exercising the AUDIT-S21 stuck-at detection path.
 reg [15:0] adc_sample_cnt;
+reg        adc_stuck_mode;       // 1 = drive constant adc_stuck_value
+reg [15:0] adc_stuck_value;
 always @(posedge clk or negedge reset_n) begin
     if (!reset_n) begin
         adc_data_in   <= 16'd0;
@@ -89,7 +93,8 @@ always @(posedge clk or negedge reset_n) begin
             // Provide a new ADC sample every 4 cycles (simulating 25 MHz sample rate)
             adc_sample_cnt <= adc_sample_cnt + 1;
             if (adc_sample_cnt[1:0] == 2'b11) begin
-                adc_data_in  <= adc_sample_cnt[15:0];
+                adc_data_in  <= adc_stuck_mode ? adc_stuck_value
+                                               : adc_sample_cnt[15:0];
                 adc_valid_in <= 1'b1;
             end else begin
                 adc_valid_in <= 1'b0;
@@ -123,7 +128,9 @@ initial begin
     pass_count = 0;
     fail_count = 0;
 
-    trigger = 0;
+    trigger          = 0;
+    adc_stuck_mode   = 1'b0;
+    adc_stuck_value  = 16'd0;
 
     $display("");
     $display("============================================================");
@@ -220,6 +227,68 @@ initial begin
 
     check("Re-trigger completes", result_valid);
     check("All pass on re-run",   result_flags == 5'b11111);
+
+    // =====================================================================
+    // Group 5: AUDIT-S21 — stuck-at ADC must FAIL Test 4
+    // =====================================================================
+    // Pre-fix Test 4 set result_flags[4] <= 1'b1 once N samples landed,
+    // regardless of value. Drive a constant ADC sample (stuck-at-0) and
+    // verify Test 4 now FAILs with result_detail == 0xAD.
+    $display("");
+    $display("--- Group 5: ADC Stuck-At Detection (AUDIT-S21) ---");
+
+    adc_stuck_mode  = 1'b1;
+    adc_stuck_value = 16'd0;
+    repeat (10) @(posedge clk);
+    @(posedge clk);
+    trigger = 1;
+    @(posedge clk);
+    trigger = 0;
+
+    begin : wait_for_done3
+        integer i;
+        for (i = 0; i < 5000; i = i + 1) begin
+            @(posedge clk);
+            if (result_valid) begin
+                i = 5000;
+            end
+        end
+    end
+
+    check("Stuck ADC: result_valid",   result_valid);
+    check("Stuck ADC: Tests 0-3 pass", result_flags[3:0] == 4'b1111);
+    check("Stuck ADC: Test 4 FAILS",   !result_flags[4]);
+    check("Stuck ADC: detail=0xAD",    result_detail == 8'hAD);
+
+    // =====================================================================
+    // Group 6: AUDIT-S21 — stuck-at-MAX (different stuck value) must also FAIL
+    // =====================================================================
+    $display("");
+    $display("--- Group 6: ADC Stuck-At-MAX Detection (AUDIT-S21) ---");
+
+    adc_stuck_mode  = 1'b1;
+    adc_stuck_value = 16'h7FFF;     // stuck high
+    repeat (10) @(posedge clk);
+    @(posedge clk);
+    trigger = 1;
+    @(posedge clk);
+    trigger = 0;
+
+    begin : wait_for_done4
+        integer i;
+        for (i = 0; i < 5000; i = i + 1) begin
+            @(posedge clk);
+            if (result_valid) begin
+                i = 5000;
+            end
+        end
+    end
+
+    check("Stuck-MAX: Test 4 FAILS",   !result_flags[4]);
+    check("Stuck-MAX: detail=0xAD",    result_detail == 8'hAD);
+
+    // Restore varied-sample mode
+    adc_stuck_mode  = 1'b0;
 
     // =====================================================================
     // Summary

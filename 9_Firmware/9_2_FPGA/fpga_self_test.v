@@ -120,6 +120,21 @@ reg [BRAM_AW-1:0] bram_rd_addr_d;
 reg bram_rd_valid;
 
 // ============================================================================
+// AUDIT-S19/S20/S21: real Test 1/2/4 state (replaces pre-fix tautologies)
+// ============================================================================
+// Test 1 (CIC integrator impulse response)
+reg signed [31:0] cic_accum;
+reg signed [15:0] cic_input;
+// Test 2 (radix-2 butterfly with complex twiddle)
+reg signed [15:0] fft_a_re, fft_b_re, fft_w_re, fft_w_im;
+reg signed [31:0] fft_wb_re, fft_wb_im;
+reg signed [16:0] fft_aprime_re, fft_aprime_im;
+reg signed [16:0] fft_bprime_re, fft_bprime_im;
+// Test 4 (ADC activity check — min/max over capture window)
+reg signed [15:0] adc_min, adc_max;
+localparam signed [15:0] ADC_RANGE_THRESHOLD = 16'sd10;
+
+// ============================================================================
 // Main FSM
 // ============================================================================
 always @(posedge clk or negedge reset_n) begin
@@ -140,6 +155,21 @@ always @(posedge clk or negedge reset_n) begin
         adc_cap_cnt   <= 0;
         bram_rd_addr_d <= 0;
         bram_rd_valid  <= 1'b0;
+        // AUDIT-S19/S20/S21
+        cic_accum     <= 32'sd0;
+        cic_input     <= 16'sd0;
+        fft_a_re      <= 16'sd0;
+        fft_b_re      <= 16'sd0;
+        fft_w_re      <= 16'sd0;
+        fft_w_im      <= 16'sd0;
+        fft_wb_re     <= 32'sd0;
+        fft_wb_im     <= 32'sd0;
+        fft_aprime_re <= 17'sd0;
+        fft_aprime_im <= 17'sd0;
+        fft_bprime_re <= 17'sd0;
+        fft_bprime_im <= 17'sd0;
+        adc_min       <= 16'sd0;
+        adc_max       <= 16'sd0;
     end else begin
         // Default one-shot signals
         result_valid  <= 1'b0;
@@ -211,43 +241,81 @@ always @(posedge clk or negedge reset_n) begin
         end
 
         // ============================================================
-        // Test 1: CIC Impulse Response (simplified)
+        // Test 1: CIC integrator impulse response (AUDIT-S19 fix)
         // ============================================================
-        // We don't instantiate a full CIC here — instead we verify
-        // the integrator/comb arithmetic that the CIC uses.
-        // A 4-stage integrator with input {1,0,0,0,...} should produce
-        // {1,1,1,1,...} at the integrator output.
+        // Pre-fix this state set `result_flags[1] <= 1'b1` unconditionally
+        // ("always true for simple check") so a broken integrator path on
+        // the silicon would still PASS. Now drives a real impulse {5,0,0,...}
+        // through y[n] = y[n-1] + x[n] and checks the registered accumulator
+        // value at the end. Catches stuck-at, broken adder, or sign-extension
+        // bug in the arithmetic path.
         ST_CIC_SETUP: begin
-            // Simulate 4-tap running sum: impulse → step response
-            // After 4 cycles of input 0 following a 1, accumulator = 1
-            // This tests the core accumulation logic.
-            // We use step_cnt as a simple state tracker.
-            if (step_cnt < 8) begin
-                step_cnt <= step_cnt + 1;
+            if (step_cnt == 0) begin
+                cic_accum <= 32'sd0;
+                cic_input <= 16'sd5;        // impulse value
+                step_cnt  <= 1;
+            end else if (step_cnt < 8) begin
+                cic_accum <= cic_accum +
+                             {{16{cic_input[15]}}, cic_input};   // sign-extend
+                cic_input <= 16'sd0;        // zero-pad after impulse
+                step_cnt  <= step_cnt + 1;
             end else begin
-                // CIC test: pass if arithmetic is correct (always true for simple check)
-                result_flags[1] <= 1'b1;
-                state <= ST_FFT_SETUP;
+                // After impulse + 6 zeros, integrator holds at 5 (step response)
+                if (cic_accum == 32'sd5) begin
+                    result_flags[1] <= 1'b1;
+                end else begin
+                    result_flags[1] <= 1'b0;
+                    result_detail   <= 8'hC1;   // CIC fail marker
+                end
+                state    <= ST_FFT_SETUP;
                 step_cnt <= 0;
             end
         end
 
         // ============================================================
-        // Test 2: FFT Known-Input (simplified)
+        // Test 2: Radix-2 butterfly with twiddle multiply (AUDIT-S20 fix)
         // ============================================================
-        // Verify DC input produces energy in bin 0.
-        // Full FFT instantiation is too heavy for self-test — instead we
-        // verify the butterfly computation: (A+B, A-B) with known values.
-        // A=100, B=100 → sum=200, diff=0. This matches radix-2 butterfly.
+        // Pre-fix this evaluated `(16'sd100+16'sd100 == 16'sd200) &&
+        // (16'sd100-16'sd100 == 16'sd0)` — both predicates compile-time-fold
+        // to 1'b1, so synth reduces the whole test to `result_flags[2] <= 1'b1`.
+        // Replaced with a real radix-2 butterfly that exercises signed
+        // multiplications + adds across multiple FSM states with register
+        // dataflow (synth must instantiate DSP/multiplier resources).
+        //
+        //   Inputs:  A = 8 (real), B = 4 (real), W = 2 + 3j
+        //   Step 1:  WB = W*B  (with B_im=0, so only 2 mults)
+        //              WB_re = W_re * B_re = 2 * 4 = 8
+        //              WB_im = W_im * B_re = 3 * 4 = 12
+        //   Step 2:  Butterfly:
+        //              A' = A + WB = (8+8, 0+12) = (16, 12)
+        //              B' = A - WB = (8-8, 0-12) = (0, -12)
+        //   Step 3:  Compare against golden.
         ST_FFT_SETUP: begin
-            if (step_cnt < 4) begin
-                step_cnt <= step_cnt + 1;
+            if (step_cnt == 0) begin
+                fft_a_re <= 16'sd8;
+                fft_b_re <= 16'sd4;
+                fft_w_re <= 16'sd2;
+                fft_w_im <= 16'sd3;
+                step_cnt <= 1;
+            end else if (step_cnt == 1) begin
+                fft_wb_re <= fft_w_re * fft_b_re;   // 2*4 = 8
+                fft_wb_im <= fft_w_im * fft_b_re;   // 3*4 = 12
+                step_cnt  <= 2;
+            end else if (step_cnt == 2) begin
+                fft_aprime_re <= {fft_a_re[15], fft_a_re} + fft_wb_re[16:0];
+                fft_aprime_im <=             17'sd0       + fft_wb_im[16:0];
+                fft_bprime_re <= {fft_a_re[15], fft_a_re} - fft_wb_re[16:0];
+                fft_bprime_im <=             17'sd0       - fft_wb_im[16:0];
+                step_cnt      <= 3;
             end else begin
-                // Butterfly check: 100+100=200, 100-100=0
-                // Both fit in 16-bit signed — PASS
-                result_flags[2] <= (16'sd100 + 16'sd100 == 16'sd200) &&
-                                   (16'sd100 - 16'sd100 == 16'sd0);
-                state <= ST_ARITH;
+                if (fft_aprime_re == 17'sd16  && fft_aprime_im == 17'sd12 &&
+                    fft_bprime_re == 17'sd0   && fft_bprime_im == -17'sd12) begin
+                    result_flags[2] <= 1'b1;
+                end else begin
+                    result_flags[2] <= 1'b0;
+                    result_detail   <= 8'hF2;   // FFT fail marker
+                end
+                state    <= ST_ARITH;
                 step_cnt <= 0;
             end
         end
@@ -281,19 +349,40 @@ always @(posedge clk or negedge reset_n) begin
         end
 
         // ============================================================
-        // Test 4: ADC Raw Data Capture
+        // Test 4: ADC activity (min/max range) check (AUDIT-S21 fix)
         // ============================================================
+        // Pre-fix this set `result_flags[4] <= 1'b1` once N samples were
+        // observed, regardless of value. A stuck-at-0 ADC (broken LVDS link,
+        // wrong AD9484 mode per AUDIT-C3, dead sample-and-hold) would still
+        // PASS as long as adc_valid_in toggled. Now tracks min/max across the
+        // capture window and requires range > ADC_RANGE_THRESHOLD (10 LSB).
+        // Catches stuck-at faults; does NOT distinguish AD9484 format
+        // mismatches (audit's per-mode mean check requires AD9484 SPI which
+        // is impossible on production HW per AUDIT-C13).
         ST_ADC_CAP: begin
             capture_active <= 1'b1;
             if (adc_valid_in) begin
                 capture_data  <= adc_data_in;
                 capture_valid <= 1'b1;
-                adc_cap_cnt   <= adc_cap_cnt + 1;
+                // Activity tracking: seed min/max on first sample, then update
+                if (adc_cap_cnt == 0) begin
+                    adc_min <= adc_data_in;
+                    adc_max <= adc_data_in;
+                end else begin
+                    if ($signed(adc_data_in) < $signed(adc_min)) adc_min <= adc_data_in;
+                    if ($signed(adc_data_in) > $signed(adc_max)) adc_max <= adc_data_in;
+                end
+                adc_cap_cnt <= adc_cap_cnt + 1;
                 if (adc_cap_cnt >= ADC_CAP_SAMPLES - 1) begin
-                    // ADC capture complete — PASS if we got samples
-                    result_flags[4] <= 1'b1;
-                    capture_active  <= 1'b0;
-                    state           <= ST_DONE;
+                    // PASS if observed range exceeds stuck-at threshold
+                    if (($signed(adc_max) - $signed(adc_min)) > ADC_RANGE_THRESHOLD) begin
+                        result_flags[4] <= 1'b1;
+                    end else begin
+                        result_flags[4] <= 1'b0;
+                        result_detail   <= 8'hAD;   // stuck-at / no-activity marker
+                    end
+                    capture_active <= 1'b0;
+                    state          <= ST_DONE;
                 end
             end
             // Timeout: if no ADC data after 1000 cycles (10 us @ 100 MHz), FAIL
