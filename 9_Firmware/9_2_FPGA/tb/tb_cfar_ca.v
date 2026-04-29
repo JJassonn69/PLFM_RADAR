@@ -19,7 +19,8 @@
  *   T10: Zero guard, zero train corner case
  *   T11: Reset during processing → clean recovery
  *   T12: Back-to-back frames → second frame processes correctly
- *   T13: detect_count accumulates across frames
+ *   T13: detect_count resets per frame (AUDIT-C6 fix); identical-scene frames
+ *        produce identical counts instead of cumulative-since-boot accumulation
  *   T14: cfar_busy asserts during processing, deasserts after
  */
 
@@ -62,6 +63,16 @@ wire [MAG_W-1:0] detect_threshold;
 wire [15:0] detect_count;
 wire        cfar_busy;
 wire [7:0]  cfar_status;
+
+// AUDIT-C6: detect_count is reset in ST_DONE before transitioning to
+// ST_IDLE, so reads after wait_cfar_done (which returns when cfar_busy
+// goes low at ST_IDLE) see 0. Snapshot the count whenever the FSM is in
+// ST_DONE so T13 can verify per-frame counting.
+reg [15:0] tb_detect_count_at_done;
+always @(posedge clk) begin
+    if (dut.state == 4'd7 /* ST_DONE */)
+        tb_detect_count_at_done <= dut.detect_count;
+end
 
 // ============================================================================
 // TEST TRACKING
@@ -604,7 +615,8 @@ initial begin
     check(12, "T12: Back-to-back frame 2: target at (20,10) detected", find_detection(6'd20, 5'd10) == 1);
 
     // ================================================================
-    // T13: detect_count accumulates
+    // T13: detect_count per-frame reset (AUDIT-C6)
+    // Identical-scene frames must produce identical counts (not cumulative).
     // ================================================================
     test_num = 13;
     do_reset;
@@ -623,16 +635,24 @@ initial begin
     wait_cfar_done(20000);
     begin : t13_save
         reg [15:0] count_after_frame1;
-        count_after_frame1 = detect_count;
-        $display("  [INFO] T13: detect_count after frame 1 = %0d", count_after_frame1);
+        // Use TB snapshot of detect_count at ST_DONE (live counter is reset
+        // before ST_IDLE so direct read returns 0). See tb_detect_count_at_done.
+        count_after_frame1 = tb_detect_count_at_done;
+        $display("  [INFO] T13: detect_count at frame 1 ST_DONE = %0d", count_after_frame1);
 
-        // Frame 2 (same target)
+        // Sanity: frame 1 produced at least one detection
+        check(13, "T13: frame 1 produced detections", count_after_frame1 > 16'd0);
+
+        // Frame 2 (same target — should produce same per-frame count)
         feed_frame(16'd1000);
         pulse_frame_complete;
         wait_cfar_done(20000);
-        $display("  [INFO] T13: detect_count after frame 2 = %0d", detect_count);
+        $display("  [INFO] T13: detect_count at frame 2 ST_DONE = %0d", tb_detect_count_at_done);
 
-        check(13, "T13: detect_count increases after second frame", detect_count > count_after_frame1);
+        // AUDIT-C6 fix: per-frame counter, identical scene → identical count.
+        // Pre-fix this would have shown ~2x count_after_frame1 (cumulative).
+        check(13, "T13: detect_count resets per frame (==frame 1 count)",
+              tb_detect_count_at_done == count_after_frame1);
     end
 
     // ================================================================

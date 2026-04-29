@@ -575,13 +575,21 @@ always @(posedge clk or negedge reset_n) begin
         // ================================================================
         // ST_DONE: Frame complete, return to idle
         // ================================================================
+        // AUDIT-C6 fix: reset detect_count per-frame so it represents
+        // "detections this frame" instead of "total since power-on". The
+        // 16-bit counter saturates after ~6500 frames at typical detection
+        // rates (tens of seconds of real traffic), breaking any rate-based
+        // host telemetry that reads it.
+        // ================================================================
         ST_DONE: begin
             cfar_status <= 8'd0;
             state <= ST_IDLE;
 
             `ifdef SIMULATION
-            $display("[CFAR] Frame complete: %0d total detections", detect_count);
+            $display("[CFAR] Frame complete: %0d frame detections", detect_count);
             `endif
+
+            detect_count <= 16'd0;
         end
 
         default: state <= ST_IDLE;
