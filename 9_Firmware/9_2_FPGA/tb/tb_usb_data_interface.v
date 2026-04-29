@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+`include "radar_params.vh"
 
 module tb_usb_data_interface;
 
@@ -418,19 +419,25 @@ module tb_usb_data_interface;
               "ft601_siwu_n=1 after reset");
 
         // ────────────────────────────────────────────────────────
-        // Frame-sync regression (NUM_CELLS bug)
+        // Frame-sync regression (NUM_CELLS bug — historical 12-bit, AUDIT-C16)
         //
-        // sample_counter was 12 bits wide with NUM_CELLS=2048 before the
-        // 2048-pt FFT architecture was completed. With 512 range bins x 32
-        // Doppler = 16384 cells per frame, the old 12-bit counter wrapped
-        // 8 times per real frame and the host saw 8 false frame-start
-        // markers. These checks pin the counter width and NUM_CELLS value
-        // so the regression fails loudly if either is narrowed again.
+        // History: sample_counter was 12 bits with NUM_CELLS=2048 before the
+        // 2048-pt FFT architecture; under-width counter wrapped 8x per real
+        // 16384-cell frame, host saw 8 false markers.
+        //
+        // AUDIT-C16: same failure mode would re-emerge on 200T builds where
+        // RP_MAX_OUTPUT_BINS=4096 -> NUM_CELLS=131072. Fix derives NUM_CELLS
+        // and counter width from radar_params.vh so both scale with the build
+        // (50T: 16384 cells / 14-bit counter; 200T: 131072 / 17-bit).
+        //
+        // These checks pin the parameterization so a future regression that
+        // reverts to a hardcoded value fails loudly.
         // ────────────────────────────────────────────────────────
-        check($bits(uut.sample_counter) >= 15,
-              "Frame-sync: sample_counter width >= 15 bits (holds 0..16383)");
-        check(uut.NUM_CELLS === 15'd16384,
-              "Frame-sync: NUM_CELLS == 16384 (512 range x 32 Doppler)");
+        check($bits(uut.sample_counter) == `RP_DOPPLER_MEM_ADDR_W,
+              "Frame-sync: sample_counter width == RP_DOPPLER_MEM_ADDR_W");
+        check(uut.NUM_CELLS ==
+                  (`RP_MAX_OUTPUT_BINS * `RP_NUM_DOPPLER_BINS),
+              "Frame-sync: NUM_CELLS == RP_MAX_OUTPUT_BINS*RP_NUM_DOPPLER_BINS");
 
         // ════════════════════════════════════════════════════════
         // TEST GROUP 2: Data packet word packing

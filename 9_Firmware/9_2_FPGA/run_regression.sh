@@ -566,6 +566,15 @@ run_test "GPIO dig5/dig7 split (AUDIT-S10)" \
     tb/tb_audit_s10_gpio_split.vvp \
     tb/tb_audit_s10_gpio_split.v
 
+run_test "NUM_CELLS sizing 50T (AUDIT-C16)" \
+    tb/tb_audit_c16_num_cells_50t.vvp \
+    tb/tb_audit_c16_num_cells.v
+
+run_test --timeout=120 "NUM_CELLS sizing 200T (AUDIT-C16)" \
+    tb/tb_audit_c16_num_cells_200t.vvp \
+    -DSUPPORT_LONG_RANGE \
+    tb/tb_audit_c16_num_cells.v
+
 echo ""
 
 # ===========================================================================
