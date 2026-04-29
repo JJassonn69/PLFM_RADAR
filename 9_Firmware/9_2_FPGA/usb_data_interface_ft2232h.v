@@ -20,20 +20,41 @@
  *   [If stream_range (bit 0):]
  *     Next 1024 bytes: Range profile, 512 × 16-bit magnitude, MSB first
  *
- *   [If stream_doppler (bit 1) AND mag_only (bit 3):]
+ *   [If stream_doppler (bit 1):]
  *     Next 32768 bytes: Doppler magnitude, 512×32 × 16-bit, row-major, MSB first
  *
- *   [If stream_doppler (bit 1) AND NOT mag_only:]
- *     Next 65536 bytes: Doppler I/Q, 512×32 × 32-bit (I16,Q16), row-major, MSB first
- *
- *   [If stream_cfar (bit 2) AND NOT sparse_det (bit 4):]
+ *   [If stream_cfar (bit 2):]
  *     Next 2048 bytes: Detection flags, 512×32 bits packed into bytes, MSB-first bit order
  *
- *   [If stream_cfar (bit 2) AND sparse_det (bit 4):]
- *     Next 2 bytes: Detection count N (16-bit, MSB first)
- *     Next N×6 bytes: Each = {range_bin[16], doppler_bin[16], magnitude[16]}, MSB first
- *
  *   Last byte:    0x55 (frame end footer)
+ *
+ * INERT FLAGS — mag_only (bit 3) and sparse_det (bit 4) (AUDIT-C9):
+ *   The wire format byte 1 reserves these two bits for future encodings:
+ *     - mag_only=0 was meant to switch the doppler section to 65536 B
+ *       full-I/Q (16-bit I + 16-bit Q per cell, row-major, MSB first).
+ *     - sparse_det=1 was meant to switch the CFAR section to a
+ *       variable-length list: 2 B count N + N×6 B (range, doppler, mag).
+ *   Neither encoding is implemented in the write FSM below — the FSM
+ *   always emits 32768 B mag and 2048 B dense bitmap regardless of the
+ *   flag bits. To eliminate the foot-gun, `radar_system_top.v` opcode
+ *   0x04 force-clamps mag_only=1 and sparse_det=0 in `host_stream_control`
+ *   when USB_MODE=1. A SIMULATION-only assertion at the bottom of this
+ *   module fires if either bit ever leaves its clamped value, in case a
+ *   future patch adds a path that bypasses the host register clamp.
+ *
+ *   Reasons differ between the two:
+ *     - Full-I/Q is constrained by FPGA resources: it needs a new
+ *       ~28-BRAM18 I/Q buffer (16384 cells × 32-bit) which may not fit
+ *       on the 50T (currently ~78% BRAM18 utilisation after wiring the
+ *       Xilinx FFT IP). USB 2.0 bandwidth is also tight: 12.21 MB/s vs
+ *       the conservative 8 MB/s sustained budget. Both gating items.
+ *     - Sparse-list is feasible — bandwidth-wise it's smaller than the
+ *       dense bitmap for any frame with fewer than ~341 detections
+ *       (typical scenes produce 10-200), and memory-wise it costs
+ *       ~1 BRAM18 with MAX_DETECTIONS=256. The absence is just
+ *       unimplemented RTL work (a small detection-list BRAM + a new
+ *       WR_DETECT_SPARSE FSM state), not a hardware constraint.
+ *   See the open-defects ledger for the follow-up work items.
  *
  * Status packet (FPGA→Host): 26 bytes (unchanged from legacy)
  *   Byte 0:       0xBB (status header)
@@ -54,13 +75,13 @@
  *     Written in clk domain from range_valid events.
  *   - Detection flag buffer: 512×32 = 16384 bits = 2048 bytes (~1 BRAM18)
  *     Written in clk domain from cfar_valid events.
- *   - Doppler I/Q BRAM: 16384 × 32-bit = 64 KB (~28 BRAM18) — only when mag_only=0
- *     NOTE: For 50T (75 BRAM18 total), I/Q mode may not fit alongside processing
- *     chain BRAMs. Default to mag_only=1. I/Q mode is a stretch goal.
  *
- * BANDWIDTH BUDGET (mag_only=1, all streams):
+ * BANDWIDTH BUDGET (current production: mag_only=1, all streams):
  *   Header: 8 B + Range: 1024 B + Doppler: 32768 B + CFAR: 2048 B + Footer: 1 B
- *   = 35,849 bytes/frame × 178 fps = 6.38 MB/s (80% of USB 2.0 Hi-Speed 8 MB/s)
+ *   = 35,849 bytes/frame × ~178 fps = 6.38 MB/s
+ *   FT2232H 245-Sync-FIFO sustained budget ~8 MB/s conservative (FTDI
+ *   AN_232B-04). 80% utilisation; full-I/Q (12.21 MB/s) would not fit at
+ *   the conservative budget and is why mag_only is force-clamped to 1.
  *
  * CDC STRATEGY:
  *   - Frame data: Written to dual-port BRAM at 100 MHz, read at 60 MHz (inherently CDC-safe)
@@ -1021,6 +1042,30 @@ always @(posedge ft_clk or negedge ft_reset_n) begin
         cmd_addr_prev   <= cmd_addr;
         cmd_value_prev  <= cmd_value;
         cmd_valid_prev  <= cmd_valid;
+    end
+end
+`endif
+
+// ============================================================================
+// AUDIT-C9: inert-flag checker (simulation only)
+//
+// stream_mag_only and stream_sparse_det are documented in the wire format
+// but the write FSM does not act on them — see the "INERT FLAGS" note in
+// the module header. radar_system_top.v opcode 0x04 force-clamps these
+// bits when USB_MODE=1 so production firmware cannot reach an unsupported
+// state. This checker is the backstop: it fires `[ASSERT FAIL]` if either
+// bit ever escapes its clamped value, catching any future patch that
+// bypasses the host register clamp (e.g. a different opcode that writes
+// stream_control directly, or a stream_control source other than the
+// host). Synthesis-inert.
+// ============================================================================
+`ifdef SIMULATION
+always @(posedge clk) begin
+    if (reset_n) begin
+        if (stream_mag_only !== 1'b1)
+            $display("[ASSERT FAIL] AUDIT-C9: stream_mag_only=0; full-I/Q write FSM not implemented");
+        if (stream_sparse_det !== 1'b0)
+            $display("[ASSERT FAIL] AUDIT-C9: stream_sparse_det=1; sparse-list write FSM not implemented");
     end
 end
 `endif

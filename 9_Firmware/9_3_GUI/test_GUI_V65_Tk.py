@@ -21,6 +21,10 @@ from radar_protocol import (
     HEADER_BYTE, FOOTER_BYTE, STATUS_HEADER_BYTE,
     NUM_RANGE_BINS, NUM_DOPPLER_BINS,
     DATA_PACKET_SIZE,
+    BULK_FRAME_HEADER_SIZE, BULK_FRAME_MAX_SIZE,
+    BULK_RANGE_SECTION_BYTES, BULK_FOOTER_SIZE,
+    BULK_FLAG_STREAM_RANGE, BULK_FLAG_STREAM_DOPPLER, BULK_FLAG_STREAM_CFAR,
+    BULK_FLAG_MAG_ONLY, BULK_FLAG_SPARSE_DET,
 )
 from GUI_V65_Tk import DemoTarget, DemoSimulator, _ReplayController
 
@@ -376,6 +380,240 @@ class TestRadarProtocol(unittest.TestCase):
             self.assertIsNotNone(RadarProtocol.parse_data_packet(buf[start:end]))
 
 
+class TestBulkFrameParser(unittest.TestCase):
+    """AUDIT-C9: parser for the FT2232H bulk per-frame wire format."""
+
+    def _build_bulk_frame(
+        self,
+        flags: int = (BULK_FLAG_STREAM_RANGE | BULK_FLAG_STREAM_DOPPLER
+                      | BULK_FLAG_STREAM_CFAR | BULK_FLAG_MAG_ONLY),
+        frame_number: int = 0xBEEF,
+        n_range: int = NUM_RANGE_BINS,
+        n_doppler: int = NUM_DOPPLER_BINS,
+        range_seed: int = 1,
+        doppler_seed: int = 2,
+        cfar_seed: int = 3,
+        bad_footer: bool = False,
+    ) -> tuple[bytes, np.ndarray, np.ndarray, np.ndarray]:
+        """Synthesize a bulk frame matching usb_data_interface_ft2232h.v.
+
+        Returns (frame_bytes, range_profile, doppler_mag, cfar_dense). The
+        latter three are the source-of-truth arrays used to generate the
+        bytes; tests can assert round-trip equality.
+        """
+        rng_r = np.random.RandomState(range_seed)
+        rng_d = np.random.RandomState(doppler_seed)
+        rng_c = np.random.RandomState(cfar_seed)
+
+        range_profile = (rng_r.randint(0, 65535, size=n_range)
+                         .astype(np.uint16) if (flags & BULK_FLAG_STREAM_RANGE)
+                         else None)
+        doppler_mag = (rng_d.randint(0, 65535, size=(n_range, n_doppler))
+                       .astype(np.uint16) if (flags & BULK_FLAG_STREAM_DOPPLER)
+                       else None)
+        cfar_dense = (rng_c.randint(0, 2, size=(n_range, n_doppler))
+                      .astype(np.uint8) if (flags & BULK_FLAG_STREAM_CFAR)
+                      else None)
+
+        out = bytearray()
+        out.append(HEADER_BYTE)
+        # Don't mask reserved bits here — the parser must reject any byte
+        # with bits [7:6] set, and the rejection test relies on those bits
+        # actually surviving into the synthesized frame.
+        out.append(flags & 0xFF)
+        out.append((frame_number >> 8) & 0xFF)
+        out.append(frame_number & 0xFF)
+        out.append((n_range >> 8) & 0xFF)
+        out.append(n_range & 0xFF)
+        out.append((n_doppler >> 8) & 0xFF)
+        out.append(n_doppler & 0xFF)
+        if range_profile is not None:
+            out += range_profile.astype(">u2").tobytes()
+        if doppler_mag is not None:
+            out += doppler_mag.astype(">u2").tobytes()
+        if cfar_dense is not None:
+            out += np.packbits(cfar_dense.flatten()).tobytes()
+        out.append(0x00 if bad_footer else FOOTER_BYTE)
+        return bytes(out), range_profile, doppler_mag, cfar_dense
+
+    def test_parse_full_frame_round_trip(self):
+        """All-streams mag-only round trip: every cell exact."""
+        raw, rprof, dmag, cdense = self._build_bulk_frame()
+        parsed = RadarProtocol.parse_bulk_frame(raw)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["frame_number"], 0xBEEF)
+        self.assertEqual(parsed["n_range"], NUM_RANGE_BINS)
+        self.assertEqual(parsed["n_doppler"], NUM_DOPPLER_BINS)
+        self.assertEqual(parsed["frame_size"], BULK_FRAME_MAX_SIZE)
+        np.testing.assert_array_equal(parsed["range_profile"], rprof)
+        np.testing.assert_array_equal(parsed["doppler_mag"], dmag)
+        np.testing.assert_array_equal(parsed["cfar_dense"], cdense)
+
+    def test_parse_range_only(self):
+        flags = BULK_FLAG_STREAM_RANGE | BULK_FLAG_MAG_ONLY
+        raw, rprof, _dmag, _cdense = self._build_bulk_frame(flags=flags)
+        parsed = RadarProtocol.parse_bulk_frame(raw)
+        self.assertIsNotNone(parsed)
+        np.testing.assert_array_equal(parsed["range_profile"], rprof)
+        self.assertIsNone(parsed["doppler_mag"])
+        self.assertIsNone(parsed["cfar_dense"])
+        self.assertEqual(
+            parsed["frame_size"],
+            BULK_FRAME_HEADER_SIZE + BULK_RANGE_SECTION_BYTES + BULK_FOOTER_SIZE,
+        )
+
+    def test_parse_doppler_only(self):
+        flags = BULK_FLAG_STREAM_DOPPLER | BULK_FLAG_MAG_ONLY
+        raw, _rprof, dmag, _cdense = self._build_bulk_frame(flags=flags)
+        parsed = RadarProtocol.parse_bulk_frame(raw)
+        self.assertIsNotNone(parsed)
+        self.assertIsNone(parsed["range_profile"])
+        np.testing.assert_array_equal(parsed["doppler_mag"], dmag)
+        self.assertIsNone(parsed["cfar_dense"])
+
+    def test_parse_cfar_only(self):
+        flags = BULK_FLAG_STREAM_CFAR | BULK_FLAG_MAG_ONLY
+        raw, _rprof, _dmag, cdense = self._build_bulk_frame(flags=flags)
+        parsed = RadarProtocol.parse_bulk_frame(raw)
+        self.assertIsNotNone(parsed)
+        np.testing.assert_array_equal(parsed["cfar_dense"], cdense)
+
+    def test_parse_no_streams(self):
+        """Header + footer only (8 + 1 = 9 bytes)."""
+        flags = BULK_FLAG_MAG_ONLY  # streams off, mag_only still set
+        raw, *_ = self._build_bulk_frame(flags=flags)
+        self.assertEqual(len(raw), 9)
+        parsed = RadarProtocol.parse_bulk_frame(raw)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["frame_size"], 9)
+
+    def test_reject_full_iq_until_rtl_lands(self):
+        """mag_only=0 must be rejected — FPGA write FSM doesn't emit it."""
+        flags = BULK_FLAG_STREAM_DOPPLER  # NB: mag_only bit cleared
+        raw, *_ = self._build_bulk_frame(flags=flags)
+        # Frame is structurally consistent; rejection comes from the
+        # mag_only=0 + stream_doppler=1 combination check in parse_bulk_frame.
+        self.assertIsNone(RadarProtocol.parse_bulk_frame(raw))
+
+    def test_reject_sparse_det(self):
+        """sparse_det=1 must be rejected — FPGA emits dense bitmap only."""
+        flags = (BULK_FLAG_STREAM_CFAR | BULK_FLAG_MAG_ONLY | BULK_FLAG_SPARSE_DET)
+        raw, *_ = self._build_bulk_frame(flags=flags)
+        self.assertIsNone(RadarProtocol.parse_bulk_frame(raw))
+
+    def test_reject_reserved_bits_set(self):
+        """Reserved high bits in flags byte must be zero."""
+        raw, *_ = self._build_bulk_frame(flags=0x80 | BULK_FLAG_MAG_ONLY)
+        self.assertIsNone(RadarProtocol.parse_bulk_frame(raw))
+
+    def test_reject_wrong_n_range(self):
+        raw, *_ = self._build_bulk_frame(n_range=999)
+        # Note: the synthesized payload size is wrong too but the n_range
+        # check fires before any payload-size checks.
+        self.assertIsNone(RadarProtocol.parse_bulk_frame(raw))
+
+    def test_reject_wrong_n_doppler(self):
+        raw, *_ = self._build_bulk_frame(n_doppler=64)
+        self.assertIsNone(RadarProtocol.parse_bulk_frame(raw))
+
+    def test_reject_missing_footer(self):
+        raw, *_ = self._build_bulk_frame(bad_footer=True)
+        self.assertIsNone(RadarProtocol.parse_bulk_frame(raw))
+
+    def test_reject_wrong_header(self):
+        raw, *_ = self._build_bulk_frame()
+        bad = b"\x00" + raw[1:]
+        self.assertIsNone(RadarProtocol.parse_bulk_frame(bad))
+
+    def test_reject_truncated(self):
+        raw, *_ = self._build_bulk_frame()
+        self.assertIsNone(RadarProtocol.parse_bulk_frame(raw[:1000]))
+
+    def test_find_boundaries_two_frames(self):
+        f1, *_ = self._build_bulk_frame(frame_number=1)
+        f2, *_ = self._build_bulk_frame(frame_number=2)
+        buf = b"\x00\x12" + f1 + b"\x33" + f2  # garbage between/around frames
+        out = RadarProtocol.find_bulk_frame_boundaries(buf)
+        data = [(s, e, t) for (s, e, t) in out if t == "data"]
+        self.assertEqual(len(data), 2)
+        # Round-trip both
+        for s, _e, _t in data:
+            parsed = RadarProtocol.parse_bulk_frame(buf, offset=s)
+            self.assertIsNotNone(parsed)
+
+    def test_find_boundaries_with_status(self):
+        """Status packets coexist with bulk frames in the same stream."""
+        f1, *_ = self._build_bulk_frame()
+        # Build a minimal valid status packet (byte 1 = 0xFF, footer = 0x55).
+        status = bytes([STATUS_HEADER_BYTE, 0xFF] + [0x00] * 23 + [FOOTER_BYTE])
+        buf = f1 + status
+        out = RadarProtocol.find_bulk_frame_boundaries(buf)
+        types = [t for _s, _e, t in out]
+        self.assertIn("data", types)
+        self.assertIn("status", types)
+
+    def test_find_boundaries_truncated_residual(self):
+        """A partial frame at the buffer tail is not returned (kept as residual)."""
+        f1, *_ = self._build_bulk_frame()
+        # Cut off the last 100 bytes — find_bulk_frame_boundaries must not
+        # return this frame; the caller keeps the bytes for next iteration.
+        buf = f1[:-100]
+        out = RadarProtocol.find_bulk_frame_boundaries(buf)
+        self.assertEqual([t for _s, _e, t in out], [])
+
+    def test_resync_after_byte_drop(self):
+        """A dropped byte at the head must not lock the parser onto false positives."""
+        f1, *_ = self._build_bulk_frame()
+        # Single garbage byte before the real frame.
+        buf = b"\x99" + f1
+        out = RadarProtocol.find_bulk_frame_boundaries(buf)
+        data = [(s, e, t) for (s, e, t) in out if t == "data"]
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0][0], 1)  # frame starts at offset 1
+
+    def test_acquisition_dispatches_bulk_for_ft2232h(self):
+        """RadarAcquisition must select bulk format for FT2232H connections."""
+        ft = FT2232HConnection(mock=True)
+        ft.open()
+        q: queue.Queue = queue.Queue()
+        acq = RadarAcquisition(ft, q)
+        self.assertTrue(acq._is_bulk)
+        ft.close()
+
+    def test_acquisition_dispatches_legacy_for_ft601(self):
+        """RadarAcquisition must select legacy format for FT601 connections."""
+        ft = FT601Connection(mock=True)
+        ft.open()
+        q: queue.Queue = queue.Queue()
+        acq = RadarAcquisition(ft, q)
+        self.assertFalse(acq._is_bulk)
+        ft.close()
+
+    def test_ingest_bulk_frame_populates_radarframe(self):
+        """End-to-end: bulk parse → RadarFrame in queue with correct fields."""
+        ft = FT2232HConnection(mock=True)
+        ft.open()
+        q: queue.Queue = queue.Queue(maxsize=4)
+        acq = RadarAcquisition(ft, q)
+        # Drive one tick of run() manually instead of starting the thread.
+        chunk = ft.read(BULK_FRAME_MAX_SIZE * 2)
+        packets = RadarProtocol.find_bulk_frame_boundaries(chunk)
+        self.assertGreater(len(packets), 0)
+        for s, _e, t in packets:
+            if t == "data":
+                parsed = RadarProtocol.parse_bulk_frame(chunk, offset=s)
+                acq._ingest_bulk_frame(parsed)
+        ft.close()
+
+        frame = q.get_nowait()
+        self.assertIsInstance(frame, RadarFrame)
+        self.assertTrue(frame.mag_only)
+        # Mag-only mode: I/Q stay zero, magnitude carries data.
+        self.assertTrue((frame.range_doppler_i == 0).all())
+        self.assertTrue((frame.range_doppler_q == 0).all())
+        self.assertGreater(frame.magnitude.max(), 0)
+
+
 class TestFT2232HConnection(unittest.TestCase):
     """Test mock FT2232H connection."""
 
@@ -395,16 +633,20 @@ class TestFT2232HConnection(unittest.TestCase):
         conn.close()
 
     def test_mock_read_contains_valid_packets(self):
-        """Mock data should contain parseable data packets."""
+        """Mock data should contain a parseable bulk frame (AUDIT-C9)."""
         conn = FT2232HConnection(mock=True)
         conn.open()
-        raw = conn.read(4096)
-        packets = RadarProtocol.find_packet_boundaries(raw)
+        raw = conn.read(BULK_FRAME_MAX_SIZE * 2)
+        packets = RadarProtocol.find_bulk_frame_boundaries(raw)
         self.assertGreater(len(packets), 0)
-        for start, end, ptype in packets:
+        for start, _end, ptype in packets:
             if ptype == "data":
-                result = RadarProtocol.parse_data_packet(raw[start:end])
-                self.assertIsNotNone(result)
+                parsed = RadarProtocol.parse_bulk_frame(raw, offset=start)
+                self.assertIsNotNone(parsed)
+                self.assertEqual(parsed["n_range"], NUM_RANGE_BINS)
+                self.assertEqual(parsed["n_doppler"], NUM_DOPPLER_BINS)
+                self.assertTrue(parsed["flags"] & BULK_FLAG_MAG_ONLY)
+                self.assertFalse(parsed["flags"] & BULK_FLAG_SPARSE_DET)
         conn.close()
 
     def test_mock_write(self):
@@ -578,8 +820,8 @@ class TestRadarAcquisition(unittest.TestCase):
         acq = RadarAcquisition(conn, fq)
         acq.start()
 
-        # Wait for at least one frame (mock produces ~32 samples per read,
-        # need 2048 for a full frame, so may take a few seconds)
+        # AUDIT-C9: FT2232H mock now emits one full bulk frame per read
+        # (50 ms cadence in the mock), so a frame should land within ~100 ms.
         frame = None
         try:  # noqa: SIM105
             frame = fq.get(timeout=10)
@@ -590,12 +832,11 @@ class TestRadarAcquisition(unittest.TestCase):
         acq.join(timeout=3)
         conn.close()
 
-        # With mock data producing 32 packets per read at 50ms interval,
-        # a full frame (2048 samples) takes ~3.2s. Allow up to 10s.
         if frame is not None:
             self.assertIsInstance(frame, RadarFrame)
             self.assertEqual(frame.magnitude.shape,
                              (NUM_RANGE_BINS, NUM_DOPPLER_BINS))
+            self.assertTrue(frame.mag_only)
         # If no frame arrived in timeout, that's still OK for a fast CI run
 
     def test_acquisition_stop(self):

@@ -1018,7 +1018,24 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
                 8'h01: host_radar_mode     <= usb_cmd_value[1:0];
                 8'h02: host_trigger_pulse  <= 1'b1;
                 8'h03: host_detect_threshold <= usb_cmd_value;
-                8'h04: host_stream_control <= usb_cmd_value[5:0];
+                // AUDIT-C9: stream_control bits [3] (mag_only) and [4]
+                // (sparse_det) are documented in the FT2232H bulk-frame
+                // header but the write FSM does not implement the alternate
+                // encodings yet (see usb_data_interface_ft2232h.v "INERT
+                // FLAGS" note). Force-clamp them to the only encodings the
+                // FSM actually emits so a host write of 0x04 cannot create
+                // a wire-format vs FSM divergence on the production board.
+                8'h04: begin
+                    if (USB_MODE == 1) begin
+                        // FT2232H production: mag_only stuck at 1, sparse_det stuck at 0.
+                        host_stream_control <= {usb_cmd_value[5],
+                                                1'b0,                // sparse_det
+                                                1'b1,                // mag_only
+                                                usb_cmd_value[2:0]}; // stream r/d/c
+                    end else begin
+                        host_stream_control <= usb_cmd_value[5:0];
+                    end
+                end
                 // Gap 2: chirp timing configuration
                 8'h10: host_long_chirp_cycles  <= usb_cmd_value;
                 8'h11: host_long_listen_cycles <= usb_cmd_value;

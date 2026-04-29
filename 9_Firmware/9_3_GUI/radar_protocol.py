@@ -5,15 +5,39 @@ AERIS-10 Radar Protocol Layer
 Pure-logic module for USB packet parsing and command building.
 No GUI dependencies — safe to import from tests and headless scripts.
 
-USB Interface: FT2232H USB 2.0 (8-bit, 50T production board) via pyftdi
-               FT601 USB 3.0 (32-bit, 200T premium board) via ftd3xx
+USB transports + wire formats (these intentionally diverge):
 
-USB Packet Protocol (11-byte):
-  TX (FPGA→Host):
-    Data packet:  [0xAA] [range_q 2B] [range_i 2B] [dop_re 2B] [dop_im 2B] [det 1B] [0x55]
-    Status packet: [0xBB] [status 6x32b] [0x55]
-  RX (Host→FPGA):
-    Command: 4 bytes received sequentially {opcode, addr, value_hi, value_lo}
+  FT2232H USB 2.0 (50T production board, USB_MODE=1, default)
+      Bulk per-frame format from `usb_data_interface_ft2232h.v`. One header
+      + variable-length sections + footer per Doppler frame. The bulk format
+      exists because USB 2.0's ~8 MB/s sustained ceiling cannot carry the
+      production frame rate (~178 fps x 35849 B = 6.4 MB/s) at per-sample
+      granularity. Wire layout:
+          [0xAA][flags 1B][frame_num 2B][n_range 2B][n_doppler 2B]
+          [range_profile 1024 B  if flags.stream_range]
+          [doppler_mag   32768 B if flags.stream_doppler]   # mag_only=1 only
+          [cfar_dense    2048 B  if flags.stream_cfar]      # sparse_det=0 only
+          [0x55]
+      Production FPGA today only emits mag_only=1 + dense-bitmap CFAR; the
+      flag bits for full-I/Q (mag_only=0) and sparse-detection-list
+      (sparse_det=1) are reserved for a future RTL extension and currently
+      force-clamped to 1 and 0 respectively in `radar_system_top.v` opcode
+      0x04 handler when USB_MODE=1.
+
+  FT601 USB 3.0 (200T premium board, USB_MODE=0)
+      Per-sample 11-byte legacy format from `usb_data_interface.v`. USB 3.0
+      has ~50x the bandwidth headroom (~360 MB/s practical), so the lighter
+      per-sample format is fine and offers easier resync after byte drops.
+      Wire layout (per sample, 16384 samples per frame):
+          [0xAA][range_q 2B][range_i 2B][dop_re 2B][dop_im 2B][det 1B][0x55]
+          where det byte = {frame_start, 6'b0, cfar_detection}.
+      Status (both transports): [0xBB][6x32b status words][0x55] = 26 B.
+
+  RX (Host → FPGA, both transports)
+      4 bytes per command: {opcode[7:0], addr[7:0], value[15:8], value[7:0]}.
+
+The GUI parser handles both formats; `RadarAcquisition` dispatches on
+connection type (FT2232HConnection → bulk; FT601Connection → legacy).
 """
 
 import struct
@@ -48,6 +72,25 @@ NUM_DOPPLER_BINS = 32
 NUM_CELLS = NUM_RANGE_BINS * NUM_DOPPLER_BINS  # 16384
 
 WATERFALL_DEPTH = 64
+
+# AUDIT-C9: FT2232H bulk-frame wire format constants. Mirrors
+# usb_data_interface_ft2232h.v; if the RTL header changes, update both sides.
+BULK_FRAME_HEADER_SIZE   = 8                       # AA + flags + fnum2 + nr2 + nd2
+BULK_RANGE_SECTION_BYTES = NUM_RANGE_BINS * 2      # 512 x 2  = 1024
+BULK_DOPPLER_MAG_BYTES   = NUM_CELLS * 2           # 16384 x 2 = 32768
+BULK_DETECT_DENSE_BYTES  = NUM_CELLS // 8          # 16384 / 8 = 2048
+BULK_FOOTER_SIZE         = 1
+BULK_FRAME_MIN_SIZE      = BULK_FRAME_HEADER_SIZE + BULK_FOOTER_SIZE   # 9
+BULK_FRAME_MAX_SIZE      = (BULK_FRAME_HEADER_SIZE + BULK_RANGE_SECTION_BYTES
+                            + BULK_DOPPLER_MAG_BYTES + BULK_DETECT_DENSE_BYTES
+                            + BULK_FOOTER_SIZE)                        # 35849
+
+# Bulk-frame format flag bits (matches stream_ctrl_sync_1 layout in RTL).
+BULK_FLAG_STREAM_RANGE   = 0x01
+BULK_FLAG_STREAM_DOPPLER = 0x02
+BULK_FLAG_STREAM_CFAR    = 0x04
+BULK_FLAG_MAG_ONLY       = 0x08   # Forced 1 by RTL; full-I/Q write FSM not implemented.
+BULK_FLAG_SPARSE_DET     = 0x10   # Forced 0 by RTL; sparse-list write FSM not implemented.
 
 
 class Opcode(IntEnum):
@@ -134,6 +177,10 @@ class RadarFrame:
         default_factory=lambda: np.zeros(NUM_RANGE_BINS, dtype=np.float64))
     detection_count: int = 0
     frame_number: int = 0
+    # AUDIT-C9: True when this frame came from FT2232H bulk format with
+    # mag_only=1 (the only mode FPGA emits today). I/Q arrays will be zero;
+    # `magnitude` carries the per-cell Manhattan magnitude from the FPGA.
+    mag_only: bool = False
 
 
 @dataclass
@@ -316,6 +363,164 @@ class RadarProtocol:
                 i += 1
         return packets
 
+    # ----------------------------------------------------------------
+    # AUDIT-C9: FT2232H bulk-frame parsing (production board path)
+    # ----------------------------------------------------------------
+    @staticmethod
+    def _bulk_frame_size_from_flags(flags: int) -> int:
+        """Compute the on-wire size of a bulk frame from its flags byte.
+
+        Tracks the FPGA write FSM in usb_data_interface_ft2232h.v: header
+        (8 B) + per-stream payload + footer (1 B). The mag_only and
+        sparse_det bits are documented in the wire format but the FPGA
+        write FSM does not implement the alternate encodings yet — it
+        always emits 32768 B mag and 2048 B dense bitmap. The host-side
+        register handler in radar_system_top.v force-clamps these flags
+        when USB_MODE=1, so any frame the parser sees in production will
+        have mag_only=1 and sparse_det=0.
+        """
+        size = BULK_FRAME_HEADER_SIZE
+        if flags & BULK_FLAG_STREAM_RANGE:
+            size += BULK_RANGE_SECTION_BYTES
+        if flags & BULK_FLAG_STREAM_DOPPLER:
+            size += BULK_DOPPLER_MAG_BYTES
+        if flags & BULK_FLAG_STREAM_CFAR:
+            size += BULK_DETECT_DENSE_BYTES
+        size += BULK_FOOTER_SIZE
+        return size
+
+    @staticmethod
+    def parse_bulk_frame(raw: bytes, offset: int = 0) -> dict[str, Any] | None:
+        """Parse one FT2232H bulk frame starting at `offset`.
+
+        Returns a dict with keys: frame_number, flags, n_range, n_doppler,
+        range_profile (np.ndarray | None), doppler_mag (np.ndarray | None,
+        shape n_rangexn_doppler), cfar_dense (np.ndarray | None, shape
+        n_rangexn_doppler, uint8 0/1), and frame_size (total bytes consumed
+        including header + sections + footer). Returns None on any
+        structural error (bad header/footer, wrong bin counts, reserved
+        bits set, unimplemented flag combo).
+        """
+        n = len(raw)
+        if n - offset < BULK_FRAME_MIN_SIZE:
+            return None
+        if raw[offset] != HEADER_BYTE:
+            return None
+
+        flags = raw[offset + 1]
+        # Reserved high bits must be zero (FPGA emits {2'b00, 6-bit flags}).
+        if flags & 0xC0:
+            return None
+        # Production FPGA only emits mag_only=1 + dense bitmap. Any other
+        # encoding is either a corrupt frame or a future RTL revision the
+        # parser hasn't been updated for; reject so the caller can resync.
+        if (flags & BULK_FLAG_STREAM_DOPPLER) and not (flags & BULK_FLAG_MAG_ONLY):
+            return None
+        if (flags & BULK_FLAG_STREAM_CFAR) and (flags & BULK_FLAG_SPARSE_DET):
+            return None
+
+        frame_number = (raw[offset + 2] << 8) | raw[offset + 3]
+        n_range      = (raw[offset + 4] << 8) | raw[offset + 5]
+        n_doppler    = (raw[offset + 6] << 8) | raw[offset + 7]
+        if n_range != NUM_RANGE_BINS or n_doppler != NUM_DOPPLER_BINS:
+            return None
+
+        size = RadarProtocol._bulk_frame_size_from_flags(flags)
+        if n - offset < size:
+            return None
+        if raw[offset + size - 1] != FOOTER_BYTE:
+            return None
+
+        cursor = offset + BULK_FRAME_HEADER_SIZE
+        range_profile = None
+        doppler_mag = None
+        cfar_dense = None
+
+        if flags & BULK_FLAG_STREAM_RANGE:
+            range_profile = np.frombuffer(
+                raw, dtype=">u2", count=n_range, offset=cursor,
+            ).astype(np.uint16, copy=True)
+            cursor += BULK_RANGE_SECTION_BYTES
+
+        if flags & BULK_FLAG_STREAM_DOPPLER:
+            doppler_mag = np.frombuffer(
+                raw, dtype=">u2", count=n_range * n_doppler, offset=cursor,
+            ).astype(np.uint16, copy=True).reshape(n_range, n_doppler)
+            cursor += BULK_DOPPLER_MAG_BYTES
+
+        if flags & BULK_FLAG_STREAM_CFAR:
+            packed = np.frombuffer(
+                raw, dtype=np.uint8, count=BULK_DETECT_DENSE_BYTES, offset=cursor,
+            )
+            # Each byte holds 8 cells, MSB-first bit order (matches FPGA
+            # WR_DETECT_DATA emission). np.unpackbits keeps that order.
+            cfar_dense = np.unpackbits(packed).reshape(n_range, n_doppler)
+            cursor += BULK_DETECT_DENSE_BYTES
+
+        return {
+            "frame_number":  frame_number,
+            "flags":         flags,
+            "n_range":       n_range,
+            "n_doppler":     n_doppler,
+            "range_profile": range_profile,
+            "doppler_mag":   doppler_mag,
+            "cfar_dense":    cfar_dense,
+            "frame_size":    size,
+        }
+
+    @staticmethod
+    def find_bulk_frame_boundaries(buf: bytes) -> list[tuple[int, int, str]]:
+        """Scan a byte stream for FT2232H bulk frames and status packets.
+
+        Status packets (0xBB header, 26 B) are unchanged between transports
+        — the WR_STATUS_SEND state in usb_data_interface_ft2232h.v emits the
+        same layout as the legacy FT601 path. Bulk data frames (0xAA header)
+        are variable length per `_bulk_frame_size_from_flags`.
+
+        Returns a list of (start, end, ptype) tuples like
+        find_packet_boundaries, where ptype is "data" or "status". On a
+        false header (any structural mismatch) the cursor advances by 1 and
+        keeps scanning, mirroring the legacy parser's resync semantics.
+        """
+        out: list[tuple[int, int, str]] = []
+        i = 0
+        n = len(buf)
+        while i < n:
+            b = buf[i]
+            if b == HEADER_BYTE:
+                # Need at least the 8-byte header to compute the frame size.
+                if n - i < BULK_FRAME_HEADER_SIZE:
+                    break  # partial header — caller keeps as residual
+                flags = buf[i + 1]
+                # Quick reject before the more expensive size compute. The
+                # full validation lives in parse_bulk_frame.
+                if flags & 0xC0:
+                    i += 1
+                    continue
+                size = RadarProtocol._bulk_frame_size_from_flags(flags)
+                if n - i < size:
+                    break  # partial frame — keep as residual
+                # Validate footer + bin counts before accepting the boundary.
+                if (buf[i + size - 1] == FOOTER_BYTE
+                        and ((buf[i + 4] << 8) | buf[i + 5]) == NUM_RANGE_BINS
+                        and ((buf[i + 6] << 8) | buf[i + 7]) == NUM_DOPPLER_BINS):
+                    out.append((i, i + size, "data"))
+                    i += size
+                else:
+                    i += 1
+            elif b == STATUS_HEADER_BYTE:
+                end = i + STATUS_PACKET_SIZE
+                if end > n:
+                    break
+                if buf[end - 1] == FOOTER_BYTE and buf[i + 1] == 0xFF:
+                    out.append((i, end, "status"))
+                    i = end
+                else:
+                    i += 1
+            else:
+                i += 1
+        return out
+
 
 # ============================================================================
 # FT2232H USB 2.0 Connection (pyftdi, 245 Synchronous FIFO)
@@ -421,55 +626,57 @@ class FT2232HConnection:
                 return False
 
     def _mock_read(self, size: int) -> bytes:
-        """
-        Generate synthetic 11-byte radar data packets for testing.
-        Emits packets in sequential FPGA order (range_bin 0..63, doppler_bin
-        0..31 within each range bin) so that RadarAcquisition._ingest_sample()
-        places them correctly.  A target is injected near range bin 20,
-        Doppler bin 8.
+        """Generate one synthetic FT2232H bulk frame per call.
+
+        Mirrors `usb_data_interface_ft2232h.v` production behavior: mag-only
+        Doppler section + dense-bitmap CFAR, all three streams enabled
+        (matches `RP_STREAM_CTRL_DEFAULT = 6'b001_111`). A target is injected
+        near range bin 20, Doppler bin 8 so dashboards have something to draw.
         """
         time.sleep(0.05)
         self._mock_frame_num += 1
+        flags = (BULK_FLAG_STREAM_RANGE | BULK_FLAG_STREAM_DOPPLER
+                 | BULK_FLAG_STREAM_CFAR | BULK_FLAG_MAG_ONLY)
 
-        buf = bytearray()
-        num_packets = min(NUM_CELLS, size // DATA_PACKET_SIZE)
-        start_idx = getattr(self, '_mock_seq_idx', 0)
+        # Synthesize per-cell magnitudes once (vectorised).
+        rbins = np.arange(NUM_RANGE_BINS).reshape(-1, 1)
+        dbins = np.arange(NUM_DOPPLER_BINS).reshape(1, -1)
+        noise = np.abs(self._mock_rng.normal(0, 50, size=(NUM_RANGE_BINS, NUM_DOPPLER_BINS)))
+        target_mask = (np.abs(rbins - 20) < 3) & (np.abs(dbins - 8) < 2)
+        mag = noise + target_mask * 12000.0
+        mag_u16 = np.clip(mag, 0, 65535).astype(np.uint16)
 
-        for n in range(num_packets):
-            idx = (start_idx + n) % NUM_CELLS
-            rbin = idx // NUM_DOPPLER_BINS
-            dbin = idx % NUM_DOPPLER_BINS
+        range_profile = np.clip(
+            np.abs(self._mock_rng.normal(0, 100, size=NUM_RANGE_BINS))
+            + (np.abs(rbins.flatten() - 20) < 3) * 8000,
+            0, 65535,
+        ).astype(np.uint16)
 
-            range_i = int(self._mock_rng.normal(0, 100))
-            range_q = int(self._mock_rng.normal(0, 100))
-            if abs(rbin - 20) < 3:
-                range_i += 5000
-                range_q += 3000
+        det = (target_mask & (np.abs(dbins - 8) < 2) & (np.abs(rbins - 20) < 2)).astype(np.uint8)
+        det_packed = np.packbits(det.flatten())  # MSB-first bit order matches FPGA
 
-            dop_i = int(self._mock_rng.normal(0, 50))
-            dop_q = int(self._mock_rng.normal(0, 50))
-            if abs(rbin - 20) < 3 and abs(dbin - 8) < 2:
-                dop_i += 8000
-                dop_q += 4000
+        buf = bytearray(BULK_FRAME_MAX_SIZE)
+        buf[0] = HEADER_BYTE
+        buf[1] = flags & 0x3F  # reserved high bits zero, matches RTL
+        buf[2] = (self._mock_frame_num >> 8) & 0xFF
+        buf[3] = self._mock_frame_num & 0xFF
+        buf[4] = (NUM_RANGE_BINS >> 8) & 0xFF
+        buf[5] = NUM_RANGE_BINS & 0xFF
+        buf[6] = (NUM_DOPPLER_BINS >> 8) & 0xFF
+        buf[7] = NUM_DOPPLER_BINS & 0xFF
+        cursor = BULK_FRAME_HEADER_SIZE
+        # Range profile (>u2 = big-endian uint16, matches FPGA MSB-first).
+        buf[cursor:cursor + BULK_RANGE_SECTION_BYTES] = range_profile.astype(">u2").tobytes()
+        cursor += BULK_RANGE_SECTION_BYTES
+        buf[cursor:cursor + BULK_DOPPLER_MAG_BYTES] = mag_u16.astype(">u2").tobytes()
+        cursor += BULK_DOPPLER_MAG_BYTES
+        buf[cursor:cursor + BULK_DETECT_DENSE_BYTES] = det_packed.tobytes()
+        cursor += BULK_DETECT_DENSE_BYTES
+        buf[cursor] = FOOTER_BYTE
 
-            detection = 1 if (abs(rbin - 20) < 2 and abs(dbin - 8) < 2) else 0
-
-            # Build compact 11-byte packet
-            pkt = bytearray()
-            pkt.append(HEADER_BYTE)
-            pkt += struct.pack(">h", np.clip(range_q, -32768, 32767))
-            pkt += struct.pack(">h", np.clip(range_i, -32768, 32767))
-            pkt += struct.pack(">h", np.clip(dop_i, -32768, 32767))
-            pkt += struct.pack(">h", np.clip(dop_q, -32768, 32767))
-            # Bit 7 = frame_start (sample_counter == 0), bit 0 = detection
-            det_byte = (detection & 0x01) | (0x80 if idx == 0 else 0x00)
-            pkt.append(det_byte)
-            pkt.append(FOOTER_BYTE)
-
-            buf += pkt
-
-        self._mock_seq_idx = (start_idx + num_packets) % NUM_CELLS
-        return bytes(buf)
+        # `size` is the host's read budget; emit at most one frame per call
+        # (matches typical FT2232H driver semantics).
+        return bytes(buf[:min(size, BULK_FRAME_MAX_SIZE)])
 
 
 # ============================================================================
@@ -744,9 +951,15 @@ class DataRecorder:
 # ============================================================================
 
 class RadarAcquisition(threading.Thread):
-    """
-    Background thread: reads from USB (FT2232H), parses 11-byte packets,
-    assembles frames, and pushes complete frames to the display queue.
+    """Background thread: reads USB bytes, parses frames, queues them.
+
+    Dispatches between two wire formats based on connection type:
+      - FT2232HConnection -> bulk per-frame format (parses 35 KB frames in
+        one shot via parse_bulk_frame; fills RadarFrame.magnitude directly).
+      - FT601Connection   -> legacy 11-byte per-sample format (count-based
+        sample placement via _ingest_sample, the original behavior).
+
+    See module docstring for why both formats exist.
     """
 
     def __init__(self, connection, frame_queue: queue.Queue,
@@ -761,37 +974,51 @@ class RadarAcquisition(threading.Thread):
         self._frame = RadarFrame()
         self._sample_idx = 0
         self._frame_num = 0
+        # AUDIT-C9: dispatch on connection type. The bulk path skips the
+        # per-sample state machine entirely.
+        self._is_bulk = isinstance(connection, FT2232HConnection)
+        self._read_chunk = (2 * BULK_FRAME_MAX_SIZE) if self._is_bulk else 4096
 
     def stop(self):
         self._stop_event.set()
 
     def run(self):
-        log.info("Acquisition thread started")
+        log.info(
+            "Acquisition thread started (%s wire format)",
+            "FT2232H bulk" if self._is_bulk else "FT601 legacy 11-byte",
+        )
         residual = b""
         while not self._stop_event.is_set():
-            chunk = self.conn.read(4096)
+            chunk = self.conn.read(self._read_chunk)
             if chunk is None or len(chunk) == 0:
                 time.sleep(0.01)
                 continue
 
             raw = residual + chunk
-            packets = RadarProtocol.find_packet_boundaries(raw)
+            if self._is_bulk:
+                packets = RadarProtocol.find_bulk_frame_boundaries(raw)
+                max_residual = BULK_FRAME_MAX_SIZE
+            else:
+                packets = RadarProtocol.find_packet_boundaries(raw)
+                max_residual = 2 * max(DATA_PACKET_SIZE, STATUS_PACKET_SIZE)
 
-            # Keep unparsed tail bytes for next iteration
+            # Keep unparsed tail bytes for next iteration.
             if packets:
                 last_end = packets[-1][1]
                 residual = raw[last_end:]
             else:
-                # No packets found — keep entire buffer as residual
-                # but cap at 2x max packet size to avoid unbounded growth
-                max_residual = 2 * max(DATA_PACKET_SIZE, STATUS_PACKET_SIZE)
                 residual = raw[-max_residual:] if len(raw) > max_residual else raw
+
             for start, end, ptype in packets:
                 if ptype == "data":
-                    parsed = RadarProtocol.parse_data_packet(
-                        raw[start:end])
-                    if parsed is not None:
-                        self._ingest_sample(parsed)
+                    if self._is_bulk:
+                        parsed = RadarProtocol.parse_bulk_frame(raw, offset=start)
+                        if parsed is not None:
+                            self._ingest_bulk_frame(parsed)
+                    else:
+                        sample = RadarProtocol.parse_data_packet(raw[start:end])
+                        if sample is not None:
+                            self._ingest_sample(sample)
                 elif ptype == "status":
                     status = RadarProtocol.parse_status_packet(raw[start:end])
                     if status is not None:
@@ -808,6 +1035,40 @@ class RadarAcquisition(threading.Thread):
                                 log.error(f"Status callback error: {e}")
 
         log.info("Acquisition thread stopped")
+
+    def _ingest_bulk_frame(self, parsed: dict):
+        """Build a RadarFrame from one parsed bulk frame and emit it."""
+        frame = RadarFrame()
+        frame.timestamp = time.time()
+        frame.frame_number = parsed["frame_number"]
+        frame.mag_only = bool(parsed["flags"] & BULK_FLAG_MAG_ONLY)
+
+        rprof = parsed["range_profile"]
+        if rprof is not None:
+            # Wire is uint16; RadarFrame.range_profile is float64.
+            frame.range_profile[:] = rprof.astype(np.float64)
+
+        dmag = parsed["doppler_mag"]
+        if dmag is not None:
+            frame.magnitude[:] = dmag.astype(np.float64)
+            # I/Q arrays stay zero in mag-only mode (the only mode FPGA
+            # emits today). Future RTL may populate them; for now flag is
+            # the source of truth.
+
+        cdense = parsed["cfar_dense"]
+        if cdense is not None:
+            frame.detections[:] = cdense.astype(np.uint8)
+            frame.detection_count = int(cdense.sum())
+
+        try:
+            self.frame_queue.put_nowait(frame)
+        except queue.Full:
+            with contextlib.suppress(queue.Empty):
+                self.frame_queue.get_nowait()
+            self.frame_queue.put_nowait(frame)
+
+        if self.recorder and self.recorder.recording:
+            self.recorder.record_frame(frame)
 
     def _ingest_sample(self, sample: dict):
         """Place sample into current frame and emit when complete."""
