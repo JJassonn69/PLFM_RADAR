@@ -63,6 +63,17 @@ wire [7:0]  axi_dout_tuser;
 wire        axi_dout_tvalid;
 wire        axi_dout_tlast;
 
+// 1-deep skid buffer absorbs LogiCORE FFT v9.1 nonrealtime backpressure
+// (PG109: tready may dip briefly during pipeline / BFP normalization events).
+// Upstream matched_filter_processing_chain has no flow-control input, so the
+// bridge cannot push back — must buffer. Sustained 2+ cycle backpressure sets
+// overflow_sticky for debug visibility.
+reg  [31:0]      skid_data;
+reg              skid_valid;
+reg              skid_last;
+reg  [LOG2N:0]   accept_count;     // beats actually accepted by IP (tvalid&&tready)
+reg              overflow_sticky;  // sticky: skid+active both full when upstream pushed
+
 // xfft_2048 wrapper. AXI master always-accept (no backpressure modeling here).
 xfft_2048 u_xfft (
     .aclk                 (clk),
@@ -115,6 +126,11 @@ always @(posedge clk or negedge reset_n) begin
         inverse_latched <= 1'b0;
         busy            <= 1'b0;
         done            <= 1'b0;
+        skid_data       <= 32'd0;
+        skid_valid      <= 1'b0;
+        skid_last       <= 1'b0;
+        accept_count    <= 0;
+        overflow_sticky <= 1'b0;
     end else begin
         // Defaults — pulses
         done <= 1'b0;
@@ -124,11 +140,13 @@ always @(posedge clk or negedge reset_n) begin
             axi_din_tvalid <= 1'b0;
             axi_din_tlast  <= 1'b0;
             cfg_tvalid     <= 1'b0;
+            skid_valid     <= 1'b0;
             if (start) begin
                 inverse_latched <= inverse;
                 cfg_tdata       <= {7'd0, ~inverse};   // tdata[0]=1 → FWD
                 cfg_tvalid      <= 1'b1;
                 in_count        <= 0;
+                accept_count    <= 0;
                 busy            <= 1'b1;
                 state           <= S_CFG;
             end
@@ -143,20 +161,63 @@ always @(posedge clk or negedge reset_n) begin
         end
 
         S_FEED: begin
-            // Forward din_valid → AXI din_tvalid, packing {Q,I}.
-            // Assert tlast on the Nth input.
+            // Phase 1: handshake — IP accepted current beat. Drain skid into
+            // active (or clear active). Advance accept_count.
+            if (axi_din_tvalid && axi_din_tready) begin
+                accept_count <= accept_count + 1'b1;
+                if (skid_valid) begin
+                    axi_din_tdata  <= skid_data;
+                    axi_din_tlast  <= skid_last;
+                    axi_din_tvalid <= 1'b1;
+                end else begin
+                    axi_din_tvalid <= 1'b0;
+                    axi_din_tlast  <= 1'b0;
+                end
+                skid_valid <= 1'b0;
+            end
+
+            // Phase 2: load incoming sample. NBA "last assignment wins" lets
+            // these overrides supersede Phase 1 when both fire same cycle.
             if (din_valid && (in_count < N)) begin
-                axi_din_tdata  <= {din_im, din_re};
-                axi_din_tvalid <= 1'b1;
-                axi_din_tlast  <= (in_count == N - 1);
-                in_count       <= in_count + 1;
-            end else begin
+                if (axi_din_tvalid && axi_din_tready) begin
+                    // Active was just drained / shifted into this cycle
+                    if (skid_valid) begin
+                        // Skid → active; new sample → skid (skid stays full)
+                        skid_data  <= {din_im, din_re};
+                        skid_last  <= (in_count == N - 1);
+                        skid_valid <= 1'b1;
+                    end else begin
+                        // Active became empty; new sample → active
+                        axi_din_tdata  <= {din_im, din_re};
+                        axi_din_tlast  <= (in_count == N - 1);
+                        axi_din_tvalid <= 1'b1;
+                    end
+                    in_count <= in_count + 1'b1;
+                end else begin
+                    // No handshake this cycle
+                    if (!axi_din_tvalid) begin
+                        axi_din_tdata  <= {din_im, din_re};
+                        axi_din_tlast  <= (in_count == N - 1);
+                        axi_din_tvalid <= 1'b1;
+                        in_count       <= in_count + 1'b1;
+                    end else if (!skid_valid) begin
+                        skid_data  <= {din_im, din_re};
+                        skid_last  <= (in_count == N - 1);
+                        skid_valid <= 1'b1;
+                        in_count   <= in_count + 1'b1;
+                    end else begin
+                        // Both slots full — sample lost. Sticky flag for debug.
+                        overflow_sticky <= 1'b1;
+                    end
+                end
+            end
+
+            // Transition to drain on the cycle the Nth beat is accepted.
+            // Override Phase 1+2 loads — no more samples to deliver.
+            if (axi_din_tvalid && axi_din_tready && (accept_count + 1'b1 == N)) begin
                 axi_din_tvalid <= 1'b0;
                 axi_din_tlast  <= 1'b0;
-            end
-            if (in_count == N) begin
-                // All inputs delivered; await output drain.
-                state <= S_DRAIN;
+                state          <= S_DRAIN;
             end
         end
 

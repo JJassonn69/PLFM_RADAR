@@ -546,6 +546,10 @@ run_test "FPGA Self-Test" \
     tb/tb_fpga_self_test.vvp \
     tb/tb_fpga_self_test.v fpga_self_test.v
 
+run_test "FFT AXI Bridge tready handshake (AUDIT-C10)" \
+    tb/tb_fft_engine_axi_bridge.vvp \
+    tb/tb_fft_engine_axi_bridge.v fft_engine_axi_bridge.v
+
 echo ""
 
 # ===========================================================================
