@@ -79,8 +79,15 @@ module radar_receiver_final (
     // AUDIT-C3: AD9484 sign-conversion select (opcode 0x33). Selects DDC
     // sign-conversion to match the SCLK/DFS strap (SJ1) on the Main Board.
     // 2'b00 = offset-binary (default), 2'b01 = two's-complement.
-    // (Opcode 0x32 is reserved for the future S-25 fix: adc_pwdn host control.)
     input wire [1:0]  host_adc_format,
+
+    // AUDIT-S25: AD9484 power-down control (opcode 0x32). Active-high per
+    // AD9484 datasheet ("Power-Down (PWDN)" section). 1'b0 = ADC powered up
+    // (default), 1'b1 = PWDN asserted. Lets the MCU recover the ADC from a
+    // stuck state without dropping main power. Pin drives AD9484 PWDN net via
+    // the R36/R37 divider on the Main Board (CMOS thresholds, no level
+    // translation needed). Stable single-bit level — no CDC needed.
+    input wire        host_adc_pwdn,
 
     // ADC raw data tap (clk_100m domain, post-DDC, for self-test / debug)
     output wire [15:0] dbg_adc_i,            // DDC output I (16-bit signed, 100 MHz)
@@ -242,8 +249,10 @@ wire clk_400m;
 wire [7:0] adc_data_cmos;  // 8-bit ADC data (CMOS, from ad9484_interface_400m)
 wire adc_valid;            // Data valid signal
 
-// ADC power-down control (directly tie low = ADC always on)
-assign adc_pwdn = 1'b0;
+// AUDIT-S25: ADC power-down driven by host_adc_pwdn (opcode 0x32). Default
+// 0 keeps the ADC powered up — same behavior as the previous hard-tied 1'b0.
+// Set to 1 to assert AD9484 PWDN; see port comment for full design notes.
+assign adc_pwdn = host_adc_pwdn;
 
 wire adc_overrange_400m;
 ad9484_interface_400m adc (

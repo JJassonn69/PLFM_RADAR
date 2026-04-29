@@ -558,6 +558,10 @@ run_test "Doppler Frame-Start Gate (AUDIT-S3)" \
     tb/tb_doppler_frame_start_gate.vvp \
     tb/tb_doppler_frame_start_gate.v doppler_processor.v xfft_16.v fft_engine.v
 
+run_test "ADC PWDN opcode 0x32 (AUDIT-S25)" \
+    tb/tb_adc_pwdn_opcode.vvp \
+    tb/tb_adc_pwdn_opcode.v
+
 echo ""
 
 # ===========================================================================

@@ -304,7 +304,18 @@ reg [3:0]  host_agc_holdoff;      // Opcode 0x2C: frames to wait before gain-up 
 // CSB is hard-tied HIGH on the production Main Board so SPI cannot reconfigure
 // the AD9484 — see RADAR_Main_Board.sch:46719. This register is the host's
 // only path to align RTL with the physical strap without a board rework.
-// Opcode 0x32 is reserved for the future S-25 fix (host-driven adc_pwdn).
+// AUDIT-S25 (opcode 0x32): AD9484 power-down control.
+//   1'b0 = ADC powered up (default; matches the historical hard-tied state)
+//   1'b1 = ADC PWDN asserted (active-high per AD9484 datasheet section
+//          "Power-Down (PWDN)"; FPGA pin drives the AD9484 PWDN net via
+//          the R36/R37 divider on the Main Board).
+// Lets the MCU pulse PWDN during recovery without dropping main power.
+// AUDIT-C13 noted that the AD9484's CSB is hard-tied HIGH on the production
+// board (no SPI access), so PWDN is the ONLY in-system reset path for the
+// ADC. PWDN is a stable single-bit level driven from this clk_100m register
+// straight to the I/O pad; no CDC needed (asynchronous w.r.t. ADC, which
+// re-acquires its DLL on PWDN deassert).
+reg        host_adc_pwdn;
 reg [1:0]  host_adc_format;
 
 // Board bring-up self-test registers (opcode 0x30 trigger, 0x31 readback)
@@ -591,6 +602,8 @@ radar_receiver_final rx_inst (
     .host_dc_notch_width(host_dc_notch_width),
     // AUDIT-C3: ADC format select (opcode 0x33) -> DDC sign-conversion
     .host_adc_format(host_adc_format),
+    // AUDIT-S25: ADC power-down control (opcode 0x32) -> AD9484 PWDN pin
+    .host_adc_pwdn(host_adc_pwdn),
     // ADC debug tap (for self-test / bring-up)
     .dbg_adc_i(rx_dbg_adc_i),
     .dbg_adc_q(rx_dbg_adc_q),
@@ -1009,6 +1022,10 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
         host_self_test_trigger  <= 1'b0;      // Self-test idle
         // AUDIT-C3: ADC format default (offset-binary matches SJ1 default)
         host_adc_format         <= 2'b00;
+        // AUDIT-S25: AD9484 PWDN default = 0 (ADC powered up; matches the
+        // historical hard-tied state at radar_receiver_final.v:246 prior to
+        // this fix, so existing bringup behavior is preserved).
+        host_adc_pwdn           <= 1'b0;
     end else begin
         host_trigger_pulse <= 1'b0;    // Self-clearing pulse
         host_status_request <= 1'b0;   // Self-clearing pulse
@@ -1078,8 +1095,10 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
                 8'h30: host_self_test_trigger  <= 1'b1;  // Trigger self-test
                 8'h31: host_status_request     <= 1'b1;  // Self-test readback (status alias)
                 // 0x31: readback handled via status mechanism (latched results)
+                // AUDIT-S25: AD9484 power-down control (active-high). Lets MCU
+                // recover the ADC from a stuck state without dropping main power.
+                8'h32: host_adc_pwdn           <= usb_cmd_value[0];
                 // AUDIT-C3: ADC format select (matches AD9484 SCLK/DFS strap SJ1).
-                // 0x32 reserved for S-25 (adc_pwdn host control); using 0x33 here.
                 8'h33: host_adc_format         <= usb_cmd_value[1:0];
                 8'hFF: host_status_request     <= 1'b1;  // Gap 2: status readback
                 default: ;
