@@ -8,6 +8,15 @@ module ddc_400m_enhanced (
     input wire [7:0] adc_data,     // ADC data at 400MHz
     input wire adc_data_valid_i,     // Valid at 400MHz
 	 input wire adc_data_valid_q,
+    // AUDIT-C3: AD9484 sign-conversion select (driven from host opcode 0x33).
+    //   2'b00 = offset-binary (default; matches SJ1 pins 1-2 bridged)
+    //   2'b01 = two's-complement (SJ1 pins 2-3 bridged)
+    //   2'b1x = reserved (treated as offset-binary)
+    // CSB is hard-tied HIGH on the Main Board so SPI cannot reconfigure the
+    // chip; this register lets the host adapt the RTL to whichever SJ1 strap
+    // the board was assembled with. Static after boot; synchronized clk_100m
+    // -> clk_400m internally.
+    input wire [1:0] adc_format,
     output wire signed [17:0] baseband_i,
     output wire signed [17:0] baseband_q,  
     output wire baseband_valid_i,
@@ -236,9 +245,37 @@ nco_400m_enhanced nco_core (
 // In simulation (Icarus), uses behavioral equivalent since DSP48E1 is Xilinx-only
 // ============================================================================
 
+// AUDIT-C3: Two-segment ADC sign-conversion. AD9484 SCLK/DFS strap (jumper
+// SJ1 on RADAR_Main_Board.sch) selects the chip's output format at assembly
+// time; SPI is unavailable (CSB hard-tied to +1V8_CLOCK_F). Host opcode 0x33
+// drives `adc_format` so the host can match either jumper position without
+// rebuilding the bitstream. Default 2'b00 matches the offset-binary strap.
+//
+//   adc=0x80, format=00 → ~0  (mid-scale offset-binary, 0V analog)
+//   adc=0x00, format=01 → 0   (mid-scale 2's-complement, 0V analog)
+//
+// Unsynchronized adc_format would cross clk_100m → clk_400m without protection;
+// 2-FF synchronizer below resolves metastability. Static after boot.
+(* ASYNC_REG = "TRUE" *) reg [1:0] adc_format_400m_meta;
+(* ASYNC_REG = "TRUE" *) reg [1:0] adc_format_400m;
+always @(posedge clk_400m) begin
+    if (reset_400m) begin
+        adc_format_400m_meta <= 2'b00;
+        adc_format_400m      <= 2'b00;
+    end else begin
+        adc_format_400m_meta <= adc_format;
+        adc_format_400m      <= adc_format_400m_meta;
+    end
+end
+
+wire signed [MIXER_WIDTH-1:0] adc_signed_offbin;
+wire signed [MIXER_WIDTH-1:0] adc_signed_twoc;
+assign adc_signed_offbin = {1'b0, adc_data, {(MIXER_WIDTH-ADC_WIDTH-1){1'b0}}} -
+                           {1'b0, {ADC_WIDTH{1'b1}}, {(MIXER_WIDTH-ADC_WIDTH-1){1'b0}}} / 2;
+assign adc_signed_twoc   = {adc_data[ADC_WIDTH-1], adc_data, {(MIXER_WIDTH-ADC_WIDTH-1){1'b0}}};
+
 // Combinational ADC sign conversion (no register — DSP48E1 AREG handles it)
-assign adc_signed_w = {1'b0, adc_data, {(MIXER_WIDTH-ADC_WIDTH-1){1'b0}}} - 
-                      {1'b0, {ADC_WIDTH{1'b1}}, {(MIXER_WIDTH-ADC_WIDTH-1){1'b0}}} / 2;
+assign adc_signed_w = (adc_format_400m == 2'b01) ? adc_signed_twoc : adc_signed_offbin;
 
 // Valid pipeline: 5-stage shift register (1 NCO pipe + 3 DSP48E1 AREG+MREG+PREG + 1 retiming)
 always @(posedge clk_400m) begin

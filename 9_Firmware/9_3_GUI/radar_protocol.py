@@ -62,6 +62,8 @@ class Opcode(IntEnum):
         0x11  host_long_listen_cycles 0x28-0x2C  AGC control
         0x12  host_guard_cycles      0x30  host_self_test_trigger
         0x13  host_short_chirp_cycles 0x31/0xFF  host_status_request
+        0x33  host_adc_format       (AD9484 SCLK/DFS strap; AUDIT-C3)
+        (0x32 reserved for the future S-25 adc_pwdn host-control fix)
     """
     # --- Basic control (0x01-0x04) ---
     RADAR_MODE          = 0x01  # 2-bit mode select
@@ -101,6 +103,15 @@ class Opcode(IntEnum):
     SELF_TEST_TRIGGER   = 0x30
     SELF_TEST_STATUS    = 0x31
     STATUS_REQUEST      = 0xFF
+
+    # --- AD9484 ADC sign-convention (0x33, AUDIT-C3) ---
+    # 2'b00 = offset-binary (default; SJ1 jumper pins 1-2 bridged)
+    # 2'b01 = two's-complement (SJ1 jumper pins 2-3 bridged)
+    # AD9484 CSB is hard-tied HIGH on the Main Board (SPI unavailable);
+    # this opcode lets the host adapt the DDC to the physical strap
+    # without rebuilding the bitstream.
+    # (Opcode 0x32 is reserved for the future AUDIT-S25 adc_pwdn fix.)
+    ADC_FORMAT          = 0x33
 
 
 # ============================================================================

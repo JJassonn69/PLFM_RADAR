@@ -88,6 +88,7 @@ module tb_ddc_cosim;
         .adc_data         (adc_data),
         .adc_data_valid_i (adc_data_valid),
         .adc_data_valid_q (adc_data_valid),
+        .adc_format       (2'b00),  // AUDIT-C3: offset-binary (cosim baseline)
         .baseband_i       (baseband_i),
         .baseband_q       (baseband_q),
         .baseband_valid_i (baseband_valid_i),

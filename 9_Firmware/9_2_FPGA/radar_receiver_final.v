@@ -76,6 +76,12 @@ module radar_receiver_final (
     input wire        host_mti_enable,       // 1=MTI active, 0=pass-through
     input wire [2:0]  host_dc_notch_width,   // DC notch: zero Doppler bins within ±width of DC
 
+    // AUDIT-C3: AD9484 sign-conversion select (opcode 0x33). Selects DDC
+    // sign-conversion to match the SCLK/DFS strap (SJ1) on the Main Board.
+    // 2'b00 = offset-binary (default), 2'b01 = two's-complement.
+    // (Opcode 0x32 is reserved for the future S-25 fix: adc_pwdn host control.)
+    input wire [1:0]  host_adc_format,
+
     // ADC raw data tap (clk_100m domain, post-DDC, for self-test / debug)
     output wire [15:0] dbg_adc_i,            // DDC output I (16-bit signed, 100 MHz)
     output wire [15:0] dbg_adc_q,            // DDC output Q (16-bit signed, 100 MHz)
@@ -307,6 +313,7 @@ ddc_400m_enhanced ddc(
     .adc_data(adc_data_cmos),     // ADC data at 400MHz (direct from ADC interface)
     .adc_data_valid_i(adc_valid),     // Valid at 400MHz
     .adc_data_valid_q(adc_valid),     // Valid at 400MHz
+    .adc_format(host_adc_format),  // AUDIT-C3: opcode 0x33 selects offset-binary vs 2C
     .baseband_i(ddc_out_i), // I output at 100MHz
     .baseband_q(ddc_out_q), // Q output at 100MHz
     .baseband_valid_i(ddc_valid_i),     // Valid at 100MHz

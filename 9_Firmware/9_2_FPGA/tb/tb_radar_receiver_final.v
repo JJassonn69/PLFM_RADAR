@@ -173,6 +173,8 @@ radar_receiver_final dut (
 
     // Fix 3: digital gain control — pass-through for golden reference
     .host_gain_shift(4'd0),
+    // AUDIT-C3: ADC format select — offset-binary baseline
+    .host_adc_format(2'b00),
     // CFAR: frame-complete output (not used in this TB)
     .doppler_frame_done_out()
 );

@@ -296,6 +296,17 @@ reg [3:0]  host_agc_attack;       // Opcode 0x2A: gain-down step on clipping (de
 reg [3:0]  host_agc_decay;        // Opcode 0x2B: gain-up step when weak (default 1)
 reg [3:0]  host_agc_holdoff;      // Opcode 0x2C: frames to wait before gain-up (default 4)
 
+// AUDIT-C3: ADC format register (opcode 0x33). Selects DDC sign-conversion
+// to match the AD9484 SCLK/DFS strap (jumper SJ1 on Main Board).
+//   2'b00 = offset-binary (default; matches SJ1 pins 1-2 bridged)
+//   2'b01 = two's-complement (SJ1 pins 2-3 bridged)
+//   2'b1x = reserved (treated as offset-binary)
+// CSB is hard-tied HIGH on the production Main Board so SPI cannot reconfigure
+// the AD9484 — see RADAR_Main_Board.sch:46719. This register is the host's
+// only path to align RTL with the physical strap without a board rework.
+// Opcode 0x32 is reserved for the future S-25 fix (host-driven adc_pwdn).
+reg [1:0]  host_adc_format;
+
 // Board bring-up self-test registers (opcode 0x30 trigger, 0x31 readback)
 reg        host_self_test_trigger;  // Opcode 0x30: self-clearing pulse
 wire       self_test_busy;
@@ -578,6 +589,8 @@ radar_receiver_final rx_inst (
     // Ground clutter removal
     .host_mti_enable(host_mti_enable),
     .host_dc_notch_width(host_dc_notch_width),
+    // AUDIT-C3: ADC format select (opcode 0x33) -> DDC sign-conversion
+    .host_adc_format(host_adc_format),
     // ADC debug tap (for self-test / bring-up)
     .dbg_adc_i(rx_dbg_adc_i),
     .dbg_adc_q(rx_dbg_adc_q),
@@ -994,6 +1007,8 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
         host_agc_holdoff        <= 4'd4;      // 4 frames before gain-up
         // Self-test defaults
         host_self_test_trigger  <= 1'b0;      // Self-test idle
+        // AUDIT-C3: ADC format default (offset-binary matches SJ1 default)
+        host_adc_format         <= 2'b00;
     end else begin
         host_trigger_pulse <= 1'b0;    // Self-clearing pulse
         host_status_request <= 1'b0;   // Self-clearing pulse
@@ -1046,6 +1061,9 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
                 8'h30: host_self_test_trigger  <= 1'b1;  // Trigger self-test
                 8'h31: host_status_request     <= 1'b1;  // Self-test readback (status alias)
                 // 0x31: readback handled via status mechanism (latched results)
+                // AUDIT-C3: ADC format select (matches AD9484 SCLK/DFS strap SJ1).
+                // 0x32 reserved for S-25 (adc_pwdn host control); using 0x33 here.
+                8'h33: host_adc_format         <= usb_cmd_value[1:0];
                 8'hFF: host_status_request     <= 1'b1;  // Gap 2: status readback
                 default: ;
             endcase

@@ -14,6 +14,7 @@ module tb_ddc_400m;
     reg  [7:0]  adc_data;
     reg         adc_data_valid_i;
     reg         adc_data_valid_q;
+    reg  [1:0]  adc_format;       // AUDIT-C3: ADC sign-conversion select
     wire signed [17:0] baseband_i;
     wire signed [17:0] baseband_q;
     wire        baseband_valid_i;
@@ -53,6 +54,7 @@ module tb_ddc_400m;
         .adc_data          (adc_data),
         .adc_data_valid_i  (adc_data_valid_i),
         .adc_data_valid_q  (adc_data_valid_q),
+        .adc_format        (adc_format),
         .baseband_i        (baseband_i),
         .baseband_q        (baseband_q),
         .baseband_valid_i  (baseband_valid_i),
@@ -99,6 +101,7 @@ module tb_ddc_400m;
         adc_data         = 0;
         adc_data_valid_i = 0;
         adc_data_valid_q = 0;
+        adc_format       = 2'b00;  // Default offset-binary
         test_mode        = 2'b00;
         test_phase_inc   = 0;
         force_saturation = 0;
@@ -220,6 +223,84 @@ module tb_ddc_400m;
         $display("\n--- Test Group 4: Debug Counters ---");
         $display("  debug_sample_count = %0d", debug_sample_count);
         check(debug_sample_count > 0, "Sample counter increments");
+
+        // ════════════════════════════════════════════════════════
+        // TEST GROUP 5: AUDIT-C3 — ADC format selection
+        //
+        // Exercises the new opcode-0x33 path that picks offset-binary or 2C
+        // sign-conversion to match the AD9484 SCLK/DFS strap (SJ1) on the
+        // Main Board. Probes adc_signed_w via hierarchical reference because
+        // the wire is internal to the DUT.
+        //
+        // Expected pre-DSP values (MIXER_WIDTH=18, ADC_WIDTH=8):
+        //   format=00 (offset-binary), adc=0x80 -> +256       (mid-scale ≈ 0V)
+        //   format=00 (offset-binary), adc=0x00 -> -65280     (full negative)
+        //   format=00 (offset-binary), adc=0xFF -> +65280     (full positive)
+        //   format=01 (2's-complement), adc=0x00 -> 0          (mid-scale 0V)
+        //   format=01 (2's-complement), adc=0x80 -> -65536     (full negative)
+        //   format=01 (2's-complement), adc=0x7F -> +65024     (full positive)
+        // ════════════════════════════════════════════════════════
+        $display("\n--- Test Group 5: AUDIT-C3 ADC format selection ---");
+        reset_n          = 0;
+        adc_data_valid_i = 0;
+        adc_data_valid_q = 0;
+        repeat (10) @(posedge clk_400m);
+        reset_n = 1;
+        repeat (5) @(posedge clk_400m);
+
+        // Offset-binary mid-scale (adc=0x80)
+        adc_format = 2'b00;
+        repeat (5) @(posedge clk_400m);  // 2-FF sync settle
+        adc_data = 8'h80;
+        @(posedge clk_400m); #1;
+        check(uut.adc_signed_w === 18'sd256,
+              "format=00 adc=0x80 -> +256 (offset-binary mid-scale)");
+
+        // Offset-binary full negative (adc=0x00)
+        adc_data = 8'h00;
+        @(posedge clk_400m); #1;
+        check(uut.adc_signed_w === -18'sd65280,
+              "format=00 adc=0x00 -> -65280 (offset-binary min)");
+
+        // Offset-binary full positive (adc=0xFF)
+        adc_data = 8'hFF;
+        @(posedge clk_400m); #1;
+        check(uut.adc_signed_w === 18'sd65280,
+              "format=00 adc=0xFF -> +65280 (offset-binary max)");
+
+        // Switch to 2's-complement and let the synchronizer settle
+        adc_format = 2'b01;
+        repeat (5) @(posedge clk_400m);
+
+        // 2's-complement mid-scale (adc=0x00)
+        adc_data = 8'h00;
+        @(posedge clk_400m); #1;
+        check(uut.adc_signed_w === 18'sd0,
+              "format=01 adc=0x00 -> 0 (2's-complement mid-scale)");
+
+        // 2's-complement full negative (adc=0x80)
+        adc_data = 8'h80;
+        @(posedge clk_400m); #1;
+        check(uut.adc_signed_w === -18'sd65536,
+              "format=01 adc=0x80 -> -65536 (2's-complement min)");
+
+        // 2's-complement full positive (adc=0x7F)
+        adc_data = 8'h7F;
+        @(posedge clk_400m); #1;
+        check(uut.adc_signed_w === 18'sd65024,
+              "format=01 adc=0x7F -> +65024 (2's-complement max)");
+
+        // Reserved 2'b1x must fall back to offset-binary
+        adc_format = 2'b10;
+        repeat (5) @(posedge clk_400m);
+        adc_data = 8'h80;
+        @(posedge clk_400m); #1;
+        check(uut.adc_signed_w === 18'sd256,
+              "format=10 (reserved) -> offset-binary fallback");
+
+        // Restore default for any later tests
+        adc_format = 2'b00;
+        repeat (5) @(posedge clk_400m);
 
         // ════════════════════════════════════════════════════════
         // Summary
