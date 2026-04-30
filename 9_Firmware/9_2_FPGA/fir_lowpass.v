@@ -40,6 +40,26 @@
 // output bit-slice are unchanged from the unfolded design (compare against
 // ±2^(ACCUM_WIDTH-2) = ±2^34, slice [ACCUM_WIDTH-2 : DATA_WIDTH-1] =
 // [34:17]) so downstream signal levels and headroom stay the same.
+//
+// DC gain & filter shape (AUDIT-S17): the coefficient ROM has a deliberate
+// positive DC pre-emphasis. Sum of 32 signed coefficients = 231,944. With
+// the output slice taken at accumulator[34:17], effective Q-format is Q17,
+// so DC gain = 231944 / 2^17 = 1.7696 = +4.96 dB. This is bit-exact against
+// the in-line golden-model line above (DC=5000 in → 8847 out:
+// 231944 × 5000 = 1,159,720,000; >>17 = 8847).
+//
+// The +4.96 dB pre-emphasis compensates CIC droop: the upstream 4-stage
+// CIC at decimation factor 4 has ~3-4 dB of passband droop near Nyquist,
+// partially offset by this FIR's positive DC gain so the cascade response
+// is flatter than the CIC alone. Operational implication: AGC and
+// saturation budgets in downstream stages (DDC → CIC → FIR → MF) must
+// account for the +4.96 dB FIR gain — a clean 0 dB FIR assumption would
+// under-budget headroom by ~5 dB.
+//
+// Coefficients are intentionally NOT regenerated from a clean FIR design
+// tool; they are kept bit-exact with the unfolded predecessor so the
+// existing golden-model test stays valid. Touching them would invalidate
+// that contract and would silently shift downstream signal levels.
 // ============================================================================
 
 module fir_lowpass_parallel_enhanced (
