@@ -41,6 +41,8 @@
  *   vvp tb/tb_system_e2e.vvp
  */
 
+`include "radar_params.vh"
+
 module tb_system_e2e;
 
 // ============================================================================
@@ -160,8 +162,8 @@ wire [5:0]  current_chirp;
 wire        new_chirp_frame;
 wire [31:0] dbg_doppler_data;
 wire        dbg_doppler_valid;
-wire [4:0]  dbg_doppler_bin;
-wire [5:0]  dbg_range_bin;
+wire [`RP_DOPPLER_BIN_WIDTH-1:0]   dbg_doppler_bin;
+wire [`RP_RANGE_BIN_WIDTH_MAX-1:0] dbg_range_bin;
 wire [3:0]  system_status;
 
 // ============================================================================

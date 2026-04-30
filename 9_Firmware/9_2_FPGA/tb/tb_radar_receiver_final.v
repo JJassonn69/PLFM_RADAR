@@ -33,11 +33,15 @@
 //   Tap 1 (DDC output)     - bounds checking only (CDC jitter -> non-deterministic)
 //     Signals: dut.ddc_out_i [17:0], dut.ddc_out_q [17:0], dut.ddc_valid_i
 //   Tap 2 (Doppler output) - golden compared (deterministic after MF buffering)
-//     Signals: doppler_output[31:0], doppler_valid, doppler_bin[4:0],
-//              range_bin_out[8:0]
+//     Signals: doppler_output[31:0], doppler_valid,
+//              doppler_bin[`RP_DOPPLER_BIN_WIDTH-1:0]  (= 6 bits PR-F),
+//              range_bin_out[`RP_RANGE_BIN_WIDTH_MAX-1:0] (= 9 bits)
 //
 // Golden file: tb/golden/golden_doppler.mem
-//   16384 entries of 32-bit hex, indexed by range_bin*32 + doppler_bin
+//   NUM_RANGE_BINS * NUM_DOPPLER_BINS entries (24576 in PR-F: 512 range × 48 doppler)
+//   of 32-bit hex, indexed by range_bin * NUM_DOPPLER_BINS + doppler_bin.
+//   The legacy file (16384 entries, 512 range × 32 doppler) is no longer
+//   compatible — regenerate via -DGOLDEN_GENERATE under XSim with FFT IP.
 //
 // Strategy:
 //   - Uses behavioral stub for ad9484_interface_400m (no Xilinx primitives)
@@ -47,6 +51,8 @@
 //
 // Convention: check task, VCD dump, CSV output, pass/fail summary
 // ============================================================================
+
+`include "radar_params.vh"
 
 module tb_radar_receiver_final;
 
@@ -131,8 +137,8 @@ end
 // ============================================================================
 wire [31:0] doppler_output;
 wire doppler_valid;
-wire [4:0] doppler_bin;
-wire [8:0] range_bin_out;
+wire [`RP_DOPPLER_BIN_WIDTH-1:0]   doppler_bin;
+wire [`RP_RANGE_BIN_WIDTH_MAX-1:0] range_bin_out;
 
 radar_receiver_final dut (
     .clk(clk_100m),
@@ -221,10 +227,14 @@ endtask
 // ============================================================================
 // GOLDEN MEMORY DECLARATIONS AND LOAD/STORE LOGIC
 // ============================================================================
-localparam GOLDEN_ENTRIES   = 16384; // 512 range bins * 32 Doppler bins
+// PR-F: NUM_DOPPLER_BINS bumped 32 → 48 (3 sub-frames × 16 chirps each), so
+// the golden file's expected size is now 512 × 48 = 24576 (legacy was 16384).
+localparam NUM_RBINS        = `RP_NUM_RANGE_BINS;     // 512
+localparam NUM_DBINS        = `RP_NUM_DOPPLER_BINS;   // 48 (PR-F)
+localparam GOLDEN_ENTRIES   = NUM_RBINS * NUM_DBINS;  // 24576 (PR-F)
 localparam GOLDEN_TOLERANCE = 2;     // +/- 2 LSB tolerance for comparison
 
-reg [31:0] golden_doppler [0:16383];
+reg [31:0] golden_doppler [0:GOLDEN_ENTRIES-1];
 
 // -- Golden comparison tracking --
 integer golden_match_count;
@@ -285,8 +295,8 @@ end
 // ============================================================================
 integer doppler_output_count;
 integer doppler_frame_count;
-reg [511:0] range_bin_seen;    // Bitmap: which range bins appeared (512 bins)
-reg [31:0] doppler_bin_seen;   // Bitmap: which Doppler bins appeared
+reg [`RP_NUM_RANGE_BINS-1:0] range_bin_seen;   // 512-bit bitmap of seen range bins
+reg [63:0]                   doppler_bin_seen; // 64-bit bitmap (PR-F: NUM_DBINS=48 bits used)
 integer nonzero_output_count;
 reg [31:0] first_doppler_time; // Cycle when first doppler_valid appears
 reg first_doppler_seen;
@@ -299,22 +309,23 @@ reg frame_done_prev;
 integer csv_fd;
 
 // Duplicate detection: one-hot bitmap per (range_bin, doppler_bin)
-// 512 range bins x 32 doppler bins = 16384 bits -> array of 512 x 32-bit regs
-reg [31:0] index_seen [0:511];
+// 512 range bins × NUM_DBINS doppler bins. PR-F: NUM_DBINS=48 — bumped from 32
+// to a 64-bit reg per range bin so `(64'd1 << doppler_bin)` covers bins 32..47.
+reg [63:0] index_seen [0:`RP_NUM_RANGE_BINS-1];
 integer dup_count;
 
 // Bounds check B2: Doppler energy tracking per range bin
-// For each range bin, track peak |I|+|Q| across all 32 Doppler bins
+// For each range bin, track peak |I|+|Q| across all Doppler bins
 // and total energy. Verifies pipeline computes non-trivial Doppler spectra.
-reg [31:0] peak_dbin_mag [0:511]; // max |I|+|Q| across all Doppler bins
-reg [31:0] total_dbin_energy [0:511]; // sum of |I|+|Q| across all 32 Doppler bins
+reg [31:0] peak_dbin_mag    [0:`RP_NUM_RANGE_BINS-1]; // max |I|+|Q| across all Doppler bins
+reg [31:0] total_dbin_energy[0:`RP_NUM_RANGE_BINS-1]; // sum of |I|+|Q| across all Doppler bins
 integer b2_init_idx;
 
 initial begin
     doppler_output_count = 0;
     doppler_frame_count = 0;
-    range_bin_seen = 512'd0;
-    doppler_bin_seen = 32'd0;
+    range_bin_seen   = {`RP_NUM_RANGE_BINS{1'b0}};
+    doppler_bin_seen = 64'd0;
     nonzero_output_count = 0;
     first_doppler_seen = 0;
     first_doppler_time = 0;
@@ -322,8 +333,8 @@ initial begin
     frame_done_prev = 0;
     dup_count = 0;
 
-    for (b2_init_idx = 0; b2_init_idx < 512; b2_init_idx = b2_init_idx + 1) begin
-        index_seen[b2_init_idx]      = 32'd0;
+    for (b2_init_idx = 0; b2_init_idx < `RP_NUM_RANGE_BINS; b2_init_idx = b2_init_idx + 1) begin
+        index_seen[b2_init_idx]      = 64'd0;
         peak_dbin_mag[b2_init_idx]   = 32'd0;
         total_dbin_energy[b2_init_idx] = 32'd0;
     end
@@ -350,10 +361,10 @@ always @(posedge clk_100m) begin
         frame_output_count = frame_output_count + 1;
 
         // Track which bins we've seen
-        if (range_bin_out < 512)
-            range_bin_seen = range_bin_seen | (512'd1 << range_bin_out);
-        if (doppler_bin < 32)
-            doppler_bin_seen = doppler_bin_seen | (32'd1 << doppler_bin);
+        if (range_bin_out < NUM_RBINS)
+            range_bin_seen = range_bin_seen | ({{(`RP_NUM_RANGE_BINS-1){1'b0}}, 1'b1} << range_bin_out);
+        if (doppler_bin < NUM_DBINS)
+            doppler_bin_seen = doppler_bin_seen | (64'd1 << doppler_bin);
 
         // Track non-zero outputs
         if (doppler_output != 32'd0)
@@ -375,17 +386,17 @@ always @(posedge clk_100m) begin
             $display("[INFO] %0d doppler outputs so far (t=%0t)", doppler_output_count, $time);
 
         // ---- Golden index computation ----
-        gidx = range_bin_out * 32 + doppler_bin;
+        gidx = range_bin_out * NUM_DBINS + doppler_bin;
 
         // ---- Duplicate detection (B5) ----
-        if (range_bin_out < 512 && doppler_bin < 32) begin
+        if (range_bin_out < NUM_RBINS && doppler_bin < NUM_DBINS) begin
             if (index_seen[range_bin_out][doppler_bin]) begin
                 dup_count = dup_count + 1;
                 if (dup_count <= 10)
                     $display("[WARN] Duplicate index: rbin=%0d dbin=%0d (count=%0d)",
                              range_bin_out, doppler_bin, dup_count);
             end
-            index_seen[range_bin_out] = index_seen[range_bin_out] | (32'd1 << doppler_bin);
+            index_seen[range_bin_out] = index_seen[range_bin_out] | (64'd1 << doppler_bin);
         end
 
         // ---- Bounds check B2: Doppler energy tracking ----
@@ -395,7 +406,7 @@ always @(posedge clk_100m) begin
         mag_q = (mag_q_signed < 0) ? -mag_q_signed : mag_q_signed;
         mag_sum = mag_i + mag_q;
 
-        if (range_bin_out < 512) begin
+        if (range_bin_out < NUM_RBINS) begin
             total_dbin_energy[range_bin_out] = total_dbin_energy[range_bin_out] + mag_sum;
             if (mag_sum > peak_dbin_mag[range_bin_out])
                 peak_dbin_mag[range_bin_out] = mag_sum;
@@ -628,42 +639,43 @@ initial begin
     // ---- DOPPLER FRAME CHECKS (S4-S9): require FFT_USE_XILINX_IP ----
     // Under iverilog the in-house fft_engine takes ~160-180K cycles per pass
     // (RX-NEW-3 ledger entry, commit 5c8cc8c). With 2-segment long chirps
-    // that's ~340K cycles/chirp * 32 chirps/frame = ~108 ms of simulated time
-    // per Doppler frame, which the regression's 600s wall budget can't reach
-    // (sim:wall ratio under iverilog is ~30 sec/ms). Under XSim with the
-    // Xilinx FFT IP wired in (-DFFT_USE_XILINX_IP), the same chain runs at
-    // ~3300 cycles/transform and these checks pass cleanly.
+    // that's ~340K cycles/chirp × 48 chirps/frame = ~163 ms of simulated time
+    // per Doppler frame (PR-F bumped CHIRPS_PER_FRAME 32→48), which the
+    // regression's 600 s wall budget can't reach (sim:wall ratio under iverilog
+    // is ~30 sec/ms). Under XSim with the Xilinx FFT IP wired in
+    // (-DFFT_USE_XILINX_IP), the same chain runs at ~3300 cycles/transform
+    // and these checks pass cleanly.
 `ifdef FFT_USE_XILINX_IP
     check(doppler_output_count > 0,
           "S4: Doppler processor produces outputs (doppler_valid asserted)");
 
     if (doppler_frame_count > 0) begin
-        check(doppler_output_count >= 16384,
-              "S5: At least 16384 doppler outputs (one full frame: 512 rbins x 32 dbins)");
+        check(doppler_output_count >= GOLDEN_ENTRIES,
+              "S5: At least GOLDEN_ENTRIES doppler outputs (one full frame: NUM_RBINS x NUM_DBINS)");
     end else begin
-        check(0, "S5: At least 16384 doppler outputs (NO FRAME COMPLETED)");
+        check(0, "S5: At least GOLDEN_ENTRIES doppler outputs (NO FRAME COMPLETED)");
     end
 
     begin : count_range_bins
         integer rb_count, rb_i;
         rb_count = 0;
-        for (rb_i = 0; rb_i < 512; rb_i = rb_i + 1) begin
+        for (rb_i = 0; rb_i < NUM_RBINS; rb_i = rb_i + 1) begin
             if (range_bin_seen[rb_i]) rb_count = rb_count + 1;
         end
-        $display("[INFO] Unique range bins seen: %0d / 512", rb_count);
-        check(rb_count == 512,
-              "S6: All 512 range bins present in Doppler output");
+        $display("[INFO] Unique range bins seen: %0d / %0d", rb_count, NUM_RBINS);
+        check(rb_count == NUM_RBINS,
+              "S6: All NUM_RBINS range bins present in Doppler output");
     end
 
     begin : count_doppler_bins
         integer db_count, db_i;
         db_count = 0;
-        for (db_i = 0; db_i < 32; db_i = db_i + 1) begin
+        for (db_i = 0; db_i < NUM_DBINS; db_i = db_i + 1) begin
             if (doppler_bin_seen[db_i]) db_count = db_count + 1;
         end
-        $display("[INFO] Unique Doppler bins seen: %0d / 32", db_count);
-        check(db_count == 32,
-              "S7: All 32 Doppler bins present in Doppler output");
+        $display("[INFO] Unique Doppler bins seen: %0d / %0d", db_count, NUM_DBINS);
+        check(db_count == NUM_DBINS,
+              "S7: All NUM_DBINS Doppler bins present in Doppler output");
     end
 
     check(nonzero_output_count > 0,
@@ -678,7 +690,7 @@ initial begin
 `else
     $display("[SKIP] S4-S9: doppler-frame checks require -DFFT_USE_XILINX_IP");
     $display("        (iverilog uses the slow fft_engine fallback; cycle budget");
-    $display("         insufficient for 32-chirp Doppler frame in 20 ms sim).");
+    $display("         insufficient for 48-chirp Doppler frame in 20 ms sim).");
     $display("         Run under XSim with FFT_USE_XILINX_IP for full coverage.");
 `endif
 
@@ -742,7 +754,7 @@ initial begin
         nontrivial_count = 0;
         min_peak = 32'h7FFFFFFF;
         max_peak = 0;
-        for (b2_rb = 0; b2_rb < 512; b2_rb = b2_rb + 1) begin
+        for (b2_rb = 0; b2_rb < NUM_RBINS; b2_rb = b2_rb + 1) begin
             if (peak_dbin_mag[b2_rb] > 0)
                 nontrivial_count = nontrivial_count + 1;
             if (peak_dbin_mag[b2_rb] < min_peak)
@@ -750,11 +762,11 @@ initial begin
             if (peak_dbin_mag[b2_rb] > max_peak)
                 max_peak = peak_dbin_mag[b2_rb];
         end
-        $display("  Doppler peak mag: min=%0d max=%0d, non-trivial in %0d/512 range bins",
-                 min_peak, max_peak, nontrivial_count);
+        $display("  Doppler peak mag: min=%0d max=%0d, non-trivial in %0d/%0d range bins",
+                 min_peak, max_peak, nontrivial_count, NUM_RBINS);
 `ifdef FFT_USE_XILINX_IP
-        // All 512 range bins must have non-zero peak Doppler energy
-        check(nontrivial_count == 512,
+        // All range bins must have non-zero peak Doppler energy
+        check(nontrivial_count == NUM_RBINS,
               "B2a: All range bins have non-trivial Doppler energy");
 `else
         $display("[SKIP] B2a: requires -DFFT_USE_XILINX_IP (no Doppler frame under iverilog).");
@@ -765,24 +777,24 @@ initial begin
     end
 
     // ---- B3: Exact Doppler Output Count (gated on Xilinx FFT IP — see S4-S9) ----
-    $display("  Doppler output count: %0d (expected 16384)", doppler_output_count);
+    $display("  Doppler output count: %0d (expected %0d)", doppler_output_count, GOLDEN_ENTRIES);
 `ifdef FFT_USE_XILINX_IP
-    check(doppler_output_count == 16384,
-          "B3: Exact output count = 16384 (512 range x 32 Doppler)");
+    check(doppler_output_count == GOLDEN_ENTRIES,
+          "B3: Exact output count = GOLDEN_ENTRIES (NUM_RBINS x NUM_DBINS)");
 
     // ---- B4: Full Range/Doppler Bin Coverage (exact) ----
     begin : b4_check_block
         integer b4_rb_count, b4_db_count, b4_i;
         b4_rb_count = 0;
         b4_db_count = 0;
-        for (b4_i = 0; b4_i < 512; b4_i = b4_i + 1) begin
+        for (b4_i = 0; b4_i < NUM_RBINS; b4_i = b4_i + 1) begin
             if (range_bin_seen[b4_i]) b4_rb_count = b4_rb_count + 1;
         end
-        for (b4_i = 0; b4_i < 32; b4_i = b4_i + 1) begin
+        for (b4_i = 0; b4_i < NUM_DBINS; b4_i = b4_i + 1) begin
             if (doppler_bin_seen[b4_i]) b4_db_count = b4_db_count + 1;
         end
-        check(b4_rb_count == 512 && b4_db_count == 32,
-              "B4: Full bin coverage: 512 range x 32 Doppler");
+        check(b4_rb_count == NUM_RBINS && b4_db_count == NUM_DBINS,
+              "B4: Full bin coverage: NUM_RBINS range x NUM_DBINS Doppler");
     end
 `else
     $display("[SKIP] B3, B4: doppler-frame counts/coverage require -DFFT_USE_XILINX_IP.");

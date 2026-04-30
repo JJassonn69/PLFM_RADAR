@@ -389,7 +389,7 @@ wire [15:0] range_mag = range_manhattan[16] ? 16'hFFFF : range_manhattan[15:0];
 reg [15:0] frame_number;        // Incrementing frame counter
 reg        frame_ready_toggle;  // Toggle CDC: frame ready for USB transfer
 reg        frame_filling;       // 1 = currently accumulating frame data
-reg [FRAME_ADDR_W-1:0] detect_clear_addr;   // PR-F: 15-bit bit-counter (FRAME_CELLS = 24576 < 32768)
+reg [FRAME_ADDR_W-1:0] detect_clear_addr;   // PR-F: 15-bit bit-counter; FRAME_CELLS = NUM_RANGE_BINS * (1<<DOPPLER_BIN_BITS) = 32768 (full 15-bit space)
 reg        detect_clearing;     // 1 = bulk clear in progress
 
 // Range bin counter for range profile writes

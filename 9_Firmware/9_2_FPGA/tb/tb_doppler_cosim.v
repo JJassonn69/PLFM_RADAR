@@ -31,6 +31,8 @@
  *   -DSCENARIO_TWO:       two targets at different ranges/velocities
  */
 
+`include "radar_params.vh"
+
 module tb_doppler_cosim;
 
 // ============================================================================
@@ -72,16 +74,22 @@ reg         data_valid;
 reg         new_chirp_frame;
 wire [31:0] doppler_output;
 wire        doppler_valid;
-wire [4:0]  doppler_bin;
-wire [8:0]  range_bin;
+wire [`RP_DOPPLER_BIN_WIDTH-1:0]   doppler_bin;
+wire [`RP_RANGE_BIN_WIDTH_MAX-1:0] range_bin;
 wire        processing_active;
 wire        frame_complete;
 wire [3:0]  dut_status;
 
 // ============================================================================
-// DUT instantiation
+// DUT instantiation — parameter override keeps the legacy 2-subframe golden
+// vectors valid (chirp-v2 production runs 3 sub-frames at 48 chirps/frame;
+// this co-sim feeds CHIRPS=32 = 2 × CHIRPS_PER_SUBFRAME).
 // ============================================================================
-doppler_processor_optimized dut (
+doppler_processor_optimized #(
+    .CHIRPS_PER_FRAME(CHIRPS),
+    .CHIRPS_PER_SUBFRAME(16),
+    .RANGE_BINS(RANGE_BINS)
+) dut (
     .clk(clk),
     .reset_n(reset_n),
     .range_data(range_data),
@@ -112,8 +120,8 @@ end
 // ============================================================================
 reg signed [15:0] cap_out_i [0:TOTAL_OUTPUTS-1];
 reg signed [15:0] cap_out_q [0:TOTAL_OUTPUTS-1];
-reg [8:0]  cap_rbin  [0:TOTAL_OUTPUTS-1];
-reg [4:0]  cap_dbin  [0:TOTAL_OUTPUTS-1];
+reg [`RP_RANGE_BIN_WIDTH_MAX-1:0] cap_rbin  [0:TOTAL_OUTPUTS-1];
+reg [`RP_DOPPLER_BIN_WIDTH-1:0]   cap_dbin  [0:TOTAL_OUTPUTS-1];
 integer out_count;
 
 // ============================================================================
@@ -127,8 +135,8 @@ integer fft_in_count;
 wire fft_input_valid_w = dut.fft_input_valid;
 wire signed [15:0] fft_input_i_w = dut.fft_input_i;
 wire signed [15:0] fft_input_q_w = dut.fft_input_q;
-wire [8:0] read_range_bin_w = dut.read_range_bin;
-wire [4:0] read_doppler_idx_w = dut.read_doppler_index;
+wire [`RP_RANGE_BIN_WIDTH_MAX-1:0] read_range_bin_w   = dut.read_range_bin;
+wire [5:0]                         read_doppler_idx_w = dut.read_doppler_index;
 wire [2:0] dut_state_w = dut.state;
 wire [5:0] fft_sc_w = dut.fft_sample_counter;
 wire signed [15:0] mem_rdata_i_w = dut.mem_rdata_i;

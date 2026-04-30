@@ -50,9 +50,9 @@ reg new_chirp_frame;
 
 wire [31:0] doppler_output;
 wire        doppler_valid;
-wire [4:0]  doppler_bin;
+wire [`RP_DOPPLER_BIN_WIDTH-1:0]   doppler_bin;
 wire [`RP_RANGE_BIN_WIDTH_MAX-1:0] range_bin;
-wire        sub_frame;
+wire [`RP_SUBFRAME_ID_WIDTH-1:0]   sub_frame;
 wire        processing_active;
 wire        frame_complete;
 wire [3:0]  dut_status;
