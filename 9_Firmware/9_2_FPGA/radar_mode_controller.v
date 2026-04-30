@@ -13,7 +13,8 @@
  *   - mc_new_azimuth   : toggle signal indicating azimuth step
  *
  * These signals are consumed by matched_filter_multi_segment and
- * chirp_memory_loader_param in the receiver path.
+ * chirp_reference_rom in the receiver path. (chirp-v2 PR-D will replace
+ * this entire module with chirp_scheduler.)
  *
  * The controller mirrors the transmitter's chirp sequence defined in
  * plfm_chirp_controller_enhanced:

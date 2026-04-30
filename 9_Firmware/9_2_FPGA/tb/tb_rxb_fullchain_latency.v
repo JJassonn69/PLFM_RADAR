@@ -8,22 +8,28 @@
 //
 // Production wiring this TB mirrors:
 //   ddc_i/q (test stimulus) -> matched_filter_multi_segment -> chain
-//   chirp_memory_loader -----direct wire--------------------> chain ref
+//   chirp_reference_rom ---- direct wire -------------------> chain ref
 //
 // Tests:
 //   1) Pipeline timing: report cycle counts (first ddc_valid -> first
 //      pc_valid).  Confirms FSM advances and produces output.
 //   2) Autocorrelation peak position: drive ddc with the SAME short-chirp
-//      samples that the loader serves up as ref. Output is the chirp
-//      autocorrelation. Peak should be at bin 0 if ref/signal are aligned
-//      at the chain. Any shift indicates an alignment error of N cycles.
+//      samples the ROM serves up as ref. Output is the chirp autocorrelation.
+//      Peak should be at bin 0 if ref/signal are aligned at the chain.
+//
+// chirp-v2 PR-C: ROM swapped from chirp_memory_loader_param to
+// chirp_reference_rom. Stim now reads rx_short_{i,q}.mem (100 active samples,
+// 1 µs at 100 MHz) instead of the legacy short_chirp_*.mem (50 samples,
+// 0.5 µs); SHORT_LEN tracks the new active-sample count. The ROM and the
+// stim always read from the same file, so the autocorrelation invariant
+// (peak at bin 0) holds without further coordination.
 // ============================================================================
 
 module tb_rxb_fullchain_latency;
 
     localparam CLK_PERIOD = 10.0;       // 100 MHz
     localparam FFT_SIZE   = `RP_FFT_SIZE; // 2048
-    localparam SHORT_LEN  = 50;          // matches RP_SHORT_CHIRP_SAMPLES
+    localparam SHORT_LEN  = 100;        // matches RP_DEF_SHORT_CHIRP_CYCLES_V2 (1 µs)
 
     reg                 clk;
     reg                 reset_n;
@@ -38,13 +44,13 @@ module tb_rxb_fullchain_latency;
     reg                 mc_new_elevation;
     reg                 mc_new_azimuth;
 
-    // multi_segment <-> memory loader interconnect
+    // multi_segment <-> chirp_reference_rom interconnect
     wire [1:0]          segment_request;
     wire [10:0]         sample_addr_out;
     wire                mem_request;
-    wire                mem_ready_loader;       // direct from loader
+    wire                mem_ready_loader;       // direct from rom
 
-    // Loader outputs (direct-wired to chain via multi_segment ports)
+    // ROM outputs (direct-wired to chain via multi_segment ports)
     wire [15:0]         ref_i_raw;
     wire [15:0]         ref_q_raw;
 
@@ -54,15 +60,16 @@ module tb_rxb_fullchain_latency;
     wire                pc_valid;
     wire [3:0]          ms_status;
 
-    // ----- Memory loader -----
-    chirp_memory_loader_param #(
-        .DEBUG(0)
-    ) chirp_mem (
+    // wave_sel shim — matches radar_receiver_final.v PR-C transitional wiring.
+    wire [1:0]          wave_sel = use_long_chirp ? `RP_WAVE_LONG : `RP_WAVE_SHORT;
+
+    // ----- Chirp reference ROM (chirp-v2 PR-C) -----
+    chirp_reference_rom chirp_rom (
         .clk            (clk),
         .reset_n        (reset_n),
+        .wave_sel       (wave_sel),
         .segment_select (segment_request),
         .mem_request    (mem_request),
-        .use_long_chirp (use_long_chirp),
         .sample_addr    (sample_addr_out),
         .ref_i          (ref_i_raw),
         .ref_q          (ref_q_raw),
@@ -224,11 +231,11 @@ module tb_rxb_fullchain_latency;
         mc_new_elevation = 1'b0;
         mc_new_azimuth   = 1'b0;
 
-        // Load the same short-chirp samples the loader will serve as ref,
+        // Load the same short-chirp samples the ROM will serve as ref,
         // so signal == ref → autocorrelation. Peak should be at bin 0 if
         // ref/signal alignment is correct.
-        $readmemh("short_chirp_i.mem", stim_chirp_i, 0, SHORT_LEN-1);
-        $readmemh("short_chirp_q.mem", stim_chirp_q, 0, SHORT_LEN-1);
+        $readmemh("rx_short_i.mem", stim_chirp_i, 0, SHORT_LEN-1);
+        $readmemh("rx_short_q.mem", stim_chirp_q, 0, SHORT_LEN-1);
         $display("[TB] Loaded %0d short-chirp samples for stimulus", SHORT_LEN);
 
         repeat (8) @(posedge clk);
@@ -237,7 +244,7 @@ module tb_rxb_fullchain_latency;
 
         $display("\n=== RX-B Option A verification ===");
         $display("Configuration: latency_buffer REMOVED, ref direct-wired");
-        $display("Path: chirp_memory_loader.ref_i ----> multi_segment.ref_chirp_real");
+        $display("Path: chirp_reference_rom.ref_i ----> multi_segment.ref_chirp_real");
         $display("FFT_SIZE: %0d, SHORT_LEN: %0d", FFT_SIZE, SHORT_LEN);
         $display("");
 

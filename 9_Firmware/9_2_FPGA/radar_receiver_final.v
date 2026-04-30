@@ -148,9 +148,15 @@ wire [7:0] gc_saturation_count;  // Diagnostic: per-frame clipped sample counter
 wire [7:0] gc_peak_magnitude;    // Diagnostic: per-frame peak magnitude
 wire [3:0] gc_current_gain;      // Diagnostic: effective gain_shift
 
-// Reference signal for the processing chain (carries long OR short ref
-// depending on use_long_chirp — selected by chirp_memory_loader_param)
+// Reference signal for the processing chain (carries SHORT/MEDIUM/LONG ref
+// depending on wave_sel — selected by chirp_reference_rom).
 wire [15:0] ref_chirp_real, ref_chirp_imag;
+
+// chirp-v2 PR-C: wave_sel shim. radar_mode_controller still produces a
+// 1-bit use_long_chirp output (replaced in PR-D by chirp_scheduler whose
+// native output is wave_sel[1:0]). MEDIUM is unreachable through the
+// 1-bit path; the rom serves SHORT or LONG only until PR-D lands.
+wire [1:0] wave_sel = use_long_chirp ? `RP_WAVE_LONG : `RP_WAVE_SHORT;
 
 // ========== DOPPLER PROCESSING SIGNALS ==========
 wire [31:0] range_data_32bit;
@@ -390,16 +396,16 @@ rx_gain_control gain_ctrl (
     .current_gain(gc_current_gain)
 );
 
-// 3. Dual Chirp Memory Loader
+// 3. Chirp reference ROM (chirp-v2 PR-C)
 wire [10:0] sample_addr_from_chain;
 
-chirp_memory_loader_param chirp_mem (
+chirp_reference_rom chirp_rom (
     .clk(clk),
     .reset_n(reset_n),
+    .wave_sel(wave_sel),
     .segment_select(segment_request),
     .mem_request(mem_request),
-    .use_long_chirp(use_long_chirp),
-	 .sample_addr(sample_addr_from_chain),
+    .sample_addr(sample_addr_from_chain),
     .ref_i(ref_i),
     .ref_q(ref_q),
     .mem_ready(mem_ready)
@@ -414,7 +420,7 @@ chirp_memory_loader_param chirp_mem (
 //
 // Why the 1-FF stage: multi_segment ST_PROCESSING latches `adc_data` through
 // one register stage (`fft_input_i <= buf_rdata_i`) before it reaches the
-// chain. The ref path from chirp_memory_loader is combinational into the
+// chain. The ref path from chirp_reference_rom is combinational into the
 // chain. Without compensation, ref leads sig by 1 cycle → autocorrelation
 // peak at bin 1 instead of bin 0 (verified in tb/tb_rxb_fullchain_latency.v
 // against fft_engine.v synthesis path: peak/mean ratio ~80× confirms clean

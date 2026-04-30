@@ -62,7 +62,7 @@ PROD_RTL=(
     cdc_async_fifo.v
     fir_lowpass.v
     ddc_input_interface.v
-    chirp_memory_loader_param.v
+    chirp_reference_rom.v
     matched_filter_multi_segment.v
     matched_filter_processing_chain.v
     range_bin_decimator.v
@@ -101,7 +101,7 @@ RECEIVER_RTL=(
     tb/ad9484_interface_400m_stub.v
     ddc_400m.v nco_400m_enhanced.v cic_decimator_4x_enhanced.v
     cdc_modules.v cdc_async_fifo.v fir_lowpass.v ddc_input_interface.v
-    chirp_memory_loader_param.v
+    chirp_reference_rom.v
     matched_filter_multi_segment.v matched_filter_processing_chain.v
     range_bin_decimator.v doppler_processor.v xfft_16.v fft_engine.v
     xfft_2048.v fft_engine_axi_bridge.v
@@ -285,7 +285,7 @@ run_mf_cosim() {
     if [[ -n "$define" ]]; then
         cmd="$cmd $define"
     fi
-    cmd="$cmd -o $vvp tb/tb_mf_cosim.v matched_filter_processing_chain.v fft_engine.v xfft_2048.v fft_engine_axi_bridge.v frequency_matched_filter.v chirp_memory_loader_param.v"
+    cmd="$cmd -o $vvp tb/tb_mf_cosim.v matched_filter_processing_chain.v fft_engine.v xfft_2048.v fft_engine_axi_bridge.v frequency_matched_filter.v chirp_reference_rom.v"
 
     if ! eval "$cmd" 2>/tmp/iverilog_err_$$; then
         echo -e "${RED}COMPILE FAIL${NC}"
@@ -677,7 +677,7 @@ run_test --timeout=600 "Matched Filter Chain" \
     tb/tb_mf_reg.vvp \
     tb/tb_matched_filter_processing_chain.v matched_filter_processing_chain.v \
     fft_engine.v xfft_2048.v fft_engine_axi_bridge.v \
-    chirp_memory_loader_param.v frequency_matched_filter.v
+    chirp_reference_rom.v frequency_matched_filter.v
 
 # RX-B regression coverage: chain pipeline depth + full-chain
 # autocorrelation peak position. Both run the production fft_engine
@@ -693,7 +693,7 @@ run_test --timeout=600 "RX-B Full-Chain Autocorrelation (tb_rxb_fullchain_latenc
     tb/tb_rxb_fullchain_latency.v matched_filter_multi_segment.v \
     matched_filter_processing_chain.v fft_engine.v xfft_2048.v \
     fft_engine_axi_bridge.v frequency_matched_filter.v \
-    chirp_memory_loader_param.v
+    chirp_reference_rom.v
 
 echo ""
 

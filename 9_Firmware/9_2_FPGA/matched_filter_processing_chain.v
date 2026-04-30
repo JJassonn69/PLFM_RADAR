@@ -63,8 +63,8 @@ module matched_filter_processing_chain (
     // inside the chain. multi_segment passed it through to nothing.
 
     // Reference chirp (time-domain, latency-aligned by upstream buffer)
-    // Upstream chirp_memory_loader_param selects long/short reference
-    // via use_long_chirp — this single pair carries whichever is active.
+    // Upstream chirp_reference_rom selects SHORT/MEDIUM/LONG reference
+    // via wave_sel[1:0] — this single pair carries whichever is active.
     input wire [15:0] ref_chirp_real,
     input wire [15:0] ref_chirp_imag,
 

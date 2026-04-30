@@ -55,7 +55,7 @@ set rtl_files [list \
     "${rtl_dir}/adc_clk_mmcm.v" \
     "${rtl_dir}/ad9484_interface_400m.v" \
     "${rtl_dir}/cdc_modules.v" \
-    "${rtl_dir}/chirp_memory_loader_param.v" \
+    "${rtl_dir}/chirp_reference_rom.v" \
     "${rtl_dir}/cic_decimator_4x_enhanced.v" \
     "${rtl_dir}/dac_interface_single.v" \
     "${rtl_dir}/ddc_400m.v" \
