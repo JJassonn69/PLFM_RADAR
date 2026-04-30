@@ -59,6 +59,7 @@ PROD_RTL=(
     nco_400m_enhanced.v
     cic_decimator_4x_enhanced.v
     cdc_modules.v
+    cdc_async_fifo.v
     fir_lowpass.v
     ddc_input_interface.v
     chirp_memory_loader_param.v
@@ -99,7 +100,7 @@ RECEIVER_RTL=(
     radar_mode_controller.v
     tb/ad9484_interface_400m_stub.v
     ddc_400m.v nco_400m_enhanced.v cic_decimator_4x_enhanced.v
-    cdc_modules.v fir_lowpass.v ddc_input_interface.v
+    cdc_modules.v cdc_async_fifo.v fir_lowpass.v ddc_input_interface.v
     chirp_memory_loader_param.v
     matched_filter_multi_segment.v matched_filter_processing_chain.v
     range_bin_decimator.v doppler_processor.v xfft_16.v fft_engine.v
@@ -585,7 +586,7 @@ echo "--- PHASE 2: Integration Tests ---"
 run_test "DDC Chain (NCO→CIC→FIR)" \
     tb/tb_ddc_reg.vvp \
     tb/tb_ddc_cosim.v ddc_400m.v nco_400m_enhanced.v \
-    cic_decimator_4x_enhanced.v fir_lowpass.v cdc_modules.v
+    cic_decimator_4x_enhanced.v fir_lowpass.v cdc_modules.v cdc_async_fifo.v
 
 # Real-data co-simulation: committed golden hex vs RTL (exact match required).
 # These catch architecture mismatches (e.g. 32-pt → dual 16-pt Doppler FFT)
@@ -704,6 +705,10 @@ echo "--- PHASE 4: Infrastructure ---"
 run_test "CDC Modules (3 variants)" \
     tb/tb_cdc_reg.vvp \
     tb/tb_cdc_modules.v cdc_modules.v
+
+run_test "CDC Async FIFO (AUDIT-C11)" \
+    tb/tb_cdc_async_fifo_reg.vvp \
+    tb/tb_cdc_async_fifo.v cdc_async_fifo.v
 
 run_test "Edge Detector" \
     tb/tb_edge_reg.vvp \

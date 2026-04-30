@@ -643,9 +643,16 @@ wire [17:0] fir_d_in_i, fir_d_in_q;
 wire cdc_fir_i_overrun;
 wire cdc_fir_q_overrun;
 
-cdc_adc_to_processing #(
+// AUDIT-C11: replaced cdc_adc_to_processing (Gray-CDC anti-pattern: independent
+// data and toggle synchronizer chains can skew under metastability and let the
+// destination capture a half-resolved Gray word) with cdc_async_fifo (Cummings
+// SNUG-2002 design — data sits in dual-clock distRAM; only ±1-incrementing
+// Gray-coded read/write pointers cross domains). Port shape is preserved so
+// the swap is local to these two instantiations. Sticky-overrun aggregation
+// at line ~680 is unchanged.
+cdc_async_fifo #(
     .WIDTH(18),
-    .STAGES(3)
+    .DEPTH(16)
 )CDC_FIR_i(
     .src_clk(clk_400m),
     .dst_clk(clk_100m),
@@ -658,9 +665,9 @@ cdc_adc_to_processing #(
     .overrun(cdc_fir_i_overrun)
 );
 
-cdc_adc_to_processing #(
+cdc_async_fifo #(
     .WIDTH(18),
-    .STAGES(3)
+    .DEPTH(16)
 )CDC_FIR_q(
     .src_clk(clk_400m),
     .dst_clk(clk_100m),
