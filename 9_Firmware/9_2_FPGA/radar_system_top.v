@@ -681,17 +681,21 @@ wire [`RP_RANGE_BIN_WIDTH_MAX-1:0]  notched_range_bin = rx_range_bin;
 // See cfar_ca.v for architecture details.
 
 wire cfar_detect_flag;
-wire [`RP_DETECT_CLASS_WIDTH-1:0] cfar_detect_class;
 wire cfar_detect_valid;
 wire [`RP_RANGE_BIN_WIDTH_MAX-1:0]  cfar_detect_range;
 wire [`RP_DOPPLER_BIN_WIDTH-1:0]    cfar_detect_doppler;
 wire [16:0] cfar_detect_magnitude;
 wire [16:0] cfar_detect_threshold;
-wire [16:0] cfar_detect_threshold_soft;
 wire [15:0] cfar_detect_count;
-wire [15:0] cfar_detect_count_cand;
 wire        cfar_busy_w;
 wire [7:0]  cfar_status_w;
+// PR-F note: cfar_ca also drives detect_class[1:0], detect_threshold_soft,
+// detect_count_cand. The soft-tier comparison still feeds detect_flag (which
+// is wired to USB), so the candidate logic is preserved in synth — but the
+// class / soft-thr / cand-count outputs themselves don't go anywhere until
+// PR-G adds the USB opcodes (0x28 alpha_soft + bulk-frame v2). We deliberately
+// leave the cfar_ca output ports unconnected here so they do NOT show up as
+// dangling wires in radar_system_top; PR-G will reattach them.
 
 cfar_ca cfar_inst (
     .clk(clk_100m_buf),
@@ -715,17 +719,17 @@ cfar_ca cfar_inst (
 
     // Detection outputs
     .detect_flag(cfar_detect_flag),
-    .detect_class(cfar_detect_class),
+    .detect_class(),                       // PR-F: routed in PR-G (USB 0x2A read)
     .detect_valid(cfar_detect_valid),
     .detect_range(cfar_detect_range),
     .detect_doppler(cfar_detect_doppler),
     .detect_magnitude(cfar_detect_magnitude),
     .detect_threshold(cfar_detect_threshold),
-    .detect_threshold_soft(cfar_detect_threshold_soft),
+    .detect_threshold_soft(),              // PR-F: routed in PR-G
 
     // Status
     .detect_count(cfar_detect_count),
-    .detect_count_cand(cfar_detect_count_cand),
+    .detect_count_cand(),                  // PR-F: routed in PR-G (telemetry)
     .cfar_busy(cfar_busy_w),
     .cfar_status(cfar_status_w)
 );

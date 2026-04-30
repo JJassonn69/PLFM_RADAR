@@ -488,11 +488,22 @@ always @(posedge clk) begin
                                 window_val_reg <= $signed(window_coeff[win_idx]);
                         end
                         // Advance BRAM read: chirp_base + (counter + 2).
-                        // For NUM_SUBFRAMES * CHIRPS_PER_SUBFRAME = CHIRPS_PER_FRAME
-                        // and counter <= CHIRPS_PER_SUBFRAME-1, chirp_base+offset
-                        // is bounded by CHIRPS_PER_FRAME so no clamp is needed.
-                        read_doppler_index <= current_sub_frame * CHIRPS_PER_SUBFRAME
-                                              + {2'd0, fft_sample_counter[3:0]} + 6'd2;
+                        // The last useful read is data[chirp_base + CPS-1], needed
+                        // by mult_i_raw at counter=CPS-1. Working back through the
+                        // 2-cycle BRAM-then-multiply pipeline, the last NBA that
+                        // matters is at counter = CPS-3 (= 13 for CPS=16) which
+                        // schedules read of base+CPS-1. After that, advancing
+                        // would address chirp base+CPS or base+CPS+1 — past the
+                        // end of the highest sub-frame's data window (e.g. chirps
+                        // 48 / 49 with sub_frame=2 in a 48-chirp frame), which is
+                        // outside MEM_DEPTH = RANGE_BINS * CHIRPS_PER_FRAME. The
+                        // would-be values are never consumed, but the reads
+                        // would still drive an out-of-range mem_read_addr. Stop
+                        // the read pointer at the last useful chirp instead.
+                        if (fft_sample_counter <= CHIRPS_PER_SUBFRAME - 3) begin
+                            read_doppler_index <= current_sub_frame * CHIRPS_PER_SUBFRAME
+                                                  + {2'd0, fft_sample_counter[3:0]} + 6'd2;
+                        end
                     end
 
                     if (fft_sample_counter == CHIRPS_PER_SUBFRAME + 1) begin
