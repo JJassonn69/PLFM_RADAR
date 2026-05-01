@@ -41,7 +41,7 @@ module matched_filter_multi_segment (
 );
 
 // ========== FIXED PARAMETERS ==========
-parameter BUFFER_SIZE = `RP_FFT_SIZE;              // 2048
+parameter BUFFER_SIZE = `RP_FFT_SIZE;              // 2048 (FFT pass size)
 parameter LONG_CHIRP_SAMPLES   = 3000;             // 30 us @ 100 MHz
 parameter MEDIUM_CHIRP_SAMPLES = 500;              // 5 us @ 100 MHz (chirp-v2)
 parameter SHORT_CHIRP_SAMPLES  = 100;              // 1 us @ 100 MHz (chirp-v2; was 50)
@@ -49,10 +49,34 @@ parameter OVERLAP_SAMPLES = `RP_OVERLAP_SAMPLES;   // 128
 parameter SEGMENT_ADVANCE = `RP_SEGMENT_ADVANCE;   // 2048 - 128 = 1920 samples
 parameter DEBUG = 1;                               // Debug output control
 
-// Segment counts (overlap-save). LONG spans 2 segments; SHORT and MEDIUM
-// both fit in a single 2048 buffer with zero-pad.
-parameter LONG_SEGMENTS  = `RP_LONG_SEGMENTS_3KM;  // 2 segments (30 us / 2048-128 overlap)
+// Segment counts. LONG spans 2 segments; SHORT and MEDIUM both fit in a
+// single 2048-sample window with zero-pad.
+parameter LONG_SEGMENTS  = `RP_LONG_SEGMENTS_3KM;  // 2 segments (30 us)
 parameter SHORT_SEGMENTS = 1;                      // SHORT or MEDIUM, single segment
+
+// PR-J.2: pre-collect-then-slide ingestion. The full chirp is captured into
+// INPUT_BUF_DEPTH-deep BRAM during ST_COLLECT_DATA, then segments are read
+// out non-destructively as 2048-sample windows starting at
+// current_segment * SEGMENT_ADVANCE. This replaces the original overlap-save
+// mechanism, which assumed the input ddc stream stayed live across segment
+// processing — a contract that breaks because chain processing (~70 us at
+// production xfft_2048 timing) outlasts the LONG chirp duration (30 us),
+// dropping segment-N>0 input samples.
+//
+// Required depth: (LONG_SEGMENTS - 1) * SEGMENT_ADVANCE + BUFFER_SIZE
+//                 50T  -> 1*1920 + 2048 = 3968  (round up to 4096)
+//                 200T -> 7*1920 + 2048 = 15488 (would need 16384)
+// 50T-only here; 200T variant must bump INPUT_BUF_DEPTH when LONG_SEGMENTS
+// changes via SUPPORT_LONG_RANGE.
+parameter INPUT_BUF_DEPTH  = 4096;
+parameter INPUT_BUF_ADDR_W = 12;
+
+// Total samples needed in buffer to cover LONG_SEGMENTS segments with
+// overlap-save indexing. Last segment ends at (LONG_SEGMENTS-1)*ADVANCE +
+// BUFFER_SIZE = 3968 (50T). ST_ZERO_PAD pads up to this point for LONG
+// chirps so segment 1's read window is well-defined even when the chirp
+// only delivers 3000 real samples.
+parameter LONG_FILL_END = (LONG_SEGMENTS - 1) * SEGMENT_ADVANCE + BUFFER_SIZE;
 
 // Convenience nets so the FSM body reads cleanly.
 wire is_long   = (wave_sel == `RP_WAVE_LONG);
@@ -62,23 +86,30 @@ wire is_medium = (wave_sel == `RP_WAVE_MEDIUM);
 reg signed [31:0] pc_i, pc_q;
 reg pc_valid;
 
-// Dual buffer for overlap-save — BRAM inferred for synthesis
-(* ram_style = "block" *) reg signed [15:0] input_buffer_i [0:BUFFER_SIZE-1];
-(* ram_style = "block" *) reg signed [15:0] input_buffer_q [0:BUFFER_SIZE-1];
-reg [11:0] buffer_write_ptr;    // 12-bit for 0..2048
-reg [11:0] buffer_read_ptr;     // 12-bit for 0..2048
+// Pre-collect input buffer (PR-J.2). Sized to hold the full LONG chirp plus
+// segment-1's read tail; SHORT/MEDIUM only use the first 2048 entries.
+(* ram_style = "block" *) reg signed [15:0] input_buffer_i [0:INPUT_BUF_DEPTH-1];
+(* ram_style = "block" *) reg signed [15:0] input_buffer_q [0:INPUT_BUF_DEPTH-1];
+reg [INPUT_BUF_ADDR_W-1:0] buffer_write_ptr;
+reg [INPUT_BUF_ADDR_W-1:0] buffer_read_ptr;       // global address into input_buffer
 reg buffer_has_data;
 reg buffer_processing;
 reg [15:0] chirp_samples_collected;
 
+// Per-segment offset and feed counter — segment N reads buffer[segment_offset
+// .. segment_offset + FFT_SIZE - 1], where segment_offset advances by
+// SEGMENT_ADVANCE each ST_NEXT_SEGMENT.
+reg [INPUT_BUF_ADDR_W-1:0] segment_offset;
+reg [11:0]                 samples_fed;            // 0..BUFFER_SIZE within a segment
+
 // BRAM write port signals
-reg        buf_we;
-reg [10:0] buf_waddr;           // 11-bit for 0..2047
-reg signed [15:0] buf_wdata_i, buf_wdata_q;
+reg                        buf_we;
+reg [INPUT_BUF_ADDR_W-1:0] buf_waddr;
+reg signed [15:0]          buf_wdata_i, buf_wdata_q;
 
 // BRAM read port signals
-reg [10:0] buf_raddr;           // 11-bit for 0..2047
-reg signed [15:0] buf_rdata_i, buf_rdata_q;
+reg [INPUT_BUF_ADDR_W-1:0] buf_raddr;
+reg signed [15:0]          buf_rdata_i, buf_rdata_q;
 
 // State machine
 reg [3:0] state;
@@ -90,7 +121,8 @@ localparam ST_PROCESSING = 4;
 localparam ST_WAIT_FFT = 5;
 localparam ST_OUTPUT = 6;
 localparam ST_NEXT_SEGMENT = 7;
-localparam ST_OVERLAP_COPY = 8;
+// State 8 (ST_OVERLAP_COPY) retired in PR-J.2 — pre-collected buffer is
+// stable across segments, so no overlap copy is needed.
 
 // Segment tracking
 reg [2:0] current_segment;        // 0-3
@@ -98,18 +130,6 @@ reg [2:0] total_segments;
 reg segment_done;
 reg chirp_complete;
 reg saw_chain_output;             // Flag: chain started producing output
-
-// Overlap cache — captured during ST_PROCESSING, written back in ST_OVERLAP_COPY
-// Uses sync-only write block to allow distributed RAM inference (not FFs).
-// 128 entries = distributed RAM (LUTRAM), NOT BRAM (too shallow).
-reg signed [15:0] overlap_cache_i [0:OVERLAP_SAMPLES-1];
-reg signed [15:0] overlap_cache_q [0:OVERLAP_SAMPLES-1];
-reg [7:0] overlap_copy_count;
-
-// Overlap cache write port signals (driven from FSM, used in sync-only block)
-reg        ov_we;
-reg [6:0]  ov_waddr;
-reg signed [15:0] ov_wdata_i, ov_wdata_q;
 
 // Processing chain signals
 wire [15:0] fft_pc_i, fft_pc_q;
@@ -122,19 +142,17 @@ reg fft_input_valid;
 reg fft_start;
 
 // ========== SAMPLE ADDRESS OUTPUT ==========
-assign sample_addr_out = buffer_read_ptr[10:0];
+// chirp_reference_rom expects a per-segment 0..2047 address (the reference
+// window is segment-scoped, FFT_SIZE-deep). samples_fed counts FFT-input
+// position within the current segment, which is exactly that.
+assign sample_addr_out = samples_fed[10:0];
 
 // ========== BUFFER INITIALIZATION ==========
 integer buf_init;
-integer ov_init;
 initial begin
-    for (buf_init = 0; buf_init < BUFFER_SIZE; buf_init = buf_init + 1) begin
+    for (buf_init = 0; buf_init < INPUT_BUF_DEPTH; buf_init = buf_init + 1) begin
         input_buffer_i[buf_init] = 16'd0;
         input_buffer_q[buf_init] = 16'd0;
-    end
-    for (ov_init = 0; ov_init < OVERLAP_SAMPLES; ov_init = ov_init + 1) begin
-        overlap_cache_i[ov_init] = 16'd0;
-        overlap_cache_q[ov_init] = 16'd0;
     end
 end
 
@@ -143,16 +161,6 @@ always @(posedge clk) begin
     if (buf_we) begin
         input_buffer_i[buf_waddr] <= buf_wdata_i;
         input_buffer_q[buf_waddr] <= buf_wdata_q;
-    end
-end
-
-// ========== OVERLAP CACHE WRITE PORT (sync only — distributed RAM inference) ==========
-// Removing async reset from memory write path prevents Vivado from
-// synthesizing the 128x16 arrays as FFs + mux trees.
-always @(posedge clk) begin
-    if (ov_we) begin
-        overlap_cache_i[ov_waddr] <= ov_wdata_i;
-        overlap_cache_q[ov_waddr] <= ov_wdata_q;
     end
 end
 
@@ -174,6 +182,8 @@ always @(posedge clk or negedge reset_n) begin
         current_segment <= 0;
         segment_done <= 0;
         segment_request <= 0;
+        segment_offset <= 0;
+        samples_fed <= 0;
         mem_request <= 0;
         pc_valid <= 0;
         status <= 0;
@@ -187,17 +197,11 @@ always @(posedge clk or negedge reset_n) begin
         buf_wdata_i <= 0;
         buf_wdata_q <= 0;
         buf_raddr <= 0;
-        ov_we <= 0;
-        ov_waddr <= 0;
-        ov_wdata_i <= 0;
-        ov_wdata_q <= 0;
-        overlap_copy_count <= 0;
     end else begin
         pc_valid <= 0;
         mem_request <= 0;
         fft_input_valid <= 0;
         buf_we <= 0;  // Default: no write
-        ov_we <= 0;   // Default: no overlap write
         
         case (state)
             ST_IDLE: begin
@@ -207,11 +211,13 @@ always @(posedge clk or negedge reset_n) begin
                 buffer_has_data <= 0;
                 buffer_processing <= 0;
                 current_segment <= 0;
+                segment_offset <= 0;
+                samples_fed <= 0;
                 segment_done <= 0;
                 chirp_samples_collected <= 0;
                 chirp_complete <= 0;
                 saw_chain_output <= 0;
-                
+
                 // Wait for chirp start (1-cycle pulse from chirp_scheduler)
                 if (chirp_pulse) begin
                     state <= ST_COLLECT_DATA;
@@ -228,176 +234,139 @@ always @(posedge clk or negedge reset_n) begin
             end
             
             ST_COLLECT_DATA: begin
-                // Collect samples for current segment with overlap-save
-                if (ddc_valid && buffer_write_ptr < BUFFER_SIZE) begin
-                    // Store in buffer via BRAM write port
+                // PR-J.2: pre-collect entire chirp into the input buffer.
+                // No mid-stream segment processing; segments slide over the
+                // stable buffer once collection + zero-pad complete.
+                if (ddc_valid && buffer_write_ptr < INPUT_BUF_DEPTH) begin
                     buf_we <= 1;
-                    buf_waddr <= buffer_write_ptr[10:0];
-                    // [RX-A FIX] ddc_i = {{2{gc_i[15]}}, gc_i} — top 2 bits are
-                    // sign-extension. The previous `ddc_i[17:2] + ddc_i[1]`
-                    // was a gratuitous /4 scaling (~12 dB dynamic-range loss).
-                    // fft_engine has INTERNAL_W=32 with saturating 16-bit output,
-                    // so full 16-bit input is safe (no bit-growth overflow risk).
+                    buf_waddr <= buffer_write_ptr;
+                    // [RX-A FIX] ddc_i = {{2{gc_i[15]}}, gc_i} — top 2 bits
+                    // are sign-extension; full 16-bit input is safe because
+                    // fft_engine has INTERNAL_W=32 with saturating 16-bit
+                    // output (no bit-growth overflow risk).
                     buf_wdata_i <= ddc_i[15:0];
                     buf_wdata_q <= ddc_q[15:0];
-                    
+
                     buffer_write_ptr <= buffer_write_ptr + 1;
                     chirp_samples_collected <= chirp_samples_collected + 1;
-                    
-                    // Debug: Show first few samples
-                    if (chirp_samples_collected < 10 && buffer_write_ptr < 10) begin
+
+                    if (chirp_samples_collected < 10) begin
                         `ifdef SIMULATION
-                        $display("[MULTI_SEG_FIXED] Store[%0d]: I=%h Q=%h", 
-                                 buffer_write_ptr, 
-                                 ddc_i[17:2] + ddc_i[1], 
-                                 ddc_q[17:2] + ddc_q[1]);
+                        $display("[MULTI_SEG_FIXED] Store[%0d]: I=%h Q=%h",
+                                 buffer_write_ptr, ddc_i[15:0], ddc_q[15:0]);
                         `endif
-                    end
-                    
-                    // SHORT/MEDIUM single-segment path: collect waveform-specific
-                    // sample count then zero-pad to 2048. SHORT=100 (1 us),
-                    // MEDIUM=500 (5 us). LONG path falls through to the
-                    // multi-segment overlap-save block below.
-                    if (!is_long) begin
-                        if (( is_medium && chirp_samples_collected >= MEDIUM_CHIRP_SAMPLES - 1) ||
-                            (!is_medium && chirp_samples_collected >= SHORT_CHIRP_SAMPLES  - 1)) begin
-                            state <= ST_ZERO_PAD;
-                            chirp_complete <= 1;  // Bug A fix: mark chirp done so ST_OUTPUT exits to IDLE
-                            `ifdef SIMULATION
-                            $display("[MULTI_SEG_FIXED] %s chirp: collected %d samples, starting zero-pad",
-                                     is_medium ? "Medium" : "Short",
-                                     chirp_samples_collected + 1);
-                            `endif
-                        end
                     end
                 end
-                
-                // LONG CHIRP: segment-ready and chirp-complete checks
-                // evaluated every clock (not gated by ddc_valid) to avoid
-                // missing the transition when buffer_write_ptr updates via
-                // non-blocking assignment one cycle after the last write.
-                //
-                // Overlap-save fix: fill the FULL FFT_SIZE-sample buffer before
-                // processing.  For segment 0 this means FFT_SIZE fresh samples.
-                // For segments 1+, write_ptr starts at OVERLAP_SAMPLES (128)
-                // so we collect 896 new samples to fill the buffer.
-                if (is_long) begin
-                    if (buffer_write_ptr >= BUFFER_SIZE) begin
-                        buffer_has_data <= 1;
-                        state <= ST_WAIT_REF;
-                        segment_request <= current_segment[1:0];
-                        mem_request <= 1;
 
-                        `ifdef SIMULATION
-                        $display("[MULTI_SEG_FIXED] Segment %d ready: %d samples collected",
-                                 current_segment, chirp_samples_collected);
-                        `endif
-                    end
-
-                    if (chirp_samples_collected >= LONG_CHIRP_SAMPLES && !chirp_complete) begin
+                // Chirp-complete check (each-clock, not gated on ddc_valid,
+                // so the transition fires the cycle after the last write).
+                if (!chirp_complete) begin
+                    if (is_long &&
+                        chirp_samples_collected >= LONG_CHIRP_SAMPLES) begin
                         chirp_complete <= 1;
+                        state <= ST_ZERO_PAD;
                         `ifdef SIMULATION
-                        $display("[MULTI_SEG_FIXED] End of long chirp reached");
+                        $display("[MULTI_SEG_FIXED] LONG chirp: collected %0d samples, padding to %0d",
+                                 chirp_samples_collected, LONG_FILL_END);
                         `endif
-                        // If buffer isn't full yet, zero-pad the remainder
-                        // (last segment with fewer than 896 new samples)
-                        if (buffer_write_ptr < BUFFER_SIZE) begin
-                            state <= ST_ZERO_PAD;
-                            `ifdef SIMULATION
-                            $display("[MULTI_SEG_FIXED] Last segment partial: zero-padding from %0d to %0d",
-                                     buffer_write_ptr, BUFFER_SIZE - 1);
-                            `endif
-                        end
+                    end else if (is_medium &&
+                                 chirp_samples_collected >= MEDIUM_CHIRP_SAMPLES) begin
+                        chirp_complete <= 1;
+                        state <= ST_ZERO_PAD;
+                        `ifdef SIMULATION
+                        $display("[MULTI_SEG_FIXED] MEDIUM chirp: collected %0d samples, padding to %0d",
+                                 chirp_samples_collected, BUFFER_SIZE);
+                        `endif
+                    end else if (!is_long && !is_medium &&
+                                 chirp_samples_collected >= SHORT_CHIRP_SAMPLES) begin
+                        chirp_complete <= 1;
+                        state <= ST_ZERO_PAD;
+                        `ifdef SIMULATION
+                        $display("[MULTI_SEG_FIXED] SHORT chirp: collected %0d samples, padding to %0d",
+                                 chirp_samples_collected, BUFFER_SIZE);
+                        `endif
                     end
                 end
             end
             
             ST_ZERO_PAD: begin
-                // Zero-pad remaining buffer via BRAM write port
+                // Zero-pad remaining buffer via BRAM write port. LONG pads
+                // to LONG_FILL_END (covers all segments' read windows).
+                // SHORT/MEDIUM pads to BUFFER_SIZE (single-segment).
                 buf_we <= 1;
-                buf_waddr <= buffer_write_ptr[10:0];
+                buf_waddr <= buffer_write_ptr;
                 buf_wdata_i <= 16'd0;
                 buf_wdata_q <= 16'd0;
                 buffer_write_ptr <= buffer_write_ptr + 1;
-                
-                if (buffer_write_ptr >= BUFFER_SIZE - 1) begin
-                    // Done zero-padding
+
+                if ((is_long  && buffer_write_ptr >= LONG_FILL_END - 1) ||
+                    (!is_long && buffer_write_ptr >= BUFFER_SIZE   - 1)) begin
                     buffer_has_data <= 1;
-                    buffer_write_ptr <= 0;
                     state <= ST_WAIT_REF;
-                    segment_request <= is_long ? current_segment[1:0] : 2'd0;
+                    segment_request <= 2'd0;
                     mem_request <= 1;
                     `ifdef SIMULATION
-                    $display("[MULTI_SEG_FIXED] Zero-pad complete, buffer full");
+                    $display("[MULTI_SEG_FIXED] Zero-pad complete, requesting segment 0 reference");
                     `endif
                 end
             end
             
             ST_WAIT_REF: begin
-                // Wait for memory to provide reference coefficients
-                buf_raddr <= 11'd0;  // Pre-present addr 0 so buf_rdata is ready next cycle
+                // Pre-present this segment's first read address so buf_rdata
+                // holds buffer[segment_offset] on the first ST_PROCESSING clk.
+                buf_raddr <= segment_offset;
                 if (mem_ready) begin
-                    // Start processing — buf_rdata[0] will be valid on FIRST clock of ST_PROCESSING
                     buffer_processing <= 1;
-                    buffer_read_ptr <= 0;
-                    fft_start <= 1;
-                    state <= ST_PROCESSING;
-                    
+                    buffer_read_ptr   <= segment_offset;
+                    samples_fed       <= 0;
+                    fft_start         <= 1;
+                    state             <= ST_PROCESSING;
+
                     `ifdef SIMULATION
-                    $display("[MULTI_SEG_FIXED] Reference ready, starting processing segment %d",
-                             current_segment);
+                    $display("[MULTI_SEG_FIXED] Reference ready, starting processing segment %0d (offset=%0d)",
+                             current_segment, segment_offset);
                     `endif
                 end
             end
-            
+
             ST_PROCESSING: begin
-                // Feed data to FFT chain from BRAM.
-                // buf_raddr was pre-presented in ST_WAIT_REF (=0), so
-                // buf_rdata already contains data[0] on the first clock here.
-                // Each cycle: feed buf_rdata, present NEXT address.
-                if ((buffer_processing) && (buffer_read_ptr < BUFFER_SIZE)) begin
-                    // 1. Feed BRAM read data to FFT (valid for current buffer_read_ptr)
-                    fft_input_i <= buf_rdata_i;
-                    fft_input_q <= buf_rdata_q;
-                    fft_input_valid <= 1;
-                    
-                    // 2. Request corresponding reference sample
+                // Feed BUFFER_SIZE (FFT_SIZE) samples from buffer[segment_offset
+                // .. segment_offset+FFT_SIZE-1] into the chain. samples_fed
+                // counts within the segment; buffer_read_ptr is the global
+                // BRAM address (= segment_offset + samples_fed).
+                if (buffer_processing && samples_fed < BUFFER_SIZE) begin
+                    fft_input_i      <= buf_rdata_i;
+                    fft_input_q      <= buf_rdata_q;
+                    fft_input_valid  <= 1;
+
+                    // Request corresponding reference sample (per-segment
+                    // address; sample_addr_out is samples_fed[10:0]).
                     mem_request <= 1'b1;
-                    
-                    // 3. Cache tail samples for overlap-save (via sync-only write port)
-                    if (buffer_read_ptr >= SEGMENT_ADVANCE) begin
-                        ov_we <= 1;
-                        ov_waddr <= buffer_read_ptr - SEGMENT_ADVANCE;  // 0..OVERLAP-1
-                        ov_wdata_i <= buf_rdata_i;
-                        ov_wdata_q <= buf_rdata_q;
-                    end
-                    
-                    // Debug every 100 samples
-                    if (buffer_read_ptr % 100 == 0) begin
+
+                    if (samples_fed % 100 == 0) begin
                         `ifdef SIMULATION
-                        $display("[MULTI_SEG_FIXED] Processing[%0d]: ADC I=%h Q=%h",
-                                buffer_read_ptr,
-                                buf_rdata_i,
-                                buf_rdata_q);
+                        $display("[MULTI_SEG_FIXED] Processing seg=%0d [%0d/%0d]: ADC I=%h Q=%h",
+                                 current_segment, samples_fed, BUFFER_SIZE,
+                                 buf_rdata_i, buf_rdata_q);
                         `endif
                     end
-                    
-                    // Present NEXT read address (for next cycle)
-                    buf_raddr <= buffer_read_ptr[10:0] + 11'd1;
-                    buffer_read_ptr <= buffer_read_ptr + 1;
-                    
-                end else if (buffer_read_ptr >= BUFFER_SIZE) begin
-                    // Done feeding buffer
-                    fft_input_valid <= 0;
-                    mem_request <= 0;
+
+                    // Present NEXT read address for next cycle.
+                    buf_raddr        <= buffer_read_ptr + 1;
+                    buffer_read_ptr  <= buffer_read_ptr + 1;
+                    samples_fed      <= samples_fed + 1;
+
+                end else if (samples_fed >= BUFFER_SIZE) begin
+                    // Done feeding this segment.
+                    fft_input_valid   <= 0;
+                    mem_request       <= 0;
                     buffer_processing <= 0;
-                    buffer_has_data <= 0;
-                    saw_chain_output <= 0;
-                    state <= ST_WAIT_FFT;  // CRITICAL: Wait for FFT completion
-                    
+                    saw_chain_output  <= 0;
+                    state             <= ST_WAIT_FFT;
+
                     `ifdef SIMULATION
-                    $display("[MULTI_SEG_FIXED] Finished feeding %d samples to FFT, waiting...",
-                             BUFFER_SIZE);
+                    $display("[MULTI_SEG_FIXED] Finished feeding %0d samples for seg=%0d, waiting on FFT chain",
+                             BUFFER_SIZE, current_segment);
                     `endif
                 end
             end
@@ -449,56 +418,22 @@ always @(posedge clk or negedge reset_n) begin
             end
             
             ST_NEXT_SEGMENT: begin
-                // Prepare for next segment with OVERLAP-SAVE
+                // Bump segment counter and slide the read window forward by
+                // SEGMENT_ADVANCE. Buffer is stable across segments, so we
+                // go straight to ST_WAIT_REF for the next reference window.
                 current_segment <= current_segment + 1;
-                segment_done <= 0;
-                
-                if (is_long) begin
-                    // OVERLAP-SAVE: Write cached tail samples back to BRAM [0..127]
-                    overlap_copy_count <= 0;
-                    state <= ST_OVERLAP_COPY;
-                    
-                    `ifdef SIMULATION
-                    $display("[MULTI_SEG_FIXED] Overlap-save: writing %d cached samples",
-                             OVERLAP_SAMPLES);
-                    `endif
-                end else begin
-                    // SHORT or MEDIUM: only one segment, no overlap-save.
-                    buffer_write_ptr <= 0;
-                    if (!chirp_complete) begin
-                        state <= ST_COLLECT_DATA;
-                    end else begin
-                        state <= ST_IDLE;
-                    end
-                end
+                segment_offset  <= segment_offset + SEGMENT_ADVANCE;
+                segment_done    <= 0;
+                segment_request <= current_segment + 1;
+                mem_request     <= 1;
+                state           <= ST_WAIT_REF;
+
+                `ifdef SIMULATION
+                $display("[MULTI_SEG_FIXED] Next segment: %0d (offset will be %0d)",
+                         current_segment + 1, segment_offset + SEGMENT_ADVANCE);
+                `endif
             end
-            
-            ST_OVERLAP_COPY: begin
-                // Write one cached overlap sample per cycle to BRAM
-                buf_we <= 1;
-                buf_waddr <= {{3{1'b0}}, overlap_copy_count};
-                buf_wdata_i <= overlap_cache_i[overlap_copy_count];
-                buf_wdata_q <= overlap_cache_q[overlap_copy_count];
-                
-                if (overlap_copy_count < OVERLAP_SAMPLES - 1) begin
-                    overlap_copy_count <= overlap_copy_count + 1;
-                end else begin
-                    // All 128 samples written back
-                    buffer_write_ptr <= OVERLAP_SAMPLES;
-                    
-                    `ifdef SIMULATION
-                    $display("[MULTI_SEG_FIXED] Overlap-save: copied %d samples, write_ptr=%d",
-                             OVERLAP_SAMPLES, OVERLAP_SAMPLES);
-                    `endif
-                    
-                    if (!chirp_complete) begin
-                        state <= ST_COLLECT_DATA;
-                    end else begin
-                        state <= ST_IDLE;
-                    end
-                end
-            end
-            
+
             default: begin
                 state <= ST_IDLE;
             end

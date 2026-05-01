@@ -40,7 +40,7 @@ module tb_mf_long_chirp;
     localparam SHORT_LEN  = 100;        // RP_DEF_SHORT_CHIRP_CYCLES_V2
     localparam MEDIUM_LEN = 500;        // RP_DEF_MEDIUM_CHIRP_CYCLES
     localparam LONG_LEN   = `RP_LONG_CHIRP_SAMPLES_3KM; // 3000
-    localparam HARD_BUDGET_CYCLES = 200_000;
+    localparam HARD_BUDGET_CYCLES = 500_000;
 
     reg                 clk;
     reg                 reset_n;
