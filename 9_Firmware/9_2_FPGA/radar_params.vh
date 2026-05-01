@@ -229,6 +229,12 @@
 // ============================================================================
 // CFAR DEFAULTS
 // ============================================================================
+// alpha defaults below are calibrated for the Dolph-Chebyshev 60 dB Doppler
+// window (PR-M, 2026-05-01). With the new -60 dB sidelobes, training cells
+// suffer ~27 dB less leakage from strong off-Doppler returns than under the
+// previous "Hamming-ish" -33 dB LUT — effective Pfa at fixed alpha drops
+// accordingly. Re-measure during HW bring-up; opcode 0x23/0x2D adjusts at
+// runtime. See cfar_ca.v "Doppler-window dependency" comment for details.
 `define RP_DEF_CFAR_GUARD           2
 `define RP_DEF_CFAR_TRAIN           8
 `define RP_DEF_CFAR_ALPHA           8'h30   // 3.0 in Q4.4

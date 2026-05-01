@@ -42,6 +42,29 @@
  *     alpha_fpga = alpha_statistical / 16 = 0.305 → Q4.4 ≈ 0x05
  *   Or host can set alpha per training cell if it accounts for count.
  *
+ * Doppler-window dependency (PR-M, 2026-05-01):
+ *   CFAR slides through RANGE within each Doppler-bin column, so the
+ *   training-cell statistics depend on what "noise" actually looks like
+ *   in a column — which includes Doppler-window sidelobe leakage from
+ *   strong returns at OTHER Doppler bins at the same range.
+ *
+ *   With the new Dolph-Chebyshev 60 dB window (vs the old "Hamming-ish"
+ *   LUT at -33 dB peak sidelobes), sidelobe leakage drops 27 dB. Training
+ *   cells are now closer to true thermal noise; effective Pfa at the
+ *   shipped α defaults (RP_DEF_CFAR_ALPHA=3.0, ALPHA_SOFT=1.5) drops
+ *   accordingly. Two operating-point choices for HW bring-up:
+ *
+ *     (a) Hold α — accept lower Pfa, get higher Pd as a free win.
+ *     (b) Lower α — recover original Pfa, get even higher Pd.
+ *
+ *   Defaults are NOT changed in this PR. Recommended bring-up procedure:
+ *     1. Collect noise-only frames (no targets in dwell).
+ *     2. Measure empirical Pfa at shipped α=3.0/1.5.
+ *     3. If Pfa < 0.5 × design target, lower α to spec; otherwise hold.
+ *
+ *   The opcodes 0x23 (RP_OP_CFAR_ALPHA) and 0x2D (RP_OP_CFAR_ALPHA_SOFT)
+ *   let the host adjust α at runtime without firmware change.
+ *
  * Edge handling:
  *   At range boundaries where the full window doesn't fit, only available
  *   training cells are used. The noise estimate naturally reduces, raising
