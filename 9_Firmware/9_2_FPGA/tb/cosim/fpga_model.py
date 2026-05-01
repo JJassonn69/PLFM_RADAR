@@ -1088,29 +1088,44 @@ HAMMING_WINDOW = [
 
 class DopplerProcessor:
     """
-    Bit-accurate model of doppler_processor_optimized.v (dual 16-pt FFT architecture).
+    Bit-accurate model of doppler_processor_optimized.v (per-subframe 16-pt FFT).
 
-    The staggered-PRF frame has 32 chirps total:
-      - Sub-frame 0 (long PRI):  chirps 0-15  -> 16-pt Hamming -> 16-pt FFT -> bins 0-15
-      - Sub-frame 1 (short PRI): chirps 16-31 -> 16-pt Hamming -> 16-pt FFT -> bins 16-31
+    PR-F: 48 chirps total, 3 sub-frames (SHORT/MEDIUM/LONG):
+      - Sub-frame 0 (SHORT PRI):  chirps  0..15 -> 16-pt Hamming -> 16-pt FFT -> bins  0..15
+      - Sub-frame 1 (MEDIUM PRI): chirps 16..31 -> 16-pt Hamming -> 16-pt FFT -> bins 16..31
+      - Sub-frame 2 (LONG PRI):   chirps 32..47 -> 16-pt Hamming -> 16-pt FFT -> bins 32..47
 
-    Output: doppler_bin[4:0] = {sub_frame_id, bin_in_subframe[3:0]}
-    Total output per range bin: 32 bins (16 + 16), same interface as before.
+    Output: doppler_bin[5:0] = {sub_frame_id[1:0], bin_in_subframe[3:0]}
+    Total output per range bin: 48 bins (3 x 16).
+
+    NUM_SUBFRAMES is parameterised so legacy 2-subframe call sites still work
+    (set CHIRPS_PER_FRAME=32, NUM_SUBFRAMES=2). Default tracks production.
     """
 
     DOPPLER_FFT_SIZE = 16     # Per sub-frame
     RANGE_BINS = 512
-    CHIRPS_PER_FRAME = 32
     CHIRPS_PER_SUBFRAME = 16
+    NUM_SUBFRAMES = 3
+    CHIRPS_PER_FRAME = NUM_SUBFRAMES * CHIRPS_PER_SUBFRAME  # 48
 
-    def __init__(self, twiddle_file_16=None):
+    def __init__(self, twiddle_file_16=None, num_subframes=None,
+                 chirps_per_frame=None):
         """
         For 16-point FFT, we need the 16-point twiddle file.
         If not provided, we generate twiddle factors mathematically
         (cos(2*pi*k/16) for k=0..3, quarter-wave ROM with 4 entries).
+
+        num_subframes / chirps_per_frame override the class defaults for
+        legacy 2-subframe co-sim or future variants.
         """
         self.fft16 = None
         self._twiddle_file_16 = twiddle_file_16
+        if num_subframes is not None:
+            self.NUM_SUBFRAMES = num_subframes
+            self.CHIRPS_PER_FRAME = self.NUM_SUBFRAMES * self.CHIRPS_PER_SUBFRAME
+        if chirps_per_frame is not None:
+            self.CHIRPS_PER_FRAME = chirps_per_frame
+            self.NUM_SUBFRAMES = chirps_per_frame // self.CHIRPS_PER_SUBFRAME
 
     @staticmethod
     def window_multiply(data_16, window_16):
@@ -1132,20 +1147,20 @@ class DopplerProcessor:
 
     def process_frame(self, chirp_data_i, chirp_data_q):
         """
-        Process one complete Doppler frame using dual 16-pt FFTs.
+        Process one complete Doppler frame using NUM_SUBFRAMES x 16-pt FFTs.
 
         Args:
-            chirp_data_i: 2D array [32 chirps][512 range bins] of signed 16-bit I
-            chirp_data_q: 2D array [32 chirps][512 range bins] of signed 16-bit Q
+            chirp_data_i: 2D array [CHIRPS_PER_FRAME][RANGE_BINS] of signed 16-bit I
+            chirp_data_q: 2D array [CHIRPS_PER_FRAME][RANGE_BINS] of signed 16-bit Q
 
         Returns:
-            (doppler_map_i, doppler_map_q): 2D arrays [512 range bins][32 doppler bins]
-                                            of signed 16-bit
-                                            Bins 0-15 = sub-frame 0 (long PRI)
-                                            Bins 16-31 = sub-frame 1 (short PRI)
+            (doppler_map_i, doppler_map_q): 2D arrays
+              [RANGE_BINS][NUM_SUBFRAMES * DOPPLER_FFT_SIZE] of signed 16-bit.
+              Sub-frame s occupies bins [s*16 .. s*16+15].
         """
         doppler_map_i = []
         doppler_map_q = []
+        total_bins = self.NUM_SUBFRAMES * self.DOPPLER_FFT_SIZE
 
         # Generate 16-pt twiddle factors (quarter-wave cos, 4 entries)
         # cos(2*pi*k/16) for k=0..3
@@ -1164,12 +1179,11 @@ class DopplerProcessor:
         fft16.mem_im = [0] * 16
 
         for rbin in range(self.RANGE_BINS):
-            # Output bins for this range bin: 32 total (16 from each sub-frame)
-            out_re = [0] * 32
-            out_im = [0] * 32
+            out_re = [0] * total_bins
+            out_im = [0] * total_bins
 
             # Process each sub-frame independently
-            for sf in range(2):
+            for sf in range(self.NUM_SUBFRAMES):
                 chirp_start = sf * self.CHIRPS_PER_SUBFRAME
                 bin_offset = sf * self.DOPPLER_FFT_SIZE
 
@@ -1188,10 +1202,8 @@ class DopplerProcessor:
                     fft_in_re.append(win_re)
                     fft_in_im.append(win_im)
 
-                # 16-point forward FFT
                 fft_out_re, fft_out_im = fft16.compute(fft_in_re, fft_in_im, inverse=False)
 
-                # Pack into output: sub-frame 0 -> bins 0-15, sub-frame 1 -> bins 16-31
                 for b in range(self.DOPPLER_FFT_SIZE):
                     out_re[bin_offset + b] = fft_out_re[b]
                     out_im[bin_offset + b] = fft_out_im[b]

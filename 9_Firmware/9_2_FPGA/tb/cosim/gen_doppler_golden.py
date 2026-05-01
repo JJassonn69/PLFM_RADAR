@@ -3,12 +3,14 @@
 Generate Doppler processor co-simulation golden reference data.
 
 Uses the bit-accurate Python model (fpga_model.py) to compute the expected
-Doppler FFT output for the dual 16-pt FFT architecture.  Also generates the
-input hex files consumed by the Verilog testbench (tb_doppler_cosim.v).
+Doppler FFT output for the 3-subframe / 16-pt FFT architecture (PR-F).  Also
+generates the input hex files consumed by the Verilog testbench
+(tb_doppler_cosim.v).
 
-Architecture:
-  Sub-frame 0 (long PRI):  chirps 0-15  -> 16-pt Hamming -> 16-pt FFT -> bins 0-15
-  Sub-frame 1 (short PRI): chirps 16-31 -> 16-pt Hamming -> 16-pt FFT -> bins 16-31
+Architecture (matches chirp_scheduler.v ordering — SHORT, MEDIUM, LONG):
+  Sub-frame 0 (SHORT PRI):  chirps  0..15 -> 16-pt Hamming -> 16-pt FFT -> bins  0..15
+  Sub-frame 1 (MEDIUM PRI): chirps 16..31 -> 16-pt Hamming -> 16-pt FFT -> bins 16..31
+  Sub-frame 2 (LONG PRI):   chirps 32..47 -> 16-pt Hamming -> 16-pt FFT -> bins 32..47
 
 Usage:
     cd ~/PLFM_RADAR/9_Firmware/9_2_FPGA/tb/cosim
@@ -34,10 +36,11 @@ from radar_scene import Target, generate_doppler_frame
 # =============================================================================
 
 DOPPLER_FFT_SIZE = 16     # Per sub-frame
-DOPPLER_TOTAL_BINS = 32   # Total output (2 sub-frames x 16)
+NUM_SUBFRAMES = 3
+DOPPLER_TOTAL_BINS = NUM_SUBFRAMES * DOPPLER_FFT_SIZE  # 48
 RANGE_BINS = 512
-CHIRPS_PER_FRAME = 32
-TOTAL_SAMPLES = CHIRPS_PER_FRAME * RANGE_BINS  # 16384
+CHIRPS_PER_FRAME = NUM_SUBFRAMES * 16  # 48
+TOTAL_SAMPLES = CHIRPS_PER_FRAME * RANGE_BINS  # 24576
 
 
 # =============================================================================
@@ -87,11 +90,12 @@ def make_scenario_stationary():
 
 def make_scenario_moving():
     """Single target with moderate Doppler shift."""
-    # v = 15 m/s → fd = 2*v*fc/c ≈ 1050 Hz
-    # Long PRI = 167 us → sub-frame 0 bin = fd * 16 * 167e-6 ≈ 2.8 → bin ~3
-    # Short PRI = 175 us → sub-frame 1 bin = fd * 16 * 175e-6 ≈ 2.9 → bin 16+3 = 19
+    # v = 15 m/s -> fd = 2*v*fc/c ~= 1050 Hz
+    # SHORT  PRI 175 us: bin = fd * 16 * 175e-6 ~= 2.94 -> sf0 bin ~3
+    # MEDIUM PRI 175 us: bin = fd * 16 * 175e-6 ~= 2.94 -> sf1 bin 16+3 = 19
+    # LONG   PRI 167 us: bin = fd * 16 * 167e-6 ~= 2.81 -> sf2 bin 32+3 = 35
     targets = [Target(range_m=500, velocity_mps=15.0, rcs_dbsm=20.0)]
-    return targets, "Single moving target v=15m/s (~1050Hz Doppler, sf0 bin~3, sf1 bin~19)"
+    return targets, "Single moving target v=15m/s (~1050Hz Doppler, sf0~3 sf1~19 sf2~35)"
 
 
 def make_scenario_two_targets():
@@ -117,7 +121,7 @@ SCENARIOS = {
 def generate_scenario(name, targets, description, base_dir):
     """Generate input hex + golden output for one scenario."""
 
-    # Generate Doppler frame (32 chirps x 64 range bins)
+    # Generate Doppler frame (48 chirps x RANGE_BINS, 3 sub-frames)
     frame_i, frame_q = generate_doppler_frame(targets, seed=42)
 
 

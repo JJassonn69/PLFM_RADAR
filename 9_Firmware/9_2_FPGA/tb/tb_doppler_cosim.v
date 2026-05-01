@@ -5,9 +5,9 @@
  * Co-simulation testbench for doppler_processor_optimized (doppler_processor.v).
  *
  * Tests the complete Doppler processing pipeline:
- *   - Accumulates 32 chirps x 512 range bins into BRAM
- *   - Processes each range bin: Hamming window -> dual 16-pt FFT (staggered PRF)
- *   - Outputs 16384 samples (512 range bins x 32 packed Doppler bins)
+ *   - Accumulates 48 chirps x 512 range bins into BRAM (3 sub-frames, PR-F)
+ *   - Processes each range bin: Hamming window -> 3 x 16-pt FFT (staggered PRF)
+ *   - Outputs 24576 samples (512 range bins x 48 packed Doppler bins)
  *
  * Validates:
  *   1. FSM state transitions (IDLE -> ACCUMULATE -> LOAD_FFT -> ... -> OUTPUT)
@@ -39,12 +39,12 @@ module tb_doppler_cosim;
 // Parameters
 // ============================================================================
 localparam CLK_PERIOD    = 10.0;           // 100 MHz
-localparam DOPPLER_FFT   = 32;             // Total packed Doppler bins (2 sub-frames x 16-pt FFT)
-localparam RANGE_BINS    = 512;
-localparam CHIRPS        = 32;
-localparam TOTAL_INPUTS  = CHIRPS * RANGE_BINS;  // 16384
-localparam TOTAL_OUTPUTS = RANGE_BINS * DOPPLER_FFT;  // 16384
-localparam MAX_CYCLES    = 4_000_000;        // Timeout: 40 ms at 100 MHz
+localparam DOPPLER_FFT   = `RP_NUM_DOPPLER_BINS;     // 48 (3 sub-frames x 16-pt FFT, PR-F)
+localparam RANGE_BINS    = `RP_NUM_RANGE_BINS;       // 512
+localparam CHIRPS        = `RP_CHIRPS_PER_FRAME;     // 48
+localparam TOTAL_INPUTS  = CHIRPS * RANGE_BINS;      // 24576
+localparam TOTAL_OUTPUTS = RANGE_BINS * DOPPLER_FFT; // 24576
+localparam MAX_CYCLES    = 6_000_000;                // Timeout: 60 ms at 100 MHz (3-subframe needs longer)
 
 // Scenario selection — input file name
 `ifdef SCENARIO_MOVING
@@ -81,13 +81,12 @@ wire        frame_complete;
 wire [3:0]  dut_status;
 
 // ============================================================================
-// DUT instantiation — parameter override keeps the legacy 2-subframe golden
-// vectors valid (chirp-v2 production runs 3 sub-frames at 48 chirps/frame;
-// this co-sim feeds CHIRPS=32 = 2 × CHIRPS_PER_SUBFRAME).
+// DUT instantiation — production defaults (3 sub-frames * 16 chirps = 48,
+// PR-F). T-8: legacy 2-subframe override removed; goldens regenerated.
 // ============================================================================
 doppler_processor_optimized #(
     .CHIRPS_PER_FRAME(CHIRPS),
-    .CHIRPS_PER_SUBFRAME(16),
+    .CHIRPS_PER_SUBFRAME(`RP_CHIRPS_PER_SUBFRAME),
     .RANGE_BINS(RANGE_BINS)
 ) dut (
     .clk(clk),
@@ -200,15 +199,16 @@ initial begin
     $display("============================================================");
     $display("Doppler Processor Co-Sim Testbench");
     $display("Scenario: %0s", SCENARIO);
-    $display("Input samples: %0d  (32 chirps x 512 range bins)", TOTAL_INPUTS);
-    $display("Expected outputs: %0d (512 range bins x 32 packed Doppler bins, dual 16-pt FFT)",
-             TOTAL_OUTPUTS);
+    $display("Input samples: %0d  (%0d chirps x %0d range bins)",
+             TOTAL_INPUTS, CHIRPS, RANGE_BINS);
+    $display("Expected outputs: %0d (%0d range bins x %0d packed Doppler bins, 3 x 16-pt FFT)",
+             TOTAL_OUTPUTS, RANGE_BINS, DOPPLER_FFT);
     $display("============================================================");
 
     // ---- Debug: check hex file loaded ----
     $display("  input_mem[0] = %08h", input_mem[0]);
     $display("  input_mem[1] = %08h", input_mem[1]);
-    $display("  input_mem[16383] = %08h", input_mem[16383]);
+    $display("  input_mem[%0d] = %08h", TOTAL_INPUTS - 1, input_mem[TOTAL_INPUTS - 1]);
 
     // ---- Check 1: DUT starts in IDLE ----
     check(dut_state_w == 3'b000,
@@ -250,7 +250,7 @@ initial begin
     #(CLK_PERIOD * 5);
     $display("  After wait: state=%0d", dut_state_w);
     check(dut_state_w != 3'b000 && dut_state_w != 3'b001,
-          "DUT entered processing state after 16384 input samples");
+          "DUT entered processing state after all input samples");
     check(processing_active == 1'b1,
           "processing_active asserted during Doppler FFT");
 
@@ -276,7 +276,7 @@ initial begin
 
     // ---- Check 3: Correct output count ----
     check(out_count == TOTAL_OUTPUTS,
-          "Output sample count == 16384");
+          "Output sample count matches TOTAL_OUTPUTS");
 
     // ---- Check 4: Did not timeout ----
     check(cycle_count < MAX_CYCLES,
@@ -295,12 +295,12 @@ initial begin
               "First output: range_bin=0, doppler_bin=0");
     end
 
-    // Last output should be range_bin=511
+    // Last output should be range_bin=RANGE_BINS-1, doppler_bin=DOPPLER_FFT-1
     if (out_count == TOTAL_OUTPUTS) begin
         check(cap_rbin[TOTAL_OUTPUTS-1] == RANGE_BINS - 1,
-              "Last output: range_bin=511");
+              "Last output: range_bin=RANGE_BINS-1");
         check(cap_dbin[TOTAL_OUTPUTS-1] == DOPPLER_FFT - 1,
-              "Last output: doppler_bin=31");
+              "Last output: doppler_bin=DOPPLER_FFT-1");
     end
 
     // ---- Check 7: Range bins are monotonically non-decreasing ----
@@ -338,10 +338,10 @@ initial begin
             end
         end
         check(all_ok == 1,
-              "Each range bin has exactly 32 Doppler outputs");
+              "Each range bin has exactly DOPPLER_FFT Doppler outputs");
     end
 
-    // ---- Check 9: Doppler bins cycle 0..31 within each range bin ----
+    // ---- Check 9: Doppler bins cycle 0..DOPPLER_FFT-1 within each range bin ----
     begin : dbin_cycle_check
         integer j, expected_dbin, dbin_ok;
         dbin_ok = 1;
@@ -356,7 +356,7 @@ initial begin
             end
         end
         check(dbin_ok == 1,
-              "Doppler bins cycle 0..31 within each range bin");
+              "Doppler bins cycle 0..DOPPLER_FFT-1 within each range bin");
     end
 
     // ---- Check 10: Non-trivial output (not all zeros) ----
@@ -406,7 +406,7 @@ initial begin
 
     // ---- Check: FFT input count ----
     check(fft_in_count == TOTAL_OUTPUTS,
-          "FFT input count == 16384");
+          "FFT input count == TOTAL_OUTPUTS");
 
     // ---- Summary ----
     $display("\n============================================================");

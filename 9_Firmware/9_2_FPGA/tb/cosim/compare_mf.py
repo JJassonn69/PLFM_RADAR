@@ -61,14 +61,17 @@ SCENARIOS = {
     },
 }
 
-# Thresholds for pass/fail
-# These are generous because of the fundamental twiddle arithmetic differences
-# between the SIMULATION branch (float twiddles) and Python model (fixed twiddles)
-ENERGY_CORR_MIN = 0.80       # Min correlation of magnitude spectra
-TOP_PEAK_OVERLAP_MIN = 0.50  # At least 50% of top-N peaks must overlap
-RMS_RATIO_MAX = 50.0         # Max ratio of RMS energies (generous, since gain differs)
-ENERGY_RATIO_MIN = 0.001     # Min ratio (total energy RTL / total energy Python)
-ENERGY_RATIO_MAX = 1000.0    # Max ratio
+# Pass/fail thresholds (PR-Tests-1 / T-7).
+# Two correct FFTs of identical input must be Parseval-bounded (energy
+# matches), and the same dominant tones imply high spectral / I-Q correlation.
+# SIMULATION-mode runs use float twiddles vs the Python fixed-point reference,
+# so a small gain offset is expected — but anything outside these bars
+# indicates real drift between the behavioral and synthesis paths.
+ENERGY_RATIO_MIN = 0.95
+ENERGY_RATIO_MAX = 1.05
+MAG_CORR_MIN     = 0.95   # Pearson correlation of L2 magnitude spectra
+PEAK_OVERLAP_MIN = 0.90   # Top-10 spectral-peak overlap fraction
+IQ_CORR_MIN      = 0.90   # Pearson correlation on I and Q channels
 
 
 # =============================================================================
@@ -221,41 +224,41 @@ def compare_scenario(scenario_name, config, base_dir):
 
 
     # ---- Pass/Fail Decision ----
-    # The SIMULATION branch uses floating-point twiddles ($cos/$sin) while
-    # the Python model uses the fixed-point twiddle ROM (matching synthesis).
-    # These are fundamentally different FFT implementations. We do NOT expect
-    # structural similarity (correlation, peak overlap) between them.
-    #
-    # What we CAN verify:
-    # 1. Both produce non-trivial output (state machine completes)
-    # 2. Output count is correct (1024 samples)
-    # 3. Energy is in a reasonable range (not wildly wrong)
-    #
-    # The true bit-accuracy comparison will happen when the synthesis branch
-    # is simulated (xsim on remote server) using the same fft_engine.v that
-    # the Python model was built to match.
+    # Strict (PR-Tests-1 / T-7). Two correct FFTs of the same input must be
+    # Parseval-bounded and share dominant tones; we now gate on energy ratio,
+    # spectral correlation, top-N peak overlap, and per-channel I/Q
+    # correlation — not just "did the state machine reach $finish".
 
     checks = []
 
-    # Check 1: Both produce output
     both_have_output = py_energy > 0 and rtl_energy > 0
     checks.append(('Both produce output', both_have_output))
 
-    # Check 2: RTL produced expected sample count
     correct_count = len(rtl_i) == FFT_SIZE
     checks.append(('Correct output count (2048)', correct_count))
 
-    # Check 3: Energy ratio within generous bounds
-    # Allow very wide range since twiddle differences cause large gain variation
-    energy_ok = ENERGY_RATIO_MIN < energy_ratio < ENERGY_RATIO_MAX
-    checks.append((f'Energy ratio in bounds ({ENERGY_RATIO_MIN}-{ENERGY_RATIO_MAX})',
-                    energy_ok))
+    energy_ok = ENERGY_RATIO_MIN <= energy_ratio <= ENERGY_RATIO_MAX
+    checks.append((f'Energy ratio in [{ENERGY_RATIO_MIN},{ENERGY_RATIO_MAX}] '
+                    f'(actual={energy_ratio:.3f})', energy_ok))
 
-    # Print checks
+    mag_corr_ok = mag_corr >= MAG_CORR_MIN
+    checks.append((f'mag_corr >= {MAG_CORR_MIN} (actual={mag_corr:.3f})',
+                    mag_corr_ok))
+
+    peak_overlap_ok = peak_overlap_10 >= PEAK_OVERLAP_MIN
+    checks.append((f'peak_overlap_10 >= {PEAK_OVERLAP_MIN} '
+                    f'(actual={peak_overlap_10:.3f})', peak_overlap_ok))
+
+    iq_corr_ok = corr_i >= IQ_CORR_MIN and corr_q >= IQ_CORR_MIN
+    checks.append((f'corr_i,corr_q >= {IQ_CORR_MIN} '
+                    f'(actual={corr_i:.3f}/{corr_q:.3f})', iq_corr_ok))
+
     all_pass = True
+    failed_names = []
     for _name, passed in checks:
         if not passed:
             all_pass = False
+            failed_names.append(_name)
 
     result = {
         'scenario': scenario_name,
@@ -271,6 +274,7 @@ def compare_scenario(scenario_name, config, base_dir):
         'corr_i': corr_i,
         'corr_q': corr_q,
         'passed': all_pass,
+        'failed_checks': failed_names,
     }
 
     # Write detailed comparison CSV
@@ -306,23 +310,23 @@ def main():
     for name in run_scenarios:
         passed, result = compare_scenario(name, SCENARIOS[name], base_dir)
         results.append((name, passed, result))
-
-    # Summary
-
-
-    all_pass = True
-    for _name, passed, result in results:
         if not result:
-            all_pass = False
+            print(f'[FAIL] mf {name}: missing input/output CSV')
+        elif passed:
+            print(f'[PASS] mf {name}: '
+                  f'energy={result["energy_ratio"]:.3f} '
+                  f'mag_corr={result["mag_corr"]:.3f} '
+                  f'peak10={result["peak_overlap_10"]:.3f} '
+                  f'corr_i={result["corr_i"]:.3f} corr_q={result["corr_q"]:.3f}')
         else:
-            if not passed:
-                all_pass = False
+            print(f'[FAIL] mf {name}: '
+                  f'energy={result["energy_ratio"]:.3f} '
+                  f'mag_corr={result["mag_corr"]:.3f} '
+                  f'peak10={result["peak_overlap_10"]:.3f} '
+                  f'corr_i={result["corr_i"]:.3f} corr_q={result["corr_q"]:.3f} '
+                  f'-> {result["failed_checks"]}')
 
-    if all_pass:
-        pass
-    else:
-        pass
-
+    all_pass = all(p and r for _, p, r in results)
     sys.exit(0 if all_pass else 1)
 
 

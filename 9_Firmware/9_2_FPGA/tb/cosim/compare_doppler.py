@@ -33,9 +33,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Configuration
 # =============================================================================
 
-DOPPLER_FFT = 32
+DOPPLER_FFT = 48           # 3 sub-frames x 16-pt FFT (PR-F)
 RANGE_BINS = 512
-TOTAL_OUTPUTS = RANGE_BINS * DOPPLER_FFT  # 16384
+TOTAL_OUTPUTS = RANGE_BINS * DOPPLER_FFT  # 24576
 SUBFRAME_SIZE = 16
 
 SCENARIOS = {
@@ -246,7 +246,7 @@ def compare_scenario(name, config, base_dir):
     # ---- Pass/Fail ----
     checks = []
 
-    checks.append(('RTL output count == 16384', count_ok))
+    checks.append((f'RTL output count == {TOTAL_OUTPUTS}', count_ok))
 
     energy_ok = (ENERGY_RATIO_MIN < energy_ratio < ENERGY_RATIO_MAX)
     checks.append((f'Energy ratio in bounds '
@@ -316,23 +316,22 @@ def main():
     for name in run_scenarios:
         passed, result = compare_scenario(name, SCENARIOS[name], base_dir)
         results.append((name, passed, result))
-
-    # Summary
-
-
-    all_pass = True
-    for _name, passed, result in results:
         if not result:
-            all_pass = False
+            print(f'[FAIL] doppler {name}: missing input/output CSV')
+        elif passed:
+            print(f'[PASS] doppler {name}: '
+                  f'count={result["rtl_count"]} '
+                  f'energy={result["energy_ratio"]:.4f} '
+                  f'peak_agree={result["peak_agreement"]:.3f} '
+                  f'mag_corr={result["avg_mag_corr"]:.3f}')
         else:
-            if not passed:
-                all_pass = False
+            print(f'[FAIL] doppler {name}: '
+                  f'count={result["rtl_count"]} '
+                  f'energy={result["energy_ratio"]:.4f} '
+                  f'peak_agree={result["peak_agreement"]:.3f} '
+                  f'mag_corr={result["avg_mag_corr"]:.3f}')
 
-    if all_pass:
-        pass
-    else:
-        pass
-
+    all_pass = all(p and r for _, p, r in results)
     sys.exit(0 if all_pass else 1)
 
 
