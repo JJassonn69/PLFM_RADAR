@@ -91,9 +91,6 @@ class RadarDataWorker(QThread):
         self._waveform = WaveformConfig()
         self._running = False
 
-    def set_waveform(self, wf) -> None:
-        self._waveform = wf
-
         # Frame queue for production RadarAcquisition → this thread
         self._frame_queue: queue.Queue = queue.Queue(maxsize=4)
 
@@ -104,6 +101,9 @@ class RadarDataWorker(QThread):
         self._frame_count = 0
         self._byte_count = 0
         self._error_count = 0
+
+    def set_waveform(self, wf) -> None:
+        self._waveform = wf
 
     def stop(self):
         self._running = False

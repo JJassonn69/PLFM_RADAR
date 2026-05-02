@@ -323,6 +323,37 @@ class TestHardwareReExports(unittest.TestCase):
 
 
 # =============================================================================
+# Test: v7.workers.RadarDataWorker initialization
+# (Audit P-1: __init__ must populate _frame_queue/_acquisition/counters
+# without requiring an explicit set_waveform call. Dashboard constructs
+# the worker and calls .start() directly; missing init causes AttributeError
+# on first frame in production.)
+# =============================================================================
+
+@unittest.skipUnless(_pyqt6_available(), "PyQt6 not installed")
+class TestRadarDataWorkerInit(unittest.TestCase):
+    def test_init_sets_runtime_attrs(self):
+        from v7.workers import RadarDataWorker
+        worker = RadarDataWorker(connection=None)
+        self.assertIsNotNone(worker._frame_queue)
+        self.assertEqual(worker._frame_queue.maxsize, 4)
+        self.assertIsNone(worker._acquisition)
+        self.assertEqual(worker._frame_count, 0)
+        self.assertEqual(worker._byte_count, 0)
+        self.assertEqual(worker._error_count, 0)
+        self.assertFalse(worker._running)
+
+    def test_set_waveform_does_not_reset_counters(self):
+        from v7.workers import RadarDataWorker
+        from v7.models import WaveformConfig
+        worker = RadarDataWorker(connection=None)
+        worker._frame_count = 7
+        worker.set_waveform(WaveformConfig())
+        self.assertEqual(worker._frame_count, 7,
+                         "set_waveform must not reset runtime counters")
+
+
+# =============================================================================
 # Test: v7.__init__ — clean exports
 # =============================================================================
 
