@@ -199,56 +199,109 @@ class TileServer(Enum):
 class WaveformConfig:
     """Physical waveform parameters for converting bins to SI units.
 
-    Encapsulates the radar waveform so that range/velocity resolution
-    can be derived automatically instead of hardcoded in RadarSettings.
+    PR-Q (3-PRI staggered ladder, audit C-5 Doppler unfolding):
+      - SHORT  sub-frame:  1 us chirp /  175 us PRI
+      - MEDIUM sub-frame:  5 us chirp /  161 us PRI
+      - LONG   sub-frame: 30 us chirp /  167 us PRI
 
-    Defaults match the AERIS-10 production system parameters from
-    radar_scene.py / plfm_chirp_controller.v:
-      100 MSPS DDC output, 20 MHz chirp BW, 30 us long chirp,
-      167 us long-chirp PRI, X-band 10.5 GHz carrier.
+    Each sub-frame produces ``chirps_per_subframe`` Doppler bins
+    (16 → 48 total).  Per-subframe v_unamb is ~+/-42 m/s; the host runs
+    3-PRI Chinese-Remainder unfolding (see PR-Q.5
+    processing.unfold_velocity_crt) to recover targets out to
+    ``extended_max_velocity_mps_crt``.
     """
 
     sample_rate_hz: float = 100e6        # DDC output I/Q rate (matched filter input)
-    bandwidth_hz: float = 20e6           # Chirp bandwidth (not used in range calc;
-                                         # retained for time-bandwidth product / display)
-    chirp_duration_s: float = 30e-6      # Long chirp ramp time
-    pri_s: float = 167e-6               # Pulse repetition interval (chirp + listen)
-    center_freq_hz: float = 10.5e9       # Carrier frequency (radar_scene.py: F_CARRIER)
-    n_range_bins: int = 512              # After decimation (3 km mode; 4096 in 20 km)
-    n_doppler_bins: int = 32             # Total Doppler bins (2 sub-frames x 16)
-    chirps_per_subframe: int = 16        # Chirps in one Doppler sub-frame
-    fft_size: int = 2048                 # Pre-decimation FFT length
-    decimation_factor: int = 4           # 2048 → 512
+    bandwidth_hz: float = 20e6           # Chirp bandwidth (time-bandwidth product / display)
+    chirp_duration_s: float = 30e-6      # LONG chirp ramp time (longest of the three)
 
+    # Per-subframe PRIs (PR-Q stagger; mirrors radar_params.vh
+    # RP_DEF_{SHORT,MEDIUM,LONG}_LISTEN_CYCLES + chirp cycles).
+    pri_short_s:  float = 175e-6         # SHORT  PRI (1 us chirp + 174 us listen)
+    pri_medium_s: float = 161e-6         # MEDIUM PRI (5 us chirp + 156 us listen)
+    pri_long_s:   float = 167e-6         # LONG   PRI (30 us chirp + 137 us listen)
+
+    center_freq_hz:      float = 10.5e9  # X-band carrier (radar_scene.py F_CARRIER)
+    n_range_bins:        int = 512       # After decimation (3 km mode; 4096 in 20 km)
+    n_doppler_bins:      int = 48        # 3 sub-frames * 16 chirps (matches RP_NUM_DOPPLER_BINS)
+    chirps_per_subframe: int = 16        # Chirps in one Doppler sub-frame
+    num_subframes:       int = 3         # SHORT, MEDIUM, LONG
+    fft_size:            int = 2048      # Pre-decimation matched-filter FFT length
+    decimation_factor:   int = 4         # 2048 -> 512
+
+    # ------------------------------------------------------------------
+    # Range
+    # ------------------------------------------------------------------
     @property
     def range_resolution_m(self) -> float:
         """Meters per decimated range bin (matched-filter pulse compression).
 
-        For FFT-based matched filtering, each IFFT output bin spans
-        c / (2 * Fs) in range, where Fs is the I/Q sample rate at the
-        matched-filter input (DDC output).  After decimation the bin
-        spacing grows by *decimation_factor*.
+        Each IFFT output bin spans c / (2 * Fs); after decimation the bin
+        spacing grows by ``decimation_factor``.
         """
         c = 299_792_458.0
         raw_bin = c / (2.0 * self.sample_rate_hz)
         return raw_bin * self.decimation_factor
 
     @property
-    def velocity_resolution_mps(self) -> float:
-        """m/s per Doppler bin.
-
-        lambda / (2 * chirps_per_subframe * PRI), matching radar_scene.py.
-        """
-        c = 299_792_458.0
-        wavelength = c / self.center_freq_hz
-        return wavelength / (2.0 * self.chirps_per_subframe * self.pri_s)
-
-    @property
     def max_range_m(self) -> float:
         """Maximum unambiguous range in meters."""
         return self.range_resolution_m * self.n_range_bins
 
+    # ------------------------------------------------------------------
+    # Velocity (per sub-frame)
+    # ------------------------------------------------------------------
+    def _v_res(self, pri_s: float) -> float:
+        c = 299_792_458.0
+        wavelength = c / self.center_freq_hz
+        return wavelength / (2.0 * self.chirps_per_subframe * pri_s)
+
     @property
-    def max_velocity_mps(self) -> float:
-        """Maximum unambiguous velocity (±) in m/s."""
-        return self.velocity_resolution_mps * self.n_doppler_bins / 2.0
+    def velocity_resolution_short_mps(self) -> float:
+        """m/s per Doppler bin in the SHORT sub-frame."""
+        return self._v_res(self.pri_short_s)
+
+    @property
+    def velocity_resolution_medium_mps(self) -> float:
+        """m/s per Doppler bin in the MEDIUM sub-frame."""
+        return self._v_res(self.pri_medium_s)
+
+    @property
+    def velocity_resolution_long_mps(self) -> float:
+        """m/s per Doppler bin in the LONG sub-frame."""
+        return self._v_res(self.pri_long_s)
+
+    @property
+    def max_velocity_short_mps(self) -> float:
+        """Per-subframe SHORT v_unamb (+/-)."""
+        return self.velocity_resolution_short_mps * self.chirps_per_subframe / 2.0
+
+    @property
+    def max_velocity_medium_mps(self) -> float:
+        """Per-subframe MEDIUM v_unamb (+/-)."""
+        return self.velocity_resolution_medium_mps * self.chirps_per_subframe / 2.0
+
+    @property
+    def max_velocity_long_mps(self) -> float:
+        """Per-subframe LONG v_unamb (+/-)."""
+        return self.velocity_resolution_long_mps * self.chirps_per_subframe / 2.0
+
+    def extended_max_velocity_mps_crt(self, max_alias_k: int = 6) -> float:
+        """CRT-extended unambiguous velocity ceiling (PR-Q C-5).
+
+        Three coprime PRIs let the host resolve aliases up to
+        ``max_alias_k`` folds before the alias set itself becomes
+        ambiguous.  Returns the velocity beyond which detections must
+        be flagged AMBIGUOUS even after CRT unfolding.
+
+        Ceiling is set by the largest per-subframe v_unamb (smallest
+        PRI) times the alias search depth.  For PR-Q stagger
+        (175/161/167 us) with K=6 the practical ceiling is ~266 m/s,
+        well above typical UAS speeds (50-80 m/s).
+        """
+        v_unamb = max(
+            self.max_velocity_short_mps,
+            self.max_velocity_medium_mps,
+            self.max_velocity_long_mps,
+        )
+        return v_unamb * max_alias_k

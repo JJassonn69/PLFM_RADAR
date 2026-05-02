@@ -516,7 +516,7 @@ def extract_targets_from_frame(
         One target per detection cell.
     """
     det_indices = np.argwhere(frame.detections > 0)
-    n_doppler = frame.detections.shape[1] if frame.detections.ndim == 2 else 32
+    n_doppler = frame.detections.shape[1] if frame.detections.ndim == 2 else 48
     doppler_center = n_doppler // 2
 
     targets: list[RadarTarget] = []

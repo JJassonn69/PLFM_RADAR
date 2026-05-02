@@ -428,10 +428,14 @@ class TestWaveformConfig(unittest.TestCase):
         self.assertEqual(wc.sample_rate_hz, 100e6)
         self.assertEqual(wc.bandwidth_hz, 20e6)
         self.assertEqual(wc.chirp_duration_s, 30e-6)
-        self.assertEqual(wc.pri_s, 167e-6)
+        # PR-Q: 3 staggered PRIs (SHORT 175, MEDIUM 161, LONG 167 us)
+        self.assertEqual(wc.pri_short_s, 175e-6)
+        self.assertEqual(wc.pri_medium_s, 161e-6)
+        self.assertEqual(wc.pri_long_s, 167e-6)
         self.assertEqual(wc.center_freq_hz, 10.5e9)
         self.assertEqual(wc.n_range_bins, 512)
-        self.assertEqual(wc.n_doppler_bins, 32)
+        self.assertEqual(wc.n_doppler_bins, 48)
+        self.assertEqual(wc.num_subframes, 3)
         self.assertEqual(wc.chirps_per_subframe, 16)
         self.assertEqual(wc.fft_size, 2048)
         self.assertEqual(wc.decimation_factor, 4)
@@ -442,11 +446,20 @@ class TestWaveformConfig(unittest.TestCase):
         wc = WaveformConfig()
         self.assertAlmostEqual(wc.range_resolution_m, 5.996, places=2)
 
-    def test_velocity_resolution(self):
-        """velocity_resolution_mps should be ~5.34 m/s/bin (PRI=167us, 16 chirps)."""
+    def test_velocity_resolution_per_subframe(self):
+        """Per-subframe v_res = lambda / (2 * 16 * PRI), PR-Q stagger."""
         from v7.models import WaveformConfig
         wc = WaveformConfig()
-        self.assertAlmostEqual(wc.velocity_resolution_mps, 5.343, places=1)
+        # lambda = c / 10.5e9 = 0.02856 m
+        # SHORT  175 us: 0.02856 / (32 * 175e-6) = 5.099 m/s/bin
+        # MEDIUM 161 us: 0.02856 / (32 * 161e-6) = 5.543 m/s/bin
+        # LONG   167 us: 0.02856 / (32 * 167e-6) = 5.343 m/s/bin
+        self.assertAlmostEqual(wc.velocity_resolution_short_mps,  5.099, places=2)
+        self.assertAlmostEqual(wc.velocity_resolution_medium_mps, 5.543, places=2)
+        self.assertAlmostEqual(wc.velocity_resolution_long_mps,   5.343, places=2)
+        # Smallest PRI (MEDIUM) gives largest v_res → largest v_unamb.
+        self.assertGreater(wc.velocity_resolution_medium_mps, wc.velocity_resolution_long_mps)
+        self.assertGreater(wc.velocity_resolution_medium_mps, wc.velocity_resolution_short_mps)
 
     def test_max_range(self):
         """max_range_m = range_resolution * n_range_bins."""
@@ -454,15 +467,29 @@ class TestWaveformConfig(unittest.TestCase):
         wc = WaveformConfig()
         self.assertAlmostEqual(wc.max_range_m, wc.range_resolution_m * 512, places=1)
 
-    def test_max_velocity(self):
-        """max_velocity_mps = velocity_resolution * n_doppler_bins / 2."""
+    def test_max_velocity_per_subframe(self):
+        """Per-subframe v_unamb = v_res * chirps_per_subframe / 2."""
         from v7.models import WaveformConfig
         wc = WaveformConfig()
-        self.assertAlmostEqual(
-            wc.max_velocity_mps,
-            wc.velocity_resolution_mps * 16,
-            places=2,
-        )
+        for vmax, vres in [
+            (wc.max_velocity_short_mps,  wc.velocity_resolution_short_mps),
+            (wc.max_velocity_medium_mps, wc.velocity_resolution_medium_mps),
+            (wc.max_velocity_long_mps,   wc.velocity_resolution_long_mps),
+        ]:
+            self.assertAlmostEqual(vmax, vres * 8.0, places=2)
+
+    def test_extended_max_velocity_crt(self):
+        """CRT-extended v_unamb = max(per-subframe v_unamb) * K."""
+        from v7.models import WaveformConfig
+        wc = WaveformConfig()
+        # MEDIUM has the largest per-subframe v_unamb (smallest PRI).
+        # K=6 default → ~266 m/s; well above UAS speeds 50–80 m/s.
+        v6 = wc.extended_max_velocity_mps_crt()
+        self.assertAlmostEqual(v6, wc.max_velocity_medium_mps * 6, places=2)
+        # K=3 should give half of K=6.
+        v3 = wc.extended_max_velocity_mps_crt(max_alias_k=3)
+        self.assertAlmostEqual(v3, wc.max_velocity_medium_mps * 3, places=2)
+        self.assertAlmostEqual(v6, 2.0 * v3, places=2)
 
     def test_custom_params(self):
         """Non-default parameters correctly change derived values."""
@@ -472,11 +499,15 @@ class TestWaveformConfig(unittest.TestCase):
         self.assertAlmostEqual(wc2.range_resolution_m, wc1.range_resolution_m / 2, places=2)
 
     def test_zero_center_freq_velocity(self):
-        """Zero center freq should cause ZeroDivisionError in velocity calc."""
+        """Zero center freq should ZeroDivisionError in any per-subframe velocity calc."""
         from v7.models import WaveformConfig
         wc = WaveformConfig(center_freq_hz=0.0)
         with self.assertRaises(ZeroDivisionError):
-            _ = wc.velocity_resolution_mps
+            _ = wc.velocity_resolution_long_mps
+        with self.assertRaises(ZeroDivisionError):
+            _ = wc.velocity_resolution_short_mps
+        with self.assertRaises(ZeroDivisionError):
+            _ = wc.velocity_resolution_medium_mps
 
 
 # =============================================================================
@@ -926,7 +957,8 @@ class TestExtractTargetsFromFrame(unittest.TestCase):
     def test_single_detection_range(self):
         """Detection at range bin 10 → range = 10 * range_resolution."""
         from v7.processing import extract_targets_from_frame
-        frame = self._make_frame(det_cells=[(10, 16)])  # dbin=16 = center → vel=0
+        # PR-Q: n_doppler_bins=48 → centre bin = 24 (was 16 in 32-bin world).
+        frame = self._make_frame(det_cells=[(10, 24)])
         targets = extract_targets_from_frame(frame, range_resolution=5.996)
         self.assertEqual(len(targets), 1)
         self.assertAlmostEqual(targets[0].range, 10 * 5.996, places=1)
@@ -935,10 +967,11 @@ class TestExtractTargetsFromFrame(unittest.TestCase):
     def test_velocity_sign(self):
         """Doppler bin < center → negative velocity, > center → positive."""
         from v7.processing import extract_targets_from_frame
-        frame = self._make_frame(det_cells=[(5, 10), (5, 20)])
+        # PR-Q: centre = 24 in 48-bin frame.  dbin=10 below, dbin=30 above.
+        frame = self._make_frame(det_cells=[(5, 10), (5, 30)])
         targets = extract_targets_from_frame(frame, velocity_resolution=1.484)
-        # dbin=10: vel = (10-16)*1.484 = -8.904  (approaching)
-        # dbin=20: vel = (20-16)*1.484 = +5.936  (receding)
+        # dbin=10: vel = (10-24)*1.484 = -20.776  (approaching)
+        # dbin=30: vel = (30-24)*1.484 =  +8.904  (receding)
         self.assertLess(targets[0].velocity, 0)
         self.assertGreater(targets[1].velocity, 0)
 

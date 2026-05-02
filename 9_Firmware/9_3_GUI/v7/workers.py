@@ -189,7 +189,15 @@ class RadarDataWorker(QThread):
         # Extract detections from FPGA CFAR flags
         det_indices = np.argwhere(frame.detections > 0)
         r_res = self._waveform.range_resolution_m
-        v_res = self._waveform.velocity_resolution_mps
+        # PR-Q.4: per-subframe Doppler velocity is unfolded by the CRT
+        # extractor in PR-Q.5; until that lands, treat the 48-bin output
+        # as a single-PRI grid using the LONG-PRI v_res (most conservative
+        # — smallest v_unamb).  This intentionally yields wrong velocities
+        # for SHORT/MEDIUM sub-frame bins until PR-Q.5 replaces this path
+        # with extract_targets_from_frame_crt.
+        v_res = self._waveform.velocity_resolution_long_mps
+        n_doppler = frame.detections.shape[1] if frame.detections.ndim == 2 else self._waveform.n_doppler_bins
+        doppler_center = n_doppler // 2
 
         for idx in det_indices:
             rbin, dbin = idx
@@ -198,8 +206,7 @@ class RadarDataWorker(QThread):
 
             # Convert bin indices to physical units
             range_m = float(rbin) * r_res
-            # Doppler: centre bin (16) = 0 m/s; positive bins = approaching
-            velocity_ms = float(dbin - 16) * v_res
+            velocity_ms = float(dbin - doppler_center) * v_res
 
             # Apply pitch correction if GPS data available
             raw_elev = 0.0  # FPGA doesn't send elevation per-detection
@@ -564,11 +571,14 @@ class ReplayWorker(QThread):
         self.frameReady.emit(frame)
         self.frameIndexChanged.emit(index, self._engine.total_frames)
 
-        # Target extraction
+        # Target extraction.  PR-Q.4: single LONG-PRI v_res placeholder;
+        # PR-Q.5 replaces this call with extract_targets_from_frame_crt
+        # which derives per-subframe velocity from the high 2 bits of
+        # doppler_bin and runs 3-PRI CRT unfolding.
         targets = self._extract_targets(
             frame,
             range_resolution=self._waveform.range_resolution_m,
-            velocity_resolution=self._waveform.velocity_resolution_mps,
+            velocity_resolution=self._waveform.velocity_resolution_long_mps,
             gps=self._gps,
         )
         self.targetsUpdated.emit(targets)

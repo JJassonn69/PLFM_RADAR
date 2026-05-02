@@ -73,9 +73,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Frame dimensions from FPGA
+# Frame dimensions from FPGA (mirrors radar_protocol.NUM_*; PR-F/PR-Q)
 NUM_RANGE_BINS = 64
-NUM_DOPPLER_BINS = 32
+NUM_DOPPLER_BINS = 48
 
 # Force C locale (period as decimal separator) for all QDoubleSpinBox instances.
 _C_LOCALE = QLocale(QLocale.Language.C)
@@ -94,7 +94,7 @@ def _make_dspin() -> QDoubleSpinBox:
 # =============================================================================
 
 class RangeDopplerCanvas(FigureCanvasQTAgg):
-    """Matplotlib canvas showing the 64x32 Range-Doppler map with dark theme."""
+    """Matplotlib canvas showing the Range-Doppler map (NUM_RANGE_BINS x NUM_DOPPLER_BINS) with dark theme."""
 
     def __init__(self, _parent=None):
         fig = Figure(figsize=(10, 6), facecolor=DARK_BG)
@@ -106,7 +106,10 @@ class RangeDopplerCanvas(FigureCanvasQTAgg):
             extent=[0, NUM_DOPPLER_BINS, 0, NUM_RANGE_BINS], origin="lower",
         )
 
-        self.ax.set_title("Range-Doppler Map (64x32)", color=DARK_FG)
+        self.ax.set_title(
+            f"Range-Doppler Map ({NUM_RANGE_BINS}x{NUM_DOPPLER_BINS})",
+            color=DARK_FG,
+        )
         self.ax.set_xlabel("Doppler Bin", color=DARK_FG)
         self.ax.set_ylabel("Range Bin", color=DARK_FG)
         self.ax.tick_params(colors=DARK_FG)
