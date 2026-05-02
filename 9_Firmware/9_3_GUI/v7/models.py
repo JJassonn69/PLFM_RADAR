@@ -121,8 +121,11 @@ class RadarSettings:
     not be relied on for physics-accurate display.
     """
     system_frequency: float = 10.5e9    # Hz (carrier, used for velocity calc)
-    range_resolution: float = 6.0        # Meters per range bin (c/(2*Fs)*decim = 1.5*4)
-    velocity_resolution: float = 1.0     # m/s per Doppler bin (calibrate to waveform)
+    # PLACEHOLDER — see class docstring. Live workers derive the real values
+    # from WaveformConfig (per-subframe LONG/MEDIUM/SHORT v_res). Do not use
+    # these literals for physics-accurate display.
+    range_resolution: float = 6.0        # placeholder; legacy 1.5 m * decim=4
+    velocity_resolution: float = 1.0     # placeholder; legacy 167 us / 16-chirp / 10.5 GHz
     max_distance: float = 3072           # Max detection range (m), 3 km mode
     map_size: float = 4000               # Map display size (m)
     coverage_radius: float = 3072        # Map coverage radius (m), 3 km mode

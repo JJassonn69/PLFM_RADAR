@@ -367,6 +367,10 @@ ddc_400m_enhanced ddc(
     .baseband_q(ddc_out_q), // Q output at 100MHz
     .baseband_valid_i(ddc_valid_i),     // Valid at 100MHz
     .baseband_valid_q(ddc_valid_q),
+    // RX DDC mixer is always enabled — asymmetric vs the TX path which CDCs
+    // stm32_mixers_enable into clk_120m_dac (radar_transmitter.v:175-183).
+    // Counter-UAS RX has no operational scenario where the digital DDC NCO
+    // should be quiesced while the system is running; tie-1 is intentional.
     .mixers_enable(1'b1),
     // Diagnostics (audit F-6.1) — previously all unconnected
     .ddc_status(ddc_status_w),
@@ -593,7 +597,7 @@ assign range_data_valid = mti_range_valid;
 doppler_processor_optimized #(
     .DOPPLER_FFT_SIZE(`RP_DOPPLER_FFT_SIZE),        // 16
     .RANGE_BINS(`RP_MAX_OUTPUT_BINS),               // 512 (50T) / 4096 (200T)  [RX-D]
-    .CHIRPS_PER_FRAME(`RP_CHIRPS_PER_FRAME),        // 32
+    .CHIRPS_PER_FRAME(`RP_CHIRPS_PER_FRAME),        // 48 (PR-F: 3 sub-frames * 16)
     .CHIRPS_PER_SUBFRAME(`RP_CHIRPS_PER_SUBFRAME)   // 16
 ) doppler_proc (
     .clk(clk),

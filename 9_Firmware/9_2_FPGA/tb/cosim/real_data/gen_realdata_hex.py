@@ -18,8 +18,10 @@ Outputs (all under tb/cosim/real_data/hex/):
     fullchain_doppler_ref_q.hex     same shape as doppler_ref_*
 
   GUI replay intermediates (.npy, COSIM_DIR ReplayFormat in v7.replay):
-    decimated_range_i.npy / _q.npy  (48, 512) — post range_bin_decimator
-    doppler_map_i.npy    / _q.npy   (512, 48) — post doppler_processor
+    decimated_range_i.npy / _q.npy   (48, 512) — post range_bin_decimator
+    doppler_map_i.npy    / _q.npy    (512, 48) — post doppler_processor
+    fullchain_cfar_flags.npy         (512, 48) uint8 — CA-CFAR detection mask
+    fullchain_cfar_mag.npy           (512, 48) — |I|+|Q| magnitudes (CFAR input)
 
 Dimensions match production (radar_params.vh: RP_FFT_SIZE=2048,
 RP_DECIMATION_FACTOR=4, RP_NUM_RANGE_BINS=512, RP_NUM_DOPPLER_BINS=48).
@@ -39,7 +41,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fpga_model import DopplerProcessor, RangeBinDecimator
+from fpga_model import DopplerProcessor, RangeBinDecimator, run_cfar_ca
 from radar_scene import Target, generate_doppler_frame
 
 
@@ -164,19 +166,33 @@ def gen_fullchain_realdata():
     write_hex_16(os.path.join(OUT_DIR, "fullchain_doppler_ref_q.hex"), flat_q)
 
     # Same arrays serialized for v7.replay COSIM_DIR format (GUI replay).
-    np.save(os.path.join(OUT_DIR, "decimated_range_i.npy"),
-            np.asarray(decim_i_2d, dtype=np.int32))
-    np.save(os.path.join(OUT_DIR, "decimated_range_q.npy"),
-            np.asarray(decim_q_2d, dtype=np.int32))
-    np.save(os.path.join(OUT_DIR, "doppler_map_i.npy"),
-            np.asarray(doppler_i, dtype=np.int32))
-    np.save(os.path.join(OUT_DIR, "doppler_map_q.npy"),
-            np.asarray(doppler_q, dtype=np.int32))
+    decim_i_arr = np.asarray(decim_i_2d, dtype=np.int32)
+    decim_q_arr = np.asarray(decim_q_2d, dtype=np.int32)
+    doppler_i_arr = np.asarray(doppler_i, dtype=np.int32)
+    doppler_q_arr = np.asarray(doppler_q, dtype=np.int32)
+    np.save(os.path.join(OUT_DIR, "decimated_range_i.npy"), decim_i_arr)
+    np.save(os.path.join(OUT_DIR, "decimated_range_q.npy"), decim_q_arr)
+    np.save(os.path.join(OUT_DIR, "doppler_map_i.npy"),     doppler_i_arr)
+    np.save(os.path.join(OUT_DIR, "doppler_map_q.npy"),     doppler_q_arr)
+
+    # m-9: Run the CA-CFAR model on the doppler map so v7.replay shows
+    # detections instead of falling through to zeros. Defaults match the FPGA
+    # cold-reset (RP_DEF_CFAR_*: guard=2, train=8, alpha=0x30=3.0 Q4.4, mode=CA).
+    cfar_flags, cfar_mag, _thr = run_cfar_ca(
+        doppler_i_arr, doppler_q_arr,
+        guard=2, train=8, alpha_q44=0x30, mode='CA',
+    )
+    np.save(os.path.join(OUT_DIR, "fullchain_cfar_flags.npy"),
+            cfar_flags.astype(np.uint8))
+    np.save(os.path.join(OUT_DIR, "fullchain_cfar_mag.npy"),
+            cfar_mag.astype(np.int64))
 
     print(f"  stimulus: {len(stim)} packed lines "
           f"(expected {CHIRPS_PER_FRAME * FULLCHAIN_INPUT_BINS})")
     print(f"  golden:   {len(flat_i)} lines i / {len(flat_q)} lines q "
           f"(expected {DOPPLER_RANGE_BINS * DOPPLER_TOTAL_BINS})")
+    print(f"  cfar:     {int(cfar_flags.sum())} detections "
+          f"(across {DOPPLER_RANGE_BINS}x{DOPPLER_TOTAL_BINS} cells)")
 
 
 def main():
@@ -204,6 +220,8 @@ def main():
         "decimated_range_q.npy",
         "doppler_map_i.npy",
         "doppler_map_q.npy",
+        "fullchain_cfar_flags.npy",
+        "fullchain_cfar_mag.npy",
     )
     for f in npy_files:
         path = os.path.join(OUT_DIR, f)

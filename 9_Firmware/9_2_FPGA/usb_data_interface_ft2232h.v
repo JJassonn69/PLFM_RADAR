@@ -958,7 +958,7 @@ always @(posedge ft_clk or negedge ft_effective_reset_n) begin
                     end
                 end
 
-                // ---- Frame header: 8 bytes ----
+                // ---- Frame header: 9 bytes (PR-G: added version byte at offset 1) ----
                 WR_FRAME_HDR: begin
                     if (!ft_txe_n) begin
                         ft_data_oe <= 1'b1;

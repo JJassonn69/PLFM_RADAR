@@ -56,7 +56,11 @@ class RadarProcessor:
     """Full radar processing pipeline: fusion, clustering, association, tracking."""
 
     def __init__(self):
-        self.range_doppler_map = np.zeros((1024, 32))
+        # Placeholder shape matches production (NUM_RANGE_BINS x NUM_DOPPLER_BINS
+        # = 512 x 48 from radar_protocol). Overwritten on every frame; pre-frame
+        # readers see the correct shape rather than a legacy (1024, 32).
+        from radar_protocol import NUM_RANGE_BINS, NUM_DOPPLER_BINS
+        self.range_doppler_map = np.zeros((NUM_RANGE_BINS, NUM_DOPPLER_BINS))
         self.detected_targets: list[RadarTarget] = []
         self.track_id_counter: int = 0
         self.tracks: dict[int, dict] = {}

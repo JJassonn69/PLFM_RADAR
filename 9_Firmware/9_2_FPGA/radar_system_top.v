@@ -271,7 +271,7 @@ reg [15:0] host_short_chirp_cycles;   // Opcode 0x13 (default 100, V2)
 reg [15:0] host_short_listen_cycles;  // Opcode 0x14 (default 17400, V2)
 reg [15:0] host_medium_chirp_cycles;  // Opcode 0x17 (default 500, PR-G G2)
 reg [15:0] host_medium_listen_cycles; // Opcode 0x18 (default 15600, PR-Q staggered PRI)
-reg [5:0]  host_chirps_per_elev;      // Opcode 0x15 (default 32)
+reg [5:0]  host_chirps_per_elev;      // Opcode 0x15 (default 48 = RP_CHIRPS_PER_FRAME, PR-F)
 reg        host_status_request;       // Opcode 0xFF (self-clearing pulse)
 
 // Fix 4: Doppler/chirps mismatch protection
@@ -1056,7 +1056,10 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
         host_short_listen_cycles  <= 16'd`RP_DEF_SHORT_LISTEN_CYCLES_V2;
         host_medium_chirp_cycles  <= 16'd`RP_DEF_MEDIUM_CHIRP_CYCLES;   // PR-G G2
         host_medium_listen_cycles <= 16'd`RP_DEF_MEDIUM_LISTEN_CYCLES;  // PR-G G2
-        host_chirps_per_elev      <= 6'd32;
+        // PR-F bumped RP_CHIRPS_PER_FRAME 32 -> 48 (3 sub-frames * 16); the
+        // chirps_per_elev register is echoed in status word 3 and used by host
+        // sanity-checking. Keep cold-reset value in lockstep with the truth.
+        host_chirps_per_elev      <= 6'd48;
         host_status_request     <= 1'b0;
         chirps_mismatch_error   <= 1'b0;
         host_range_mode         <= 2'b00;     // Default: 3 km mode (all short chirps)
