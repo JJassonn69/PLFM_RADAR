@@ -257,16 +257,28 @@ def check_fft_invariants(result: CheckResult):
     n = 2048
     fft = FFTEngine(n=n)
 
-    # Impulse → flat spectrum at amplitude (no saturation; amp < 32767/N is overkill).
-    in_re = [1000] + [0] * (n - 1)
+    # Impulse → flat spectrum at amplitude. Under LogiCORE v9.1 Scaled mode
+    # (one >>>1 per stage with conv-rounding, total /N applied across LOG2N
+    # stages — see PR-O / fpga_model.FFTEngine docstring), each bin lands at
+    # round(amp/N), not amp. Lift the input well above the rounding floor so
+    # the test catches twiddle / butterfly drift rather than noise. amp=32000
+    # ≈ Q15 max keeps every per-stage value within 16-bit headroom and gives
+    # expected_per_bin ≈ 16 with no twiddle interaction (impulse has b=0 at
+    # every butterfly), so banker's rounding keeps us within ±1 LSB.
+    impulse_amp = 32000
+    expected_per_bin = round(impulse_amp / n)   # 32000/2048 → 16 (banker's)
+    in_re = [impulse_amp] + [0] * (n - 1)
     in_im = [0] * n
     twin_re, twin_im = fft.compute(in_re, in_im, inverse=False)
-    flat_max = max(max(twin_re) - 1000, 1000 - min(twin_re),
-                   max(twin_im), -min(twin_im))
+    flat_max = max(
+        max(abs(v - expected_per_bin) for v in twin_re),
+        max(abs(v) for v in twin_im),
+    )
     result.check(
-        flat_max <= 5,
-        "FFT-2048(impulse): all bins ≈ amplitude (1000)",
-        f"max |bin - 1000| = {flat_max}"
+        flat_max <= 2,
+        f"FFT-2048(impulse): all bins ≈ amp/N ({expected_per_bin}) "
+        f"[scaled-mode, amp={impulse_amp}]",
+        f"max |bin - {expected_per_bin}| = {flat_max}"
     )
 
     # Single COMPLEX tone (cos + j*sin) → single peak at bin_k (no conjugate
@@ -315,12 +327,17 @@ def check_mf_invariants(result: CheckResult):
 
     delay = 100
     bin_k = 17
-    amp = 200
+    # Under scaled-mode FFTs the chain output peak ≈ correlation/N². For a
+    # 256-sample tone matched against itself, correlation peak = pulse_len*amp²,
+    # so chain output peak ≈ pulse_len*amp² / N² = amp²/16384. Lift amp from
+    # 200 (peak ≈ 2.4, swamped by Q15 quantization) to 4000 (peak ≈ 977 — clean
+    # margin against the 16-bit IFFT-output saturation at the chain boundary).
+    amp = 4000
+    pulse_len = 256
     sig_re = [0] * n
     sig_im = [0] * n
     ref_re_in = [0] * n
     ref_im_in = [0] * n
-    pulse_len = 256
     for i in range(pulse_len):
         ref_re_in[i] = round(amp * math.cos(2 * math.pi * bin_k * i / pulse_len))
         ref_im_in[i] = round(amp * math.sin(2 * math.pi * bin_k * i / pulse_len))
@@ -337,11 +354,13 @@ def check_mf_invariants(result: CheckResult):
     ref_peak = int(np.argmax(ref_mag))
     result.check(
         twin_peak == ref_peak == delay,
-        f"MF: peak at injected delay (bin {delay})",
+        f"MF: peak at injected delay (bin {delay}) [scaled-mode, amp={amp}]",
         f"twin={twin_peak}, ref={ref_peak}"
     )
 
-    # Sidelobe behaviour: peak should be N*stronger than median.
+    # Sidelobe behaviour: peak should be ≥ 5× the median magnitude. Under
+    # scaled-mode at amp=4000 the peak rises to ~977 while sidelobes stay
+    # near the LSB floor, easily clearing the threshold.
     twin_peak_val = float(twin_mag[delay])
     twin_median = float(np.median(twin_mag))
     pk_ratio = twin_peak_val / max(twin_median, 1.0)
