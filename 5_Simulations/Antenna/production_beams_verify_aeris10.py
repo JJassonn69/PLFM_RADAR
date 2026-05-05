@@ -257,24 +257,24 @@ def main():
     label_at_bp7 = expected_angle(pd_at_bp7)
     pk_at_bp7 = analyse_beam(theta_deg, total_pattern_dB(theta_deg, matrix1[7], h_pat_lin)[0])[0]
     print("2) Sign convention check (matrix1[bp=7], phase_diff = +20°):")
-    print(f"   Comment in main.cpp says \"positive steering angles\".")
-    print(f"   Math says positive phase_diff steers to NEGATIVE θ.")
+    print("   Comment in main.cpp says \"positive steering angles\".")
+    print("   Math says positive phase_diff steers to NEGATIVE θ.")
     print(f"   Sim peak θ = {pk_at_bp7:+.1f}° (predicted {label_at_bp7:+.1f}°).")
     if pk_at_bp7 * 1.0 < 0:
-        print(f"   → Comment is MISLEADING: matrix1 actually steers to NEGATIVE elevations.")
+        print("   → Comment is MISLEADING: matrix1 actually steers to NEGATIVE elevations.")
     else:
-        print(f"   → Sim agrees with comment (positive steering).")
+        print("   → Sim agrees with comment (positive steering).")
     print()
     # Symmetry / asymmetry
     print("3) Symmetry of matrix1[bp] vs matrix2[bp]:")
     print(f"   At bp=0:  matrix1 → {iter_pos_pks[0]:+5.1f}°,  matrix2 → {iter_neg_pks[0]:+5.1f}°")
     print(f"   At bp=14: matrix1 → {iter_pos_pks[14]:+5.1f}°, matrix2 → {iter_neg_pks[14]:+5.1f}°")
     if abs(abs(iter_pos_pks[0]) - abs(iter_neg_pks[0])) > 5:
-        print(f"   → ASYMMETRIC: matrix1[bp] and matrix2[bp] are NOT mirror images.")
-        print(f"   → Likely indexing intent: matrix2 should use phase_differences[30 - bp]")
-        print(f"     (mirror), not phase_differences[bp + 16] (current).")
+        print("   → ASYMMETRIC: matrix1[bp] and matrix2[bp] are NOT mirror images.")
+        print("   → Likely indexing intent: matrix2 should use phase_differences[30 - bp]")
+        print("     (mirror), not phase_differences[bp + 16] (current).")
     else:
-        print(f"   → Symmetric.")
+        print("   → Symmetric.")
     print()
     # Coverage
     all_pks = sorted(iter_pos_pks + [pk0] + iter_neg_pks)
@@ -285,20 +285,20 @@ def main():
           f"and {all_pks[int(np.argmax(gaps))+1]:+.1f}°")
     print(f"   Smallest gap: {min(g for g in gaps if g > 0.1):.2f}° "
           f"(near broadside — heavily oversampled)")
-    print(f"   1/n distribution → dense near broadside, sparse at large angles.")
+    print("   1/n distribution → dense near broadside, sparse at large angles.")
     print()
     # SLL at extreme scan
     pk_extreme = max(rows, key=lambda r: abs(r[3] or 0))
     print(f"5) Worst-case SLL at max scan: bp={pk_extreme[0]}, "
           f"matrix1 peak={pk_extreme[3]:+.1f}°, SLL={pk_extreme[5]:+.1f} dB")
     if pk_extreme[5] > -10:
-        print(f"   → SLL exceeds -10 dB at extreme scan. Significant scan loss + "
-              f"degraded sidelobe rejection (expected at near-grazing scan).")
+        print("   → SLL exceeds -10 dB at extreme scan. Significant scan loss + "
+              "degraded sidelobe rejection (expected at near-grazing scan).")
     print()
-    print(f"6) setBeamAngle() (the 4-broadcast bug we found earlier) is DEAD CODE")
-    print(f"   in production. main.cpp uses initializeBeamMatrices() +")
-    print(f"   setCustomBeamPattern16() exclusively. Fixing setBeamAngle() has zero")
-    print(f"   risk of regressing production behaviour.")
+    print("6) setBeamAngle() (the 4-broadcast bug we found earlier) is DEAD CODE")
+    print("   in production. main.cpp uses initializeBeamMatrices() +")
+    print("   setCustomBeamPattern16() exclusively. Fixing setBeamAngle() has zero")
+    print("   risk of regressing production behaviour.")
 
 
 if __name__ == "__main__":

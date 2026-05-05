@@ -36,7 +36,6 @@
 #   coupling_grid.png  — heatmap of |S_jd| dB at 10.5 GHz across array
 
 import os
-import sys
 import time
 import csv
 import numpy as np
@@ -314,7 +313,7 @@ for (i, j) in sorted(DRIVEN_SET):
 
 if N_DRIVEN > 1:
     print()
-    print(f"  Sub-array uniformity:")
+    print("  Sub-array uniformity:")
     print(f"    S11 min/max/avg : {min(S11_at_op):>6.2f} / {max(S11_at_op):>6.2f} / "
           f"{sum(S11_at_op)/N_DRIVEN:>6.2f} dB")
     R_vals = [z.real for z in zin_at_op]
@@ -325,7 +324,7 @@ if N_DRIVEN > 1:
           f"{sum(X_vals)/N_DRIVEN:+5.1f} Ω")
     # Average port (what the ADAR channel "sees" through ideal 1:8 splitter)
     Z_avg = sum(zin_at_op) / N_DRIVEN
-    print(f"    Z avg (= what ADAR channel sees through ideal 1:8 splitter):")
+    print("    Z avg (= what ADAR channel sees through ideal 1:8 splitter):")
     print(f"      Z = {Z_avg.real:.1f} + j{Z_avg.imag:+.1f} Ω, "
           f"VSWR = {abs((Z_avg-50)/(Z_avg+50)) and (1+abs((Z_avg-50)/(Z_avg+50)))/(1-abs((Z_avg-50)/(Z_avg+50))):.2f}")
 

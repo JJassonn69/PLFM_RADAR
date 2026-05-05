@@ -49,7 +49,6 @@
 #   FEED_X_MM      (default 0; offset along W-axis, normally 0 for centred feed)
 
 import os
-import sys
 import time
 import csv
 import numpy as np
@@ -277,7 +276,7 @@ print("=" * 70)
 print(f"  Resonance (R peak + Im=0): {f_res/1e9:.3f} GHz   (target 10.5 GHz)")
 print(f"  S11 at resonance     : {s11_min:.2f} dB")
 print(f"  Zin at resonance     : {zin[i_res].real:.1f} + j{zin[i_res].imag:.1f} Ω")
-print(f"  ── at 10.500 GHz exactly:")
+print("  ── at 10.500 GHz exactly:")
 print(f"  S11 @ 10.5GHz        : {s11_dB[i_op]:.2f} dB")
 print(f"  Zin @ 10.5GHz        : {zin[i_op].real:.1f} + j{zin[i_op].imag:.1f} Ω")
 print(f"  VSWR @ 10.5GHz       : {vswr[i_op]:.2f}")

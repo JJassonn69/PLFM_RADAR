@@ -45,7 +45,13 @@ try:
     import numpy as np
 except ImportError:
     _MISSING.append("numpy")
-if importlib.util.find_spec("scipy.signal") is None:
+# find_spec("scipy.signal") raises ModuleNotFoundError if the parent package
+# scipy is itself absent (rather than returning None). Wrap in try/except so
+# the regression runner gets a clean rc=2 SKIP instead of an uncaught crash.
+try:
+    if importlib.util.find_spec("scipy.signal") is None:
+        _MISSING.append("scipy")
+except ModuleNotFoundError:
     _MISSING.append("scipy")
 if _MISSING:
     print(

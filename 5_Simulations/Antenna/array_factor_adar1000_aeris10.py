@@ -261,11 +261,8 @@ def main():
     peak_dB_co = []
     actual_peak_fw = []
     actual_peak_co = []
-    # Reference broadside peak for absolute scan-loss
-    ref_pat = total_pattern_dB(theta_deg, np.zeros(N_TOTAL, dtype=int), h_pat_lin)
-    # Find peak amplitude (ref) on linear scale by recomputing without normalisation
-    # Use a simpler proxy: peak in dB rel peak is 0; we want amplitude relative to
-    # broadside. Compute |E|² broadside vs scanned without normalisation.
+    # Reference broadside peak for absolute scan-loss — peak in dB rel peak is 0;
+    # we want amplitude relative to broadside, so compute |E|² without normalisation.
 
     def total_amp_lin(theta_deg_arr, phase_codes):
         af = array_factor_hplane(theta_deg_arr, phase_codes)
@@ -374,7 +371,6 @@ def main():
     phase_shift = (2 * np.pi * D_X * np.sin(angle_rad)) / LAMBDA
     phases_continuous = np.array([(n*phase_shift) % (2*np.pi) for n in range(N_TOTAL)])
     codes_quant = correct_phase_codes(ang)
-    phases_quant = codes_to_radians(codes_quant)
 
     def total_pattern_dB_continuous(theta_deg_arr, phases_rad, h_pat_lin):
         k = 2*np.pi/LAMBDA
@@ -409,9 +405,9 @@ def main():
     # = 4d = 2λ → grating lobes at sin(θ_g) = ±λ/(4d) ± sin(θ_0) = ±0.5 ± sin(θ_0).
     print()
     print("  TEST 3: Grating-lobe geometry")
-    print(f"  Element pitch d = λ/2 → no real-space grating lobes at any scan ✓")
-    print(f"  Firmware's 4-elem broadcast → super-pitch d_super = 4d = 2λ")
-    print(f"  → grating lobes appear at sin(θ_g) = ±0.5 ± sin(θ_0)")
+    print("  Element pitch d = λ/2 → no real-space grating lobes at any scan ✓")
+    print("  Firmware's 4-elem broadcast → super-pitch d_super = 4d = 2λ")
+    print("  → grating lobes appear at sin(θ_g) = ±0.5 ± sin(θ_0)")
     for ang in [0, 15, 30, 45]:
         sin0 = np.sin(np.deg2rad(ang))
         gl = []

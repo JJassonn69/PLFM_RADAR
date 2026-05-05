@@ -261,11 +261,11 @@ bw_h = beamwidth_3dB(theta_deg, pat_dB_h_norm, i_pk_h)
 print()
 print("=" * 78)
 print(f"  Far-field NORMALISED pattern at f = {F_TX/1e9:.3f} GHz")
-print(f"  ── E-plane (φ=90°, along array axis y — array factor lives here) ──")
+print("  ── E-plane (φ=90°, along array axis y — array factor lives here) ──")
 print(f"  Broadside (θ=0°) level : {pat_dB_e_norm[i_bs]:.2f} dB (rel peak)")
 print(f"  Peak direction         : θ = {theta_deg[i_pk_e]:+.1f}° (peak = {pat_dB_e_norm[i_pk_e]:.2f} dB)")
 print(f"  -3 dB beamwidth        : {bw_e:.1f}°")
-print(f"  ── H-plane (φ=0°, perpendicular to array) ──")
+print("  ── H-plane (φ=0°, perpendicular to array) ──")
 print(f"  Broadside (θ=0°) level : {pat_dB_h_norm[i_bs]:.2f} dB (rel peak)")
 print(f"  Peak direction         : θ = {theta_deg[i_pk_h]:+.1f}° (peak = {pat_dB_h_norm[i_pk_h]:.2f} dB)")
 print(f"  -3 dB beamwidth        : {bw_h:.1f}°")
@@ -279,13 +279,13 @@ print("=" * 78)
 # Plot (normalized to peak = 0 dB)
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 for ax, pat_dB, title, peak_deg in [
-    (axes[0], pat_dB_h_norm, f"H-plane (φ=0°, xz cut, perp. to array)",
+    (axes[0], pat_dB_h_norm, "H-plane (φ=0°, xz cut, perp. to array)",
         theta_deg[i_pk_h]),
-    (axes[1], pat_dB_e_norm, f"E-plane (φ=90°, yz cut, ALONG array — array factor)",
+    (axes[1], pat_dB_e_norm, "E-plane (φ=90°, yz cut, ALONG array — array factor)",
         theta_deg[i_pk_e]),
 ]:
     ax.plot(theta_deg, pat_dB, "b-", lw=1.6)
-    ax.axvline(0, color="r", ls=":", lw=0.8, label=f"broadside (θ=0°)")
+    ax.axvline(0, color="r", ls=":", lw=0.8, label="broadside (θ=0°)")
     if abs(peak_deg) > 1.0:
         ax.axvline(peak_deg, color="g", ls=":", lw=0.8,
                    label=f"peak at θ={peak_deg:+.1f}°")

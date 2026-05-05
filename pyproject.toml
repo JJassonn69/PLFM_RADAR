@@ -57,3 +57,20 @@ select = [
 "v7/hardware.py" = ["F401"]
 # FPGA cosim scripts: CLI tools — print() is the intended output channel
 "9_Firmware/9_2_FPGA/tb/cosim/**.py" = ["T20"]
+# Antenna sim/verification scripts: engineering-analysis ergonomics. print()
+# is the intended output channel; module-header docstrings include "How to
+# run" shell examples; comments/labels use Greek letters (µ, λ, π, θ, °) for
+# physical units; matplotlib/numpy idioms produce long lines and multi-stmt
+# constructs. Keep substantive bug rules (F unused-imports/vars, B core
+# bugbears) — drop stylistic noise.
+"5_Simulations/Antenna/**.py" = [
+    "T20",  "ERA",                          # print + "How to run" header examples
+    "RUF001","RUF002","RUF003",             # Greek letters (µ, λ, π, θ) in strings/comments
+    "RUF005","RUF015","RUF046","RUF059",    # collection/iteration ergonomics
+    "E501",                                  # long matplotlib/numpy lines
+    "E701","E702",                           # one-line setup statements
+    "B007","B905","BLE001",                  # unused loop var, zip strict, broad-except diag
+    "C401","RET504","SIM118",                # generator/in-dict ergonomics
+    "PERF401","PERF402",                     # comprehension perf hints
+    "ARG001","E402",                         # kwargs API + post-import-guard ordering
+]

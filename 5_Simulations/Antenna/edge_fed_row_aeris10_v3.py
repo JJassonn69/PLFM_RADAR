@@ -311,7 +311,7 @@ print(f"  W={PATCH_W} L={PATCH_L} inset={INSET_DEPTH}/{INSET_GAP}  "
       f"conn={CONN_LEN}  pitch={PITCH:.2f}")
 print(f"  Operating mode (nearest 10.5 GHz): {f_res/1e9:.3f} GHz, {s11_min:.2f} dB")
 print(f"  Zin at op mode        : {zin[i_res].real:.1f} + j{zin[i_res].imag:+.1f} Ω")
-print(f"  ── at 10.500 GHz exactly:")
+print("  ── at 10.500 GHz exactly:")
 print(f"  S11 @ 10.5GHz         : {s11_dB[i_op]:.2f} dB")
 print(f"  Zin @ 10.5GHz         : {zin[i_op].real:.1f} + j{zin[i_op].imag:+.1f} Ω")
 print(f"  VSWR @ 10.5GHz        : {vswr[i_op]:.2f}")
