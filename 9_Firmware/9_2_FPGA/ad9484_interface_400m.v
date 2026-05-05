@@ -21,7 +21,13 @@ module ad9484_interface_400m (
     output wire adc_dco_bufg,        // Buffered 400MHz DCO clock for downstream use
     // Audit F-0.1: OR flag, clk_400m domain. High on any sample in the
     // current 400 MHz cycle where the ADC reports overrange.
-    output wire adc_overrange_400m
+    output wire adc_overrange_400m,
+    // Audit F-7.4: MMCM lock indicator. Surfaces the internal mmcm_locked
+    // wire so testbenches (and, in future, the host status pipeline) can
+    // gate on a stable jitter-cleaned 400 MHz clock instead of guessing at
+    // a fixed wait. Combinational MMCME2 output — synchronize before use
+    // outside the clk_400m domain.
+    output wire mmcm_locked
 );
 
 // LVDS to single-ended conversion
@@ -80,15 +86,18 @@ BUFIO bufio_dco (
 // MMCME2 jitter-cleaning wrapper replaces the direct BUFG.
 // The PLL feedback loop attenuates input jitter from ~50 ps to ~20-30 ps,
 // reducing clock uncertainty and improving WNS on the 400 MHz CIC path.
-wire mmcm_locked;
+// Audit F-7.4: mmcm_locked is now exposed as a module output — see the
+// port-list comment above.
+wire mmcm_locked_int;
 
 adc_clk_mmcm mmcm_inst (
     .clk_in       (adc_dco),          // 400 MHz from IBUFDS output
     .reset_n      (reset_n),
     .clk_400m_out (adc_dco_buffered), // Jitter-cleaned 400 MHz on BUFG
-    .mmcm_locked  (mmcm_locked)
+    .mmcm_locked  (mmcm_locked_int)
 );
 assign adc_dco_bufg = adc_dco_buffered;
+assign mmcm_locked  = mmcm_locked_int;
 
 // AUDIT-C4 (2026-05-01): AD9484 outputs SDR LVDS (datasheet p.5: "Output
 // (LVDS—SDR)"; p.16: "data outputs are valid on the rising edge of DCO").

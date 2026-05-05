@@ -40,7 +40,11 @@ module ad9484_interface_400m (
     output wire [7:0] adc_data_400m,
     output wire adc_data_valid_400m,
     output wire adc_dco_bufg,
-    output wire adc_overrange_400m
+    output wire adc_overrange_400m,
+    // Audit F-7.4: stub has no MMCM, but must mirror the real module's
+    // port shape. Tie the lock indicator HIGH after reset deassert so
+    // testbenches that gate on it (e.g. tb_ad9484_xsim) don't stall.
+    output wire mmcm_locked
 );
 
 // Pass-through clock (no BUFG needed in simulation)
@@ -73,5 +77,17 @@ always @(posedge adc_dco_p or negedge reset_n) begin
         adc_overrange_400m_reg <= adc_or_p;
 end
 assign adc_overrange_400m = adc_overrange_400m_reg;
+
+// Audit F-7.4: mock the real MMCM lock indicator. The synthesizable
+// path takes ~4096 DCO cycles to lock; here we just track reset_n so
+// callers see "locked" within one DCO edge of reset deassert.
+reg mmcm_locked_stub;
+always @(posedge adc_dco_p or negedge reset_n) begin
+    if (!reset_n)
+        mmcm_locked_stub <= 1'b0;
+    else
+        mmcm_locked_stub <= 1'b1;
+end
+assign mmcm_locked = mmcm_locked_stub;
 
 endmodule

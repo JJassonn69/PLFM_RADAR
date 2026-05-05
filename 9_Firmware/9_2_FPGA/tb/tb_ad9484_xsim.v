@@ -38,6 +38,17 @@ module tb_ad9484_xsim;
     wire [7:0] adc_data_400m;
     wire       adc_data_valid_400m;
     wire       adc_dco_bufg;
+    // Audit F-7.4: mmcm_locked exposed by ad9484_interface_400m so the TB
+    // can wait deterministically for the MMCM SIM model to lock (~4096
+    // DCO cycles) instead of guessing at a fixed 5-cycle delay.
+    wire       mmcm_locked;
+
+    // Audit F-7.4: AD9484 OR (overrange) pair — TB doesn't drive overrange,
+    // so tie complementary pair to a quiescent low/high so IBUFDS sees
+    // valid differential input.
+    reg        adc_or_p = 1'b0;
+    wire       adc_or_n = ~adc_or_p;
+    wire       adc_overrange_400m;
 
     // Differential complements
     assign adc_d_n   = ~adc_d_p;
@@ -59,12 +70,28 @@ module tb_ad9484_xsim;
         .adc_d_n           (adc_d_n),
         .adc_dco_p         (adc_dco_p),
         .adc_dco_n         (adc_dco_n),
+        .adc_or_p          (adc_or_p),
+        .adc_or_n          (adc_or_n),
         .sys_clk           (sys_clk),
         .reset_n           (reset_n),
         .adc_data_400m     (adc_data_400m),
         .adc_data_valid_400m(adc_data_valid_400m),
-        .adc_dco_bufg      (adc_dco_bufg)
+        .adc_dco_bufg      (adc_dco_bufg),
+        .adc_overrange_400m(adc_overrange_400m),
+        .mmcm_locked       (mmcm_locked)
     );
+
+    // ── F-7.4: gate post-reset waiting on the MMCM lock indicator ──
+    // The MMCM SIMULATION model takes 4096 DCO cycles (~10 µs at 400 MHz)
+    // to assert mmcm_locked. The interface's reset synchronizer then
+    // requires 2 more cycles for the 2-FF lock sync, plus 2 cycles for the
+    // 2-FF reset sync. Allow a couple more for the data pipeline to fill.
+    task wait_for_adc_ready;
+        begin
+            wait (mmcm_locked === 1'b1);
+            repeat (6) @(posedge adc_dco_p);
+        end
+    endtask
 
     // ── Check task ─────────────────────────────────────────────
     task check;
@@ -134,40 +161,18 @@ module tb_ad9484_xsim;
         #(DCO_PERIOD * 0.3);  // mid-cycle
         reset_n = 1;
 
-        // valid should NOT assert immediately (needs 2 sync stages)
+        // F-7.4: valid stays 0 while the MMCM is locking. Verifying it
+        // immediately after deassert covers the 2-FF reset-sync window
+        // and is also vacuously true throughout the MMCM lock phase.
         @(posedge adc_dco_p); #0.1;
-        // After 1 dco cycle: reset_sync_400m[0] = 1, [1] still = 0
-        // So reset_n_400m should still be 0
         check(adc_data_valid_400m === 1'b0,
               "valid stays 0 for 1 cycle after reset de-assert (sync stage 1)");
 
-        @(posedge adc_dco_p); #0.1;
-        // After 2 dco cycles: reset_sync_400m = 2'b11, reset_n_400m = 1
-        // But the data pipeline has its own 1-cycle delay
-        // So valid might assert this cycle or next
-
-        // Wait one more cycle for pipeline
-        @(posedge adc_dco_p); #0.1;
-
-        // By now (3 dco cycles after reset de-assert), valid should be 1
-        // Allow one more for IDDR pipeline
-        begin : wait_valid
-            reg saw_valid;
-            saw_valid = 0;
-            for (i = 0; i < 5; i = i + 1) begin
-                @(posedge adc_dco_p); #0.1;
-                if (adc_data_valid_400m) begin
-                    saw_valid = 1;
-                    $display("  valid asserted %0d dco cycles after reset de-assert", i + 4);
-                    disable wait_valid;
-                end
-            end
-            if (!saw_valid) begin
-                $display("  [WARN] valid did not assert within 8 dco cycles");
-            end
-        end
+        // Wait for the MMCM SIM model to lock and the 2-FF reset-sync
+        // pipeline to drain, then confirm the data pipeline starts producing.
+        wait_for_adc_ready();
         check(adc_data_valid_400m === 1'b1,
-              "valid asserts after reset sync pipeline completes");
+              "valid asserts after MMCM lock + reset sync pipeline completes");
 
         // ════════════════════════════════════════════════════════
         // TEST GROUP 4: Data capture via IDDR
@@ -179,8 +184,9 @@ module tb_ad9484_xsim;
         adc_d_p = 8'h00;
         #100;
         reset_n = 1;
-        // Wait for reset sync pipeline
-        repeat (5) @(posedge adc_dco_p);
+        // F-7.4: every reset cycle re-arms the MMCM lock countdown, so
+        // wait for lock + sync drain before driving the test pattern.
+        wait_for_adc_ready();
 
         // Feed a known pattern on rising edges
         // IDDR in SAME_EDGE_PIPELINED mode captures:
@@ -232,7 +238,7 @@ module tb_ad9484_xsim;
         reset_n = 0;
         #100;
         reset_n = 1;
-        repeat (5) @(posedge adc_dco_p);
+        wait_for_adc_ready();   // F-7.4: wait for MMCM lock + sync drain
 
         // Feed incrementing pattern: 0, 1, 2, ... on each half-cycle
         begin : seq_test
@@ -280,15 +286,15 @@ module tb_ad9484_xsim;
         // De-assert and verify sync pipeline
         #30;
         reset_n = 1;
-        // Should NOT be valid yet (2-stage sync)
+        // Should NOT be valid yet (2-stage sync + MMCM lock countdown)
         @(posedge adc_dco_p); #0.1;
         check(adc_data_valid_400m === 1'b0,
               "valid stays 0 during reset sync de-assertion");
 
-        // Wait for full pipeline
-        repeat (5) @(posedge adc_dco_p); #0.1;
+        // F-7.4: wait for MMCM lock + sync drain, then confirm reassert.
+        wait_for_adc_ready();
         check(adc_data_valid_400m === 1'b1,
-              "valid reasserts after sync pipeline completes");
+              "valid reasserts after MMCM lock + sync pipeline completes");
 
         // ════════════════════════════════════════════════════════
         // TEST GROUP 7: ADC power-down output
@@ -317,7 +323,7 @@ module tb_ad9484_xsim;
         adc_d_p = 8'h00;
         #100;
         reset_n = 1;
-        repeat (8) @(posedge adc_dco_p);
+        wait_for_adc_ready();   // F-7.4: wait for MMCM lock + sync drain
 
         begin : sdr_ramp
             reg [7:0] ramp_value;

@@ -301,6 +301,9 @@ wire adc_valid;            // Data valid signal
 assign adc_pwdn = host_adc_pwdn;
 
 wire adc_overrange_400m;
+// Audit F-7.4: mmcm_locked exposed as a port for sim-side gating; not
+// surfaced to the host status pipeline yet (deferred for a future status
+// widening). Leave unconnected here.
 ad9484_interface_400m adc (
 	.adc_d_p(adc_d_p),
 	.adc_d_n(adc_d_n),
@@ -313,7 +316,8 @@ ad9484_interface_400m adc (
 	.adc_data_400m(adc_data_cmos),
 	.adc_data_valid_400m(adc_valid),
 	.adc_dco_bufg(clk_400m),
-	.adc_overrange_400m(adc_overrange_400m)
+	.adc_overrange_400m(adc_overrange_400m),
+	.mmcm_locked()
 );
 
 // Audit F-0.1: stickify the 400 MHz OR pulse, then CDC to clk_100m via 2FF.
