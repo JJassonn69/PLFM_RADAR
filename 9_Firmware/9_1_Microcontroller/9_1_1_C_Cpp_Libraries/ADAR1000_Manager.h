@@ -28,7 +28,6 @@ public:
     // Device Control
     bool setAllDevicesTXMode();
     bool setAllDevicesRXMode();
-    void setADTR1107Mode(BeamDirection direction);
 
     // Monitoring and Diagnostics
     float readTemperature(uint8_t deviceIndex);
@@ -104,7 +103,10 @@ public:
     uint8_t adarAdcRead(uint8_t deviceIndex, uint8_t broadcast);
 
 private:
-
+    // setADTR1107Mode is the wrapper-internal mode switch. Public callers must
+    // go through setAllDevicesTXMode() / setAllDevicesRXMode() so the per-channel
+    // ADAR1000 RX/TX enables stay in sync with the ADTR1107 bias state.
+    void setADTR1107Mode(BeamDirection direction);
 };
 
 // Register Definitions
