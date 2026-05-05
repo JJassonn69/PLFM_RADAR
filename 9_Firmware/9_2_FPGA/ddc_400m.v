@@ -270,8 +270,18 @@ end
 
 wire signed [MIXER_WIDTH-1:0] adc_signed_offbin;
 wire signed [MIXER_WIDTH-1:0] adc_signed_twoc;
-assign adc_signed_offbin = {1'b0, adc_data, {(MIXER_WIDTH-ADC_WIDTH-1){1'b0}}} -
-                           {1'b0, {ADC_WIDTH{1'b1}}, {(MIXER_WIDTH-ADC_WIDTH-1){1'b0}}} / 2;
+// Audit F-7.6: AD9484 offset-binary → signed two's-complement is just an
+// MSB flip. Place the converted 8-bit signed value into the top of the
+// MIXER_WIDTH-bit field with one leading sign-extension copy and the
+// usual 9-zero LSB pad — exactly mirrors the twoc branch below. The
+// previous formula `(adc<<9) - (8'hFF<<8)` used `0xFF/2 = 0x7F` (integer
+// divide drops 0.5 LSB), which produced +256 at mid-scale code 0x80
+// instead of 0 and made the offbin and twoc paths disagree on the same
+// analog input. Functionally invisible in production (120 MHz IF mix +
+// LPF rejects the 0.5-LSB DC tone) but mathematically wrong.
+assign adc_signed_offbin = {~adc_data[ADC_WIDTH-1], ~adc_data[ADC_WIDTH-1],
+                            adc_data[ADC_WIDTH-2:0],
+                            {(MIXER_WIDTH-ADC_WIDTH-1){1'b0}}};
 assign adc_signed_twoc   = {adc_data[ADC_WIDTH-1], adc_data, {(MIXER_WIDTH-ADC_WIDTH-1){1'b0}}};
 
 // Combinational ADC sign conversion (no register — DSP48E1 AREG handles it)
