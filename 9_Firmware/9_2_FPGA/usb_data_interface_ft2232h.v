@@ -1056,17 +1056,19 @@ always @(posedge ft_clk or negedge ft_effective_reset_n) begin
                         ft_data_oe <= 1'b1;
                         ft_wr_n    <= 1'b0;
 
-                        // BRAM read has 1-cycle latency. We pre-loaded range_rd_addr.
-                        // On phase 0: output MSB of range_rd_data (read on prev cycle)
-                        // On phase 1: output LSB, advance to next address
+                        // PR-AA: addr advance lives at end of phase 0 (MSB emit), not
+                        // phase 1 (LSB emit). With BRAM 1-cycle read latency, a 2-byte
+                        // pair needs 2 cycles between addr-set and the next pair's MSB
+                        // read; advancing at phase 1 (1 cycle gap) leaves the next MSB
+                        // reading the prior cell's high byte. See WR_DOPPLER_DATA below.
                         if (!wr_byte_phase) begin
                             ft_data_out   <= range_rd_data[15:8];
                             wr_byte_phase <= 1'b1;
+                            range_rd_idx  <= range_rd_idx + {{(RANGE_BIN_BITS-1){1'b0}}, 1'b1};
+                            range_rd_addr <= range_rd_idx + {{(RANGE_BIN_BITS-1){1'b0}}, 1'b1};
                         end else begin
                             ft_data_out   <= range_rd_data[7:0];
                             wr_byte_phase <= 1'b0;
-                            range_rd_idx  <= range_rd_idx + {{(RANGE_BIN_BITS-1){1'b0}}, 1'b1};
-                            range_rd_addr <= range_rd_idx + {{(RANGE_BIN_BITS-1){1'b0}}, 1'b1};
                         end
 
                         wr_byte_idx <= wr_byte_idx + 16'd1;
@@ -1102,14 +1104,20 @@ always @(posedge ft_clk or negedge ft_effective_reset_n) begin
                         ft_data_oe <= 1'b1;
                         ft_wr_n    <= 1'b0;
 
+                        // PR-AA fix: BRAM read has 1-cycle latency. A 2-byte pair
+                        // emits MSB then LSB from the SAME cell, so addr must advance
+                        // at end of phase 0 (MSB) — that gives BRAM 2 cycles before
+                        // the next pair's MSB needs the new cell:
+                        //   cycle K   (phase 0): data=bram[addr_{K-1}]=bram[N], emit H(N), advance addr<=N+1
+                        //   cycle K+1 (phase 1): data=bram[addr_K]=bram[N], emit L(N)
+                        //   cycle K+2 (phase 0): data=bram[addr_{K+1}]=bram[N+1], emit H(N+1)
+                        // Previous (broken) pattern advanced at phase 1, so phase 0 of
+                        // the next pair re-read bram[N] and emitted H(N) again, leaving
+                        // the wire pair-K = (HIGH(bram[K-1]), LOW(bram[K])).
                         if (!wr_byte_phase) begin
                             ft_data_out   <= mag_rd_data[15:8];
                             wr_byte_phase <= 1'b1;
-                        end else begin
-                            ft_data_out   <= mag_rd_data[7:0];
-                            wr_byte_phase <= 1'b0;
-                            // Pre-load mag_rd_addr 1 cell ahead (BRAM 1-cycle
-                            // read latency). Address layout: {range[8:0], doppler[5:0]}.
+                            // Address layout: {range[8:0], doppler[5:0]}.
                             if (dop_doppler_idx == DOP_BIN_LAST) begin
                                 dop_doppler_idx <= {DOPPLER_BIN_BITS{1'b0}};
                                 dop_range_idx   <= dop_range_idx + {{(RANGE_BIN_BITS-1){1'b0}}, 1'b1};
@@ -1120,6 +1128,9 @@ always @(posedge ft_clk or negedge ft_effective_reset_n) begin
                                 mag_rd_addr     <= {dop_range_idx,
                                                     dop_doppler_idx + {{(DOPPLER_BIN_BITS-1){1'b0}}, 1'b1}};
                             end
+                        end else begin
+                            ft_data_out   <= mag_rd_data[7:0];
+                            wr_byte_phase <= 1'b0;
                         end
 
                         wr_byte_idx <= wr_byte_idx + 16'd1;

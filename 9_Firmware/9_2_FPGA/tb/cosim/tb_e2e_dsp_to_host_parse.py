@@ -59,11 +59,11 @@ DOPPLER_OFFSET       = HEADER_BYTES                              # 9
 CFAR_OFFSET          = DOPPLER_OFFSET + DOPPLER_MAG_BYTES        # 49161
 FOOTER_OFFSET        = CFAR_OFFSET + CFAR_DENSE_BYTES            # 55305
 
-# Doppler_mag 1-cell shift is a separate but related production bug (see
-# `project_aeris10_usb_cfar_stale_bin_2026-05-05.md` — "Related cosmetic
-# finding"). Until PR-AA investigates, allow up to this many byte
-# differences in the doppler_mag section so the regression stays green.
-DOPPLER_MAG_BYTE_DIFF_TOLERANCE = 80
+# PR-AA fix: doppler_mag is now bit-exact against the Python golden — the
+# WR_DOPPLER_DATA emit FSM advances mag_rd_addr at end of phase 0 (MSB) so
+# BRAM has 2 cycles between addr-set and the next pair's MSB read. Strict
+# zero-byte tolerance from here; any drift is a real regression.
+DOPPLER_MAG_BYTE_DIFF_TOLERANCE = 0
 
 
 # ============================================================================
@@ -156,7 +156,7 @@ def main() -> int:
 
     # ---- Per-section compare against expected_frame.bin ----
     # E12.6 is split into 4 sub-checks so diffs are isolated:
-    #   .a header (strict) .b doppler_mag (tolerance — PR-AA pending)
+    #   .a header (strict) .b doppler_mag (strict, post-PR-AA)
     #   .c cfar_dense (strict)  .d footer (strict)
     if len(captured) == len(expected):
         # .a header
@@ -164,12 +164,10 @@ def main() -> int:
         state.check('E12.6.a: header bytes == expected (strict)',
                     hdr_diff == 0, f"{hdr_diff} differing bytes")
 
-        # .b doppler_mag — relaxed tolerance until PR-AA fix
+        # .b doppler_mag — strict bit-exact (PR-AA fix landed)
         dop_diffs = [i for i in range(DOPPLER_OFFSET, CFAR_OFFSET)
                      if captured[i] != expected[i]]
-        state.check('E12.6.b: doppler_mag bytes within '
-                    f'tol={DOPPLER_MAG_BYTE_DIFF_TOLERANCE} '
-                    '(PR-AA: 1-cell-shift bug)',
+        state.check('E12.6.b: doppler_mag bytes == expected (strict)',
                     len(dop_diffs) <= DOPPLER_MAG_BYTE_DIFF_TOLERANCE,
                     f"{len(dop_diffs)} differing bytes; "
                     f"first 5 at {dop_diffs[:5]}")
@@ -217,26 +215,18 @@ def main() -> int:
     state.check('E12.13: doppler_mag shape (512, 48)',
                 doppler_mag is not None and doppler_mag.shape == (NUM_RANGE_BINS, NUM_DOPPLER_BINS))
     if doppler_mag is not None:
-        # Diff distribution drives BOTH a cell-count and a max-diff bound.
-        # Until PR-AA investigates the doppler 1-cell-shift bug, allow up
-        # to ~50 cells to differ; once the shift is fixed, this should
-        # tighten back to "max diff <= 1 LSB".
+        # Strict bit-exact post-PR-AA. Any drift fails.
         diff = np.abs(doppler_mag.astype(np.int64) - expected_mag.astype(np.int64))
         max_diff = int(diff.max())
         n_diff = int((diff > 0).sum())
-        state.check('E12.14: doppler_mag cell-diff <= 50 cells '
-                    '(PR-AA: 1-cell-shift bug)',
-                    n_diff <= 50,
+        state.check('E12.14: doppler_mag bit-exact vs Python golden',
+                    n_diff == 0,
                     f"max_diff={max_diff} ({n_diff} of {diff.size} cells differ)")
 
-        # Specific target cells — magnitude > 0 (E9). The 1-cell shift can
-        # nudge the peak's exact bin, so check the 3-cell neighborhood
-        # instead of the single expected cell.
+        # Specific target cells — magnitude at exact expected (rb,db) bin.
         for (rb, db) in EXPECTED_TARGETS:
-            window = doppler_mag[rb, max(0, db-1):db+2]
-            peak = int(window.max())
-            state.check(f'E12.15.{rb}.{db}: peak in 3-bin doppler '
-                        f'window {tuple(range(max(0,db-1), db+2))} > 1000',
+            peak = int(doppler_mag[rb, db])
+            state.check(f'E12.15.{rb}.{db}: doppler_mag[{rb},{db}] > 1000',
                         peak > 1000, f"got {peak}")
 
     # ---- CFAR dense — E10 ----
