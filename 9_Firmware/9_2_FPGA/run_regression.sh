@@ -566,9 +566,13 @@ run_test "ADC PWDN opcode 0x32 (AUDIT-S25)" \
     tb/tb_adc_pwdn_opcode.vvp \
     tb/tb_adc_pwdn_opcode.v
 
-run_test "GPIO dig5/dig7 split (AUDIT-S10)" \
-    tb/tb_audit_s10_gpio_split.vvp \
-    tb/tb_audit_s10_gpio_split.v
+run_test "Status-word stickies CDC + DIG7 fault-OR (AUDIT-S10 + PR-AB.b Step 1)" \
+    tb/tb_status_words_stickies.vvp \
+    tb/tb_status_words_stickies.v
+
+run_test "DIG6 frame-pulse stretcher (PR-AB.b)" \
+    tb/tb_dig6_frame_pulse.vvp \
+    tb/tb_dig6_frame_pulse.v
 
 run_test "NUM_CELLS sizing 50T (AUDIT-C16)" \
     tb/tb_audit_c16_num_cells_50t.vvp \

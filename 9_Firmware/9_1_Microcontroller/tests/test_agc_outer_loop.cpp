@@ -50,7 +50,7 @@ static void test_defaults()
     assert(agc.min_gain == 0);
     assert(agc.max_gain == 127);
     assert(agc.holdoff_frames == 4);
-    assert(agc.enabled == false);  // disabled by default — FPGA DIG_6 is source of truth
+    assert(agc.enabled == false);  // class default; main.cpp flips this on under !MCU_AGC_FORCE_DISABLED
     assert(agc.holdoff_counter == 0);
     assert(agc.last_saturated == false);
     assert(agc.saturation_event_count == 0);

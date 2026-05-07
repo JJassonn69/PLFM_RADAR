@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView,
     QPlainTextEdit, QStatusBar, QMessageBox,
 )
-from PyQt6.QtCore import Qt, QLocale, QTimer, pyqtSignal, pyqtSlot, QObject
+from PyQt6.QtCore import Qt, QLocale, QTimer, QSettings, pyqtSignal, pyqtSlot, QObject
 from PyQt6.QtGui import QColor
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -208,6 +208,18 @@ class RadarDashboard(QMainWindow):
         # FPGA control parameter widgets
         self._param_spins: dict = {}  # opcode_hex -> QSpinBox
 
+        # PR-AB.b: BENCH-MODE persistent flag (advanced settings checkbox).
+        # OFF (default, production): AGC is ALWAYS-ON in MCU firmware; AGC
+        # Enable spinbox + Enable/Disable AGC buttons are hidden so an operator
+        # cannot send opcode 0x28 and confuse themselves about whether the MCU
+        # is honouring the register (it doesn't — see main.cpp #ifndef
+        # MCU_AGC_FORCE_DISABLED). A coloured "ALWAYS-ON" badge replaces them.
+        # ON: bench / debug build assumed, AGC controls are exposed; the user
+        # is expected to know the MCU is compiled with MCU_AGC_FORCE_DISABLED
+        # and that opcode 0x28 only sets the FPGA register (display-only).
+        self._qsettings = QSettings("AERIS-10", "RadarDashboardV7")
+        self._bench_mode: bool = bool(self._qsettings.value("bench_mode", False, type=bool))
+
         # AGC visualization history (ring buffers)
         self._agc_history_len = 256
         self._agc_gain_history: deque[int] = deque(maxlen=self._agc_history_len)
@@ -374,6 +386,11 @@ class RadarDashboard(QMainWindow):
         self._create_agc_monitor_tab()
         self._create_diagnostics_tab()
         self._create_settings_tab()
+
+        # PR-AB.b: apply persisted BENCH-MODE state to AGC widget visibility.
+        # Has to run AFTER _create_fpga_control_tab (creates the AGC widgets)
+        # AND _create_settings_tab (creates the checkbox).
+        self._apply_bench_mode_visibility()
 
     # -----------------------------------------------------------------
     # TAB 1: Main View
@@ -816,11 +833,48 @@ class RadarDashboard(QMainWindow):
         right_layout.addWidget(grp_cfar)
 
         # ── AGC (Automatic Gain Control) ──────────────────────────────
+        # PR-AB.b: The MCU's outer-loop AGC is ALWAYS-ON in production builds
+        # (compile-time policy, see main.cpp #ifndef MCU_AGC_FORCE_DISABLED).
+        # Bench/debug builds compile the AGC body out, and the runtime enable
+        # bit becomes meaningful only as an FPGA-side display register. We
+        # therefore hide the AGC Enable spinbox + Enable/Disable buttons in
+        # production (BENCH-MODE OFF) and show a "ALWAYS-ON" badge instead.
+        # Bench engineers tick the BENCH-MODE checkbox in Settings to expose
+        # the controls.
         grp_agc = QGroupBox("AGC (Auto Gain)")
         agc_layout = QVBoxLayout(grp_agc)
 
+        # Header row — exactly one of these is visible at a time:
+        #   production: ALWAYS-ON badge.
+        #   bench:      Enable/Disable AGC buttons (send opcode 0x28 with 0|1;
+        #               the bit's only valid values, so a spinbox would add
+        #               nothing but typo-risk).
+        # Tuning knobs sit below regardless, so the AGC group's "header"
+        # control is always at the top of the box.
+        self._agc_always_on_badge = QLabel(
+            "AGC: ALWAYS-ON (production policy — MCU runs every frame)"
+        )
+        self._agc_always_on_badge.setStyleSheet(
+            f"background-color: {DARK_SUCCESS}; color: white; "
+            "padding: 6px; font-weight: bold; border-radius: 3px;"
+        )
+        self._agc_always_on_badge.setWordWrap(True)
+        agc_layout.addWidget(self._agc_always_on_badge)
+
+        self._agc_toggle_container = QWidget()
+        agc_toggle_inner = QHBoxLayout(self._agc_toggle_container)
+        agc_toggle_inner.setContentsMargins(0, 0, 0, 0)
+        self._btn_agc_on = QPushButton("Enable AGC")
+        self._btn_agc_on.clicked.connect(lambda: self._send_fpga_cmd(0x28, 1))
+        agc_toggle_inner.addWidget(self._btn_agc_on)
+        self._btn_agc_off = QPushButton("Disable AGC")
+        self._btn_agc_off.clicked.connect(lambda: self._send_fpga_cmd(0x28, 0))
+        agc_toggle_inner.addWidget(self._btn_agc_off)
+        agc_layout.addWidget(self._agc_toggle_container)
+
+        # Tuning knobs — always visible. Target/attack/decay/holdoff drive the
+        # FPGA inner-loop register fields regardless of the MCU AGC build flag.
         agc_params = [
-            ("AGC Enable",  0x28,   0,  1, "0=manual, 1=auto"),
             ("AGC Target",  0x29, 200,  8, "0-255, peak target"),
             ("AGC Attack",  0x2A,   1,  4, "0-15, atten step"),
             ("AGC Decay",   0x2B,   1,  4, "0-15, gain-up step"),
@@ -828,16 +882,6 @@ class RadarDashboard(QMainWindow):
         ]
         for label, opcode, default, bits, hint in agc_params:
             self._add_fpga_param_row(agc_layout, label, opcode, default, bits, hint)
-
-        # AGC quick toggles
-        agc_row = QHBoxLayout()
-        btn_agc_on = QPushButton("Enable AGC")
-        btn_agc_on.clicked.connect(lambda: self._send_fpga_cmd(0x28, 1))
-        agc_row.addWidget(btn_agc_on)
-        btn_agc_off = QPushButton("Disable AGC")
-        btn_agc_off.clicked.connect(lambda: self._send_fpga_cmd(0x28, 0))
-        agc_row.addWidget(btn_agc_off)
-        agc_layout.addLayout(agc_row)
 
         # AGC status readback labels
         agc_st_group = QGroupBox("AGC Status")
@@ -927,23 +971,38 @@ class RadarDashboard(QMainWindow):
         row = QHBoxLayout()
 
         lbl = QLabel(label)
-        lbl.setMinimumWidth(140)
+        # PR-AB.b: setFixedWidth (not min) so labels line up across rows
+        # regardless of whether the row sits directly in the group's
+        # QVBoxLayout or inside an intermediate QWidget container (the AGC
+        # Enable row uses _agc_enable_container so it can be hidden in
+        # production — its inner layout reflows differently and the
+        # minimum-width hint was being ignored, leaving the spinbox start
+        # ~67 px to the left of its peers).
+        lbl.setFixedWidth(140)
         row.addWidget(lbl)
 
         max_val = (1 << bits) - 1
         spin = QSpinBox()
         spin.setRange(0, max_val)
         spin.setValue(default)
-        spin.setMinimumWidth(80)
+        # PR-AB.b: setFixedWidth (not min/max) — QHBoxLayout would otherwise
+        # squeeze the spinbox toward its minimum on rows where the hint is
+        # longer than its peers (the AGC Enable hint is ~3× longer than the
+        # others and was rendering at ~90 px while siblings hit ~160).
+        spin.setFixedWidth(120)
         row.addWidget(spin)
         self._param_spins[f"0x{opcode:02X}"] = spin
 
+        # PR-AB.b: hint is the only flex element in the row — explicit stretch=1
+        # so it absorbs leftover space instead of competing with the Set button.
+        # Without this, a long hint (e.g. AGC Enable's "0=manual, 1=auto …")
+        # would shrink the Set button below its 60 px cap on the same row.
         hint_lbl = QLabel(hint)
         hint_lbl.setStyleSheet(f"color: {DARK_INFO}; font-size: 10px;")
-        row.addWidget(hint_lbl)
+        row.addWidget(hint_lbl, 1)
 
         btn = QPushButton("Set")
-        btn.setMaximumWidth(60)
+        btn.setFixedWidth(60)
         # Capture opcode and spin by value
         btn.clicked.connect(lambda _, op=opcode, sp=spin, b=bits:
                             self._send_fpga_validated(op, sp.value(), b))
@@ -1244,6 +1303,41 @@ class RadarDashboard(QMainWindow):
         p_layout.addWidget(apply_proc_btn, row, 0, 1, 2)
 
         layout.addWidget(proc_group)
+
+        # ---- Bench / Diagnostics ------------------------------------------
+        # PR-AB.b: tucked-away toggle that only matters when the MCU is built
+        # with -DMCU_AGC_FORCE_DISABLED (bench / debug build). Production
+        # operators should leave this OFF — the AGC runs always-on at the
+        # firmware level and exposing the Enable/Disable buttons would let
+        # someone send opcode 0x28 without changing observable behaviour,
+        # which would just create confusion.
+        bench_group = QGroupBox("Bench / Diagnostics")
+        bench_layout = QVBoxLayout(bench_group)
+
+        self._bench_mode_check = QCheckBox(
+            "BENCH-MODE: expose AGC Enable controls (debug-build firmware only)"
+        )
+        self._bench_mode_check.setChecked(self._bench_mode)
+        self._bench_mode_check.setToolTip(
+            "OFF (default): production firmware runs AGC every frame. "
+            "AGC Enable buttons are hidden so opcode 0x28 cannot be sent.\n"
+            "ON: bench / debug firmware (built with -DMCU_AGC_FORCE_DISABLED) "
+            "is assumed. AGC Enable buttons become visible — they only set "
+            "the FPGA-side display register, the MCU does not honour them."
+        )
+        self._bench_mode_check.toggled.connect(self._on_bench_mode_toggled)
+        bench_layout.addWidget(self._bench_mode_check)
+
+        bench_note = QLabel(
+            "<i>Future: this checkbox will go away once the MCU broadcasts "
+            "a one-shot USB-CDC boot announce identifying production vs "
+            "bench firmware build.</i>"
+        )
+        bench_note.setStyleSheet(f"color: {DARK_INFO}; font-size: 10px;")
+        bench_note.setWordWrap(True)
+        bench_layout.addWidget(bench_note)
+
+        layout.addWidget(bench_group)
 
         # ---- About group ---------------------------------------------------
         about_group = QGroupBox("About")
@@ -1868,13 +1962,10 @@ class RadarDashboard(QMainWindow):
             self._st_labels["t4"].setText(
                 f"T4 ADC:  {'PASS' if flags & 0x10 else 'FAIL'}")
 
-        # AGC status readback
+        # AGC status readback. The 'enable' line is owned by
+        # _refresh_agc_mode_labels so production stays honest with the badge.
         if hasattr(self, '_agc_labels'):
-            agc_str = "AUTO" if st.agc_enable else "MANUAL"
-            agc_color = DARK_SUCCESS if st.agc_enable else DARK_INFO
-            self._agc_labels["enable"].setStyleSheet(
-                f"color: {agc_color}; font-weight: bold;")
-            self._agc_labels["enable"].setText(f"AGC: {agc_str}")
+            self._refresh_agc_mode_labels(st)
             self._agc_labels["gain"].setText(
                 f"Gain: {st.agc_current_gain}")
             self._agc_labels["peak"].setText(
@@ -1903,12 +1994,9 @@ class RadarDashboard(QMainWindow):
         self._agc_peak_history.append(st.agc_peak_magnitude)
         self._agc_sat_history.append(st.agc_saturation_count)
 
-        # Update indicator labels (cheap Qt calls)
-        agc_str = "AUTO" if st.agc_enable else "MANUAL"
-        agc_color = DARK_SUCCESS if st.agc_enable else DARK_INFO
-        self._agc_mode_lbl.setStyleSheet(
-            f"color: {agc_color}; font-size: 16px; font-weight: bold;")
-        self._agc_mode_lbl.setText(f"AGC: {agc_str}")
+        # The mode label honours bench-mode in production — same shared helper
+        # the FPGA Control tab uses, so the two views can never disagree.
+        self._refresh_agc_mode_labels(st)
         self._agc_gain_lbl.setText(f"Gain: {st.agc_current_gain}")
         self._agc_peak_lbl.setText(f"Peak: {st.agc_peak_magnitude}")
 
@@ -2000,6 +2088,51 @@ class RadarDashboard(QMainWindow):
             QMessageBox.critical(self, "Error",
                                  f"Failed to apply DSP settings: {e}")
             logger.error(f"DSP config error: {e}")
+
+    def _on_bench_mode_toggled(self, checked: bool):
+        """Persist BENCH-MODE flag and refresh AGC widget visibility."""
+        self._bench_mode = bool(checked)
+        self._qsettings.setValue("bench_mode", self._bench_mode)
+        self._apply_bench_mode_visibility()
+        logger.info(f"BENCH-MODE {'ON' if self._bench_mode else 'OFF'}")
+
+    def _apply_bench_mode_visibility(self):
+        """Show or hide AGC Enable controls based on self._bench_mode and
+        re-sync the AGC mode labels so they don't contradict the badge."""
+        production = not self._bench_mode
+        self._agc_always_on_badge.setVisible(production)
+        self._agc_toggle_container.setVisible(self._bench_mode)
+        # Push current bench-mode state through the AGC mode labels — uses
+        # the last StatusResponse if any, otherwise the static defaults.
+        self._refresh_agc_mode_labels(self._last_status)
+
+    def _refresh_agc_mode_labels(self, st: "StatusResponse | None"):
+        """Update the AGC enable text on both the FPGA Control Status box
+        (self._agc_labels['enable']) and the AGC Monitor strip
+        (self._agc_mode_lbl). In production the firmware ignores the FPGA
+        register and runs AGC every frame, so both labels show 'ALWAYS-ON'
+        in green — keeps them honest with the production badge. In bench
+        the labels follow the StatusResponse register, falling back to '--'
+        before the first status arrives."""
+        if self._bench_mode:
+            if st is None:
+                text, color = "AGC: --", DARK_INFO
+            elif st.agc_enable:
+                text, color = "AGC: AUTO", DARK_SUCCESS
+            else:
+                text, color = "AGC: MANUAL", DARK_INFO
+        else:
+            text, color = "AGC: ALWAYS-ON", DARK_SUCCESS
+
+        if hasattr(self, "_agc_labels") and "enable" in self._agc_labels:
+            self._agc_labels["enable"].setStyleSheet(
+                f"color: {color}; font-weight: bold;")
+            self._agc_labels["enable"].setText(text)
+
+        if hasattr(self, "_agc_mode_lbl"):
+            self._agc_mode_lbl.setStyleSheet(
+                f"color: {color}; font-size: 16px; font-weight: bold;")
+            self._agc_mode_lbl.setText(text)
 
     # =====================================================================
     # Periodic GUI refresh (100 ms timer)

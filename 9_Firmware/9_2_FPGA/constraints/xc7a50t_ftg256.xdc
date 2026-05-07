@@ -219,8 +219,8 @@ set_property IOSTANDARD LVCMOS18 [get_ports {stm32_*_1v8}]
 # ============================================================================
 # STM32 CONTROL INTERFACE (DIG bus, Bank 15, VCCO=3.3V)
 # ============================================================================
-# DIG_0..DIG_4 are STM32 outputs (PD8-PD12) → FPGA inputs
-# DIG_5..DIG_7 are STM32 inputs (PD13-PD15) ← FPGA outputs (unused in RTL)
+# DIG_0..DIG_4 are STM32 outputs (PD8-PD12) → FPGA inputs (control)
+# DIG_5..DIG_7 are STM32 inputs (PD13-PD15) ← FPGA outputs (status / sync)
 
 set_property PACKAGE_PIN F13 [get_ports {stm32_new_chirp}]       ;# DIG_0 (PD8)
 set_property PACKAGE_PIN E16 [get_ports {stm32_new_elevation}]   ;# DIG_1 (PD9)
@@ -230,10 +230,13 @@ set_property IOSTANDARD LVCMOS33 [get_ports {stm32_new_*}]
 set_property IOSTANDARD LVCMOS33 [get_ports {stm32_mixers_enable}]
 # reset_n is DIG_4 (PD12) — constrained above in the RESET section
 
-# DIG_5 = H11, DIG_6 = G12, DIG_7 = H12 — FPGA→STM32 status outputs
-# DIG_5: AGC saturation flag (PD13 on STM32)
-# DIG_6: AGC enable flag (PD14) — mirrors FPGA host_agc_enable to STM32
-# DIG_7: reserved (PD15)
+# DIG_5 = H11, DIG_6 = G12, DIG_7 = H12 — FPGA→STM32 status / sync outputs
+# DIG_5 (PD13): signal-chain saturation flag — drives MCU outer-loop AGC.
+# DIG_6 (PD14): stretched chirp_scheduler frame_pulse (~100 ns) — PR-AB.b
+#               STM32 EXTI rising edge for drift-free dwell sync.
+# DIG_7 (PD15): control-chain fault OR — F-6.4 range_decim_watchdog
+#               | F-1.2 CIC→FIR CDC overrun. MCU PD15 stuck-high sampler
+#               triggers attemptErrorRecovery(ERROR_FPGA_DSP_STALL).
 set_property PACKAGE_PIN H11 [get_ports {gpio_dig5}]
 set_property PACKAGE_PIN G12 [get_ports {gpio_dig6}]
 set_property PACKAGE_PIN H12 [get_ports {gpio_dig7}]

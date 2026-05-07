@@ -142,13 +142,25 @@ void Error_Handler(void);
 #define EN_DIS_COOLING_Pin GPIO_PIN_7
 #define EN_DIS_COOLING_GPIO_Port GPIOD
 
-/* FPGA digital I/O (directly connected GPIOs) */
+/* FPGA digital I/O (directly connected GPIOs)
+ *   DIG_5 (PD13): signal-saturation flag — input, polled by AGC outer loop
+ *                 (gated by !MCU_AGC_FORCE_DISABLED).
+ *   DIG_6 (PD14): chirp_scheduler frame_pulse, ~100 ns FPGA-stretched —
+ *                 EXTI rising + pulldown; ISR increments g_frame_pulse_count
+ *                 (PR-AB.b drift-free dwell sync).
+ *   DIG_7 (PD15): control-fault OR (range_decim_watchdog | CIC→FIR overrun) —
+ *                 polled by checkSystemHealth stuck-high sampler. */
 #define FPGA_DIG5_SAT_Pin       GPIO_PIN_13
 #define FPGA_DIG5_SAT_GPIO_Port GPIOD
 #define FPGA_DIG6_Pin           GPIO_PIN_14
 #define FPGA_DIG6_GPIO_Port     GPIOD
 #define FPGA_DIG7_Pin           GPIO_PIN_15
 #define FPGA_DIG7_GPIO_Port     GPIOD
+
+/* PR-AB.b: alias names that match the post-Phase-3 role of DIG_6. */
+#define FPGA_FRAME_PULSE_Pin       FPGA_DIG6_Pin
+#define FPGA_FRAME_PULSE_GPIO_Port FPGA_DIG6_GPIO_Port
+#define FPGA_FRAME_PULSE_EXTI_IRQn EXTI15_10_IRQn
 
 #define ADF4382_RX_CE_Pin GPIO_PIN_9
 #define ADF4382_RX_CE_GPIO_Port GPIOG

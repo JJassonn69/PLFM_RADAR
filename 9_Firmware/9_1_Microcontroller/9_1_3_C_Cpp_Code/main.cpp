@@ -300,6 +300,25 @@ void systemPowerUpSequence();
 void systemPowerDownSequence();
 void initializeBeamMatrices();
 void runRadarPulseSequence();
+
+/* PR-AB.b: FPGA chirp_scheduler frame_pulse (DIG_6 / PD14, ~100 ns stretched)
+ * is wired to EXTI15_10. Each rising edge bumps g_frame_pulse_count from the
+ * ISR; the dwell loop in runRadarPulseSequence waits for the counter to
+ * advance instead of HAL_Delay-padding, so per-pattern dwell tracks the
+ * actual mask-aware ladder length (drift-free, mask-aware). The ladder is
+ * ~8 ms; we use a 20 ms timeout so a missed pulse cannot stall the loop. */
+static volatile uint32_t g_frame_pulse_count = 0;
+
+static inline void waitForFramePulse(uint32_t timeout_ms)
+{
+    uint32_t prev = g_frame_pulse_count;
+    uint32_t t0   = HAL_GetTick();
+    while (g_frame_pulse_count == prev) {
+        if ((HAL_GetTick() - t0) >= timeout_ms) {
+            return;  // timeout — caller continues; missed-pulse degrades to wall-clock cadence
+        }
+    }
+}
 /* F-2.1: executeChirpSequence() removed. The MCU is no longer in the chirp
  * dispatch path -- production runs FPGA mode 2'b01 (auto-scan) where
  * chirp_scheduler.v owns chirp timing and adar_tr_x. See runRadarPulseSequence
@@ -375,6 +394,17 @@ extern "C" {
         // Prepare for next reception
         USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &usb_rx_buffer[0]);
         USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+    }
+
+    // PR-AB.b: EXTI callback for FPGA frame_pulse on PD14 (DIG_6).
+    // EXTI15_10_IRQHandler in stm32f7xx_it.c calls HAL_GPIO_EXTI_IRQHandler,
+    // which dispatches here. Bumping g_frame_pulse_count releases the dwell
+    // loop's waitForFramePulse spin. PD15 (DIG_7 fault flag) stays polled
+    // by checkSystemHealth — no EXTI on that line.
+    void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+        if (GPIO_Pin == FPGA_FRAME_PULSE_Pin) {
+            g_frame_pulse_count++;
+        }
     }
 }
 
@@ -577,25 +607,26 @@ void runRadarPulseSequence() {
      * reference; if multiple per-pos broadside frames are ever needed
      * they should re-enter behind a runtime switch.
      *
-     * Per-pattern dwell:
+     * Per-pattern dwell tracks the actual chirp_scheduler ladder length
+     * (drift-free, mask-aware) by waiting on the FPGA frame_pulse on
+     * DIG_6 / PD14 — see waitForFramePulse + HAL_GPIO_EXTI_Callback above.
+     * Nominal ladder is:
      *   16 × PRI_SHORT  (175 us) +
      *   16 × PRI_MEDIUM (161 us) +
-     *   16 × PRI_LONG   (167 us) = 8048 us per ladder, rounded to 8 ms.
-     * HAL_Delay yields to SysTick / IRQs, so unlike the removed
-     * executeChirpSequence busy-loop the MCU stays responsive to USB CDC,
-     * UART, and I2C peripherals during the dwell. For drift-immune sync
-     * we'd wait on an FPGA `subframe_pulse` GPIO instead — DIG_7
-     * (H12→PD15) is wired in the schematic but currently driven by the
-     * F-6.4 watchdog OR; reassigning it is a tracked follow-up
-     * (PR-AB.b). */
-    static const uint32_t BEAM_PATTERN_DWELL_MS = 8u;
+     *   16 × PRI_LONG   (167 us) = 8048 us
+     * but with subframe_enable masking a single PRI it can drop to ~2.7 ms,
+     * which a fixed HAL_Delay(8) used to over-pad. The 20 ms timeout below
+     * is a safety floor — if a frame_pulse ever goes missing (FPGA reset,
+     * PD14 disconnected) the loop degrades to wall-clock cadence rather
+     * than hanging. */
+    static const uint32_t FRAME_PULSE_TIMEOUT_MS = 20u;
 
     // One broadside (vector_0) reference frame per azimuth — replaces the
     // 15 in-loop fires that PR-AB.a removed.
     DIAG("SYS", "Broadside reference (vector_0) — 1× per azimuth");
     adarManager.setCustomBeamPattern16(vector_0, ADAR1000Manager::BeamDirection::TX);
     adarManager.setCustomBeamPattern16(vector_0, ADAR1000Manager::BeamDirection::RX);
-    HAL_Delay(BEAM_PATTERN_DWELL_MS);
+    waitForFramePulse(FRAME_PULSE_TIMEOUT_MS);
     m += m_max/2;
 
     for(int beam_pos = 0; beam_pos < 15; beam_pos++) {
@@ -604,13 +635,13 @@ void runRadarPulseSequence() {
         // Pattern 1: matrix1 (negative-θ scan, peak at -62°..-3°)
         adarManager.setCustomBeamPattern16(matrix1[beam_pos], ADAR1000Manager::BeamDirection::TX);
         adarManager.setCustomBeamPattern16(matrix1[beam_pos], ADAR1000Manager::BeamDirection::RX);
-        HAL_Delay(BEAM_PATTERN_DWELL_MS);
+        waitForFramePulse(FRAME_PULSE_TIMEOUT_MS);
         m += m_max/2;
 
         // Pattern 2: matrix2 (positive-θ scan, peak at +3°..+62°)
         adarManager.setCustomBeamPattern16(matrix2[beam_pos], ADAR1000Manager::BeamDirection::TX);
         adarManager.setCustomBeamPattern16(matrix2[beam_pos], ADAR1000Manager::BeamDirection::RX);
-        HAL_Delay(BEAM_PATTERN_DWELL_MS);
+        waitForFramePulse(FRAME_PULSE_TIMEOUT_MS);
         m += m_max/2;
 
         // Reset chirp counter if needed
@@ -1718,6 +1749,17 @@ int main(void)
   DIAG("SYS", "DWT cycle counter initialized, TIM1 started");
   DIAG("SYS", "HAL tick at init start: %lu ms", (unsigned long)HAL_GetTick());
 
+  /* PR-AB.b: production AGC policy is ALWAYS-ON. Bench builds compile this
+   * out via -DMCU_AGC_FORCE_DISABLED so engineers can drive the ADAR VGA
+   * by hand. Default class state is enabled=false (see ADAR1000_AGC ctor),
+   * so we have to flip it here for the production polling loop to do work. */
+#ifndef MCU_AGC_FORCE_DISABLED
+  outerAgc.enabled = true;
+  DIAG("AGC", "Outer-loop AGC ALWAYS-ON (production policy)");
+#else
+  DIAG("AGC", "Outer-loop AGC compiled out (MCU_AGC_FORCE_DISABLED bench build)");
+#endif
+
   /* MCU-A4: skip the full 180 s OCXO warmup on warm restart. BKPSRAM
    * survives MCU-only resets (IWDG, SYSRESETREQ, brown-out) so the warmup
    * flag from the previous boot tells us the OCXO oven is still hot and
@@ -2582,30 +2624,23 @@ int main(void)
 
       runRadarPulseSequence();
 
-      /* [AGC] Outer-loop AGC: sync enable from FPGA via DIG_6 (PD14),
-       * then read saturation flag (DIG_5 / PD13) and adjust ADAR1000 VGA
-       * common gain once per radar frame (~258 ms).
-       * FPGA register host_agc_enable is the single source of truth —
-       * DIG_6 propagates it to MCU every frame.
-       * 2-frame confirmation debounce: only change outerAgc.enabled when
-       * two consecutive frames read the same DIG_6 value. Prevents a
-       * single-sample glitch from causing a spurious AGC state transition.
-       * Added latency: 1 extra frame (~258 ms), acceptable for control plane. */
+      /* [AGC] Outer-loop AGC: read saturation flag (DIG_5 / PD13) once per
+       * radar frame and adjust the ADAR1000 VGA common gain. PR-AB.b
+       * repurposed DIG_6 to carry the FPGA frame_pulse, so the runtime
+       * enable/debounce path is gone — production firmware runs AGC
+       * unconditionally (always-on policy). Bench builds compile this body
+       * out by defining MCU_AGC_FORCE_DISABLED, which lets engineers drive
+       * the ADAR VGA manually via adarManager / GUI gain widgets without
+       * the AGC fighting them. The host opcode-0x28 register stays plumbed
+       * for telemetry display; the MCU just no longer reads it. */
+#ifndef MCU_AGC_FORCE_DISABLED
       {
-          bool dig6_now = (HAL_GPIO_ReadPin(FPGA_DIG6_GPIO_Port,
-                                            FPGA_DIG6_Pin) == GPIO_PIN_SET);
-          static bool dig6_prev = false;  // matches boot default (AGC off)
-          if (dig6_now == dig6_prev) {
-              outerAgc.enabled = dig6_now;
-          }
-          dig6_prev = dig6_now;
-      }
-      if (outerAgc.enabled) {
           bool sat = HAL_GPIO_ReadPin(FPGA_DIG5_SAT_GPIO_Port,
                                       FPGA_DIG5_SAT_Pin) == GPIO_PIN_SET;
           outerAgc.update(sat);
           outerAgc.applyGain(adarManager);
       }
+#endif
 
       /* [GAP-3 FIX 2] Kick hardware watchdog — if we don't reach here within
        * ~4 s, the IWDG resets the MCU automatically. */
@@ -3143,11 +3178,29 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD13 PD14 PD15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15;
+  /*Configure GPIO pins : PD13 PD15 — polled inputs
+   *   PD13 (FPGA_DIG5_SAT): saturation flag for AGC outer loop
+   *   PD15 (FPGA_DIG7):     control-fault OR, polled by checkSystemHealth */
+  GPIO_InitStruct.Pin = GPIO_PIN_13|GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PD14 — PR-AB.b FPGA frame_pulse, EXTI rising edge.
+   * Pulldown so a disconnected FPGA can't ring the line and starve the dwell
+   * loop with phantom pulses (the FPGA-side stretcher drives 3.3V CMOS active
+   * high for ~100 ns). NVIC enable below routes EXTI15_10_IRQn to the
+   * handler in stm32f7xx_it.c. */
+  GPIO_InitStruct.Pin  = FPGA_FRAME_PULSE_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(FPGA_FRAME_PULSE_GPIO_Port, &GPIO_InitStruct);
+
+  /* Priority below USB_OTG_FS (0) and SysTick — frame_pulse ISR is short
+   * (one volatile increment) and a couple of ms of jitter is invisible to
+   * the dwell loop, so it doesn't need top priority. */
+  HAL_NVIC_SetPriority(FPGA_FRAME_PULSE_EXTI_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(FPGA_FRAME_PULSE_EXTI_IRQn);
 
   /*Configure GPIO pins : ADF4382_RX_LKDET_Pin ADF4382_TX_LKDET_Pin */
   GPIO_InitStruct.Pin = ADF4382_RX_LKDET_Pin|ADF4382_TX_LKDET_Pin;

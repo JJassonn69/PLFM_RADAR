@@ -135,8 +135,8 @@ module radar_system_top (
     // FPGA→STM32 GPIO outputs (DIG_5..DIG_7 on 50T board)
     // Used by STM32 outer AGC loop to read saturation state without USB polling.
     output wire gpio_dig5,          // DIG_5 (H11→PD13): AGC saturation flag (1=clipping detected)
-    output wire gpio_dig6,          // DIG_6 (G12→PD14): AGC enable flag (mirrors host_agc_enable)
-    output wire gpio_dig7           // DIG_7 (H12→PD15): reserved (tied low)
+    output wire gpio_dig6,          // DIG_6 (G12→PD14): stretched chirp_scheduler frame_pulse (~100 ns) for STM32 dwell sync
+    output wire gpio_dig7           // DIG_7 (H12→PD15): control-fault OR (F-6.4 watchdog | F-1.2 CDC overrun)
 );
 
 // ============================================================================
@@ -227,10 +227,29 @@ wire        rx_ddc_overflow_any;
 wire [2:0]  rx_ddc_saturation_count;
 // MTI saturation count (audit F-6.3). OR'd into gpio_dig5 for MCU visibility.
 wire [7:0]  rx_mti_saturation_count;
-// Range-bin decimator watchdog (audit F-6.4). High = decimator stalled.
+// Range-bin decimator watchdog (audit F-6.4). 1-cycle pulse from
+// range_bin_decimator (~10 ns @ 100 MHz). Drives gpio_dig7 directly so
+// the MCU can see the raw fault edge.
 wire        rx_range_decim_watchdog;
+// PR-AB.b Step 1: sticky latch over the watchdog pulse so a slow host
+// status poll never misses the event. The 100 MHz → ft_clk synchronizer
+// inside usb_data_interface_ft2232h cannot reliably capture a 10 ns
+// pulse, so we register the level here in the source (clk) domain and
+// feed the level — not the pulse — into status_words[5][5]. Cleared
+// only by reset_n: the FPGA exposes no host-driven clear opcode today.
+// See project_aeris10_clear_monitors_opcode_future.md for the bundled-PR
+// shape that would activate a host clear here and across the DDC + AD9484
+// overrange stickies in radar_receiver_final.v.
+reg         rx_range_decim_watchdog_sticky;
+always @(posedge clk_100m_buf or negedge sys_reset_n) begin
+    if (!sys_reset_n)
+        rx_range_decim_watchdog_sticky <= 1'b0;
+    else if (rx_range_decim_watchdog)
+        rx_range_decim_watchdog_sticky <= 1'b1;
+end
 // CIC→FIR CDC overrun sticky (audit F-1.2). High = at least one baseband
 // sample has been silently dropped between the 400 MHz CIC and 100 MHz FIR.
+// Already sticky in source (ddc_400m.v:697-702), no extra latch needed.
 wire        rx_ddc_cic_fir_overrun;
 
 // Data packing for USB
@@ -906,8 +925,11 @@ if (USB_MODE == 0) begin : gen_ft601
         .status_agc_enable(host_agc_enable),
 
         // AUDIT-S10: control-fault flags exposed in status_words[5][6:5]
-        // for host-side observability (paired with gpio_dig7 split)
-        .status_range_decim_watchdog(rx_range_decim_watchdog),
+        // for host-side observability (paired with gpio_dig7 split).
+        // PR-AB.b Step 1: feed the sticky version of the F-6.4 watchdog
+        // (level signal) so the ft_clk synchronizer cannot miss a 10 ns
+        // source-domain pulse. F-1.2 overrun is already sticky in source.
+        .status_range_decim_watchdog(rx_range_decim_watchdog_sticky),
         .status_ddc_cic_fir_overrun(rx_ddc_cic_fir_overrun)
     );
 
@@ -996,8 +1018,11 @@ end else begin : gen_ft2232h
         .status_agc_enable(host_agc_enable),
 
         // AUDIT-S10: control-fault flags exposed in status_words[5][6:5]
-        // for host-side observability (paired with gpio_dig7 split)
-        .status_range_decim_watchdog(rx_range_decim_watchdog),
+        // for host-side observability (paired with gpio_dig7 split).
+        // PR-AB.b Step 1: feed the sticky version of the F-6.4 watchdog
+        // (level signal) so the ft_clk synchronizer cannot miss a 10 ns
+        // source-domain pulse. F-1.2 overrun is already sticky in source.
+        .status_range_decim_watchdog(rx_range_decim_watchdog_sticky),
         .status_ddc_cic_fir_overrun(rx_ddc_cic_fir_overrun),
 
         // PR-G: 2-tier CFAR telemetry (status_words[6])
@@ -1238,7 +1263,7 @@ end
 assign system_status = status_reg;
 
 // ============================================================================
-// FPGA→STM32 GPIO OUTPUTS (DIG_5, DIG_6, DIG_7) — AUDIT-S10 SPLIT
+// FPGA→STM32 GPIO OUTPUTS (DIG_5, DIG_6, DIG_7) — AUDIT-S10 SPLIT + PR-AB.b
 // ============================================================================
 // AUDIT-S10: gpio_dig5 previously OR'd six unrelated flags (signal-saturation
 // AND control-faults), so the MCU outer-loop AGC could not distinguish
@@ -1251,19 +1276,49 @@ assign system_status = status_reg;
 // usb_data_interface[*_ft2232h].v so the host can graph each fault class
 // regardless of MCU consumption.
 //
+// PR-AB.b: gpio_dig6 is reassigned from a host_agc_enable mirror to the
+// chirp_scheduler frame_pulse, stretched to ~100 ns for clean STM32 EXTI
+// capture on PD14. The STM32 firmware swaps HAL_Delay(BEAM_PATTERN_DWELL_MS)
+// for an EXTI-driven semaphore acquire so per-pattern dwell tracks the
+// actual ladder length — drift-free, mask-aware (a 2-subframe 3 km variant
+// runs at the shorter cadence automatically because chirp_scheduler.frame_pulse
+// fires at the wrap of whatever subframes are enabled). Outer-loop AGC moves
+// to always-on in production firmware (saturation handling shouldn't be
+// optional); host_agc_enable register stays for status display + bench build
+// flag MCU_AGC_FORCE_DISABLED keeps a manual-gain path for ADAR1000
+// calibration / level checks / RX gain sweeps.
+//
 // DIG_5 (PD13): Signal-chain saturation — outer-loop AGC reduces RF gain.
 //               Asserts on AGC clipping, DDC mixer/filter overflow, or MTI
 //               2-pulse saturation (audit F-6.1/F-6.3).
-// DIG_6 (PD14): AGC enable mirror (host_agc_enable) — single source of truth.
+// DIG_6 (PD14): Stretched chirp_scheduler frame_pulse for STM32 dwell sync.
+//               1-cycle source pulse @ 100 MHz, stretched to 10 cycles
+//               (100 ns). Period tracks the enabled-subframe ladder
+//               (8.05 ms full 3-PRI, 5.38 ms SHORT+MEDIUM, 2.80 ms SHORT-only).
 // DIG_7 (PD15): Control-chain fault — MCU should log + consider FPGA reset.
 //               Asserts on range-decimator watchdog (audit F-6.4) or CIC→FIR
-//               CDC overrun (audit F-1.2). MCU consumption is a tracked
-//               follow-up; until then the host telemetry path covers it.
+//               CDC overrun (audit F-1.2). PD15 stuck-high sampler in MCU
+//               main loop fires attemptErrorRecovery(ERROR_FPGA_DSP_STALL).
 assign gpio_dig5 = (rx_agc_saturation_count != 8'd0)
                  | rx_ddc_overflow_any
                  | (rx_ddc_saturation_count != 3'd0)
                  | (rx_mti_saturation_count != 8'd0);
-assign gpio_dig6 = host_agc_enable;
+
+// PR-AB.b: 10-cycle stretcher on sched_frame_pulse. STM32 EXTI on PD14 needs
+// ≥2 APB clocks (~12 ns @ 168 MHz APB) to latch the rising edge; 100 ns gives
+// generous margin while staying well below the shortest dwell (2.80 ms =
+// SHORT-only) so back-to-back pulses never overlap.
+reg [3:0] frame_pulse_stretch_count;
+always @(posedge clk_100m_buf or negedge sys_reset_n) begin
+    if (!sys_reset_n)
+        frame_pulse_stretch_count <= 4'd0;
+    else if (sched_frame_pulse)
+        frame_pulse_stretch_count <= 4'd10;           // 10 cycles = 100 ns @ 100 MHz
+    else if (frame_pulse_stretch_count != 4'd0)
+        frame_pulse_stretch_count <= frame_pulse_stretch_count - 4'd1;
+end
+assign gpio_dig6 = (frame_pulse_stretch_count != 4'd0);
+
 assign gpio_dig7 = rx_range_decim_watchdog    // audit F-6.4
                  | rx_ddc_cic_fir_overrun;    // audit F-1.2
 

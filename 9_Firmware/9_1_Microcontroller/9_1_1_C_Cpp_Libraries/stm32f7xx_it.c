@@ -212,6 +212,25 @@ void OTG_FS_IRQHandler(void)
   /* USER CODE END OTG_FS_IRQn 1 */
 }
 
+/**
+  * @brief This function handles EXTI lines [15:10] interrupts.
+  *
+  * PR-AB.b: PD14 (FPGA frame_pulse / DIG_6) is the only EXTI source on lines
+  * 10-15. HAL_GPIO_EXTI_IRQHandler clears the pending bit and dispatches to
+  * HAL_GPIO_EXTI_Callback in main.cpp, which increments g_frame_pulse_count
+  * to release the runRadarPulseSequence dwell loop.
+  */
+void EXTI15_10_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI15_10_IRQn 0 */
+
+  /* USER CODE END EXTI15_10_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_14);
+  /* USER CODE BEGIN EXTI15_10_IRQn 1 */
+
+  /* USER CODE END EXTI15_10_IRQn 1 */
+}
+
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
