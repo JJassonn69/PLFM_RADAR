@@ -233,9 +233,9 @@ module tb_ddc_400m;
         // the wire is internal to the DUT.
         //
         // Expected pre-DSP values (MIXER_WIDTH=18, ADC_WIDTH=8):
-        //   format=00 (offset-binary), adc=0x80 -> +256       (mid-scale ≈ 0V)
-        //   format=00 (offset-binary), adc=0x00 -> -65280     (full negative)
-        //   format=00 (offset-binary), adc=0xFF -> +65280     (full positive)
+        //   format=00 (offset-binary), adc=0x80 -> 0          (mid-scale 0V)
+        //   format=00 (offset-binary), adc=0x00 -> -65536     (full negative)
+        //   format=00 (offset-binary), adc=0xFF -> +65024     (full positive)
         //   format=01 (2's-complement), adc=0x00 -> 0          (mid-scale 0V)
         //   format=01 (2's-complement), adc=0x80 -> -65536     (full negative)
         //   format=01 (2's-complement), adc=0x7F -> +65024     (full positive)
@@ -253,20 +253,20 @@ module tb_ddc_400m;
         repeat (5) @(posedge clk_400m);  // 2-FF sync settle
         adc_data = 8'h80;
         @(posedge clk_400m); #1;
-        check(uut.adc_signed_w === 18'sd256,
-              "format=00 adc=0x80 -> +256 (offset-binary mid-scale)");
+        check(uut.adc_signed_w === 18'sd0,
+              "format=00 adc=0x80 -> 0 (offset-binary mid-scale)");
 
         // Offset-binary full negative (adc=0x00)
         adc_data = 8'h00;
         @(posedge clk_400m); #1;
-        check(uut.adc_signed_w === -18'sd65280,
-              "format=00 adc=0x00 -> -65280 (offset-binary min)");
+        check(uut.adc_signed_w === -18'sd65536,
+              "format=00 adc=0x00 -> -65536 (offset-binary min)");
 
         // Offset-binary full positive (adc=0xFF)
         adc_data = 8'hFF;
         @(posedge clk_400m); #1;
-        check(uut.adc_signed_w === 18'sd65280,
-              "format=00 adc=0xFF -> +65280 (offset-binary max)");
+        check(uut.adc_signed_w === 18'sd65024,
+              "format=00 adc=0xFF -> +65024 (offset-binary max)");
 
         // Switch to 2's-complement and let the synchronizer settle
         adc_format = 2'b01;
@@ -295,7 +295,7 @@ module tb_ddc_400m;
         repeat (5) @(posedge clk_400m);
         adc_data = 8'h80;
         @(posedge clk_400m); #1;
-        check(uut.adc_signed_w === 18'sd256,
+        check(uut.adc_signed_w === 18'sd0,
               "format=10 (reserved) -> offset-binary fallback");
 
         // Restore default for any later tests
