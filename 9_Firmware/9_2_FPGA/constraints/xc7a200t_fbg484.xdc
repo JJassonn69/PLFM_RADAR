@@ -230,13 +230,12 @@ set_property IOSTANDARD LVCMOS33 [get_ports {stm32_*_3v3}]
 # ============================================================================
 # Pin: L18 = IO_L16N_T2_A27_15
 set_property PACKAGE_PIN L18 [get_ports {stm32_new_chirp}]
-# Pin: N18 = IO_L17P_T2_A26_15
-set_property PACKAGE_PIN N18 [get_ports {stm32_new_elevation}]
-# Pin: N19 = IO_L17N_T2_A25_15
-set_property PACKAGE_PIN N19 [get_ports {stm32_new_azimuth}]
+# N18 / N19 retired in PR-AB.b expanded — formerly stm32_new_elevation /
+# stm32_new_azimuth. MCU side init is also stripped (see commit 3); the
+# pins default to high-Z inputs after MCU reset.
 # Pin: N20 = IO_L18P_T2_A24_15
 set_property PACKAGE_PIN N20 [get_ports {stm32_mixers_enable}]
-set_property IOSTANDARD LVCMOS33 [get_ports {stm32_new_*}]
+set_property IOSTANDARD LVCMOS33 [get_ports {stm32_new_chirp}]
 set_property IOSTANDARD LVCMOS33 [get_ports {stm32_mixers_enable}]
 
 # ============================================================================

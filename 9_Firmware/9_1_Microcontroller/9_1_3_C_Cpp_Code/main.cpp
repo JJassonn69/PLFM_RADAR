@@ -630,7 +630,8 @@ void runRadarPulseSequence() {
     m += m_max/2;
 
     for(int beam_pos = 0; beam_pos < 15; beam_pos++) {
-    	HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_9);// new_elevation -- mode 2'b00 input only; no-op in production mode 2'b01 but harmless to keep
+    	// PD9 toggle (formerly new_elevation) retired in PR-AB.b expanded —
+    	// FPGA-side input port + counter were removed, so the toggle was a no-op.
     	DIAG("SYS", "Beam pos %d/15: patterns matrix1/matrix2", beam_pos);
         // Pattern 1: matrix1 (negative-θ scan, peak at -62°..-3°)
         adarManager.setCustomBeamPattern16(matrix1[beam_pos], ADAR1000Manager::BeamDirection::TX);
@@ -652,8 +653,8 @@ void runRadarPulseSequence() {
 
     }
 
-    HAL_GPIO_TogglePin(GPIOD,GPIO_PIN_10);//Tell FPGA that there is a new azimuth
-    DIAG("SYS", "Azimuth GPIO toggle (GPIOD pin 10), stepping motor");
+    // PD10 toggle (formerly new_azimuth) retired in PR-AB.b expanded — see PD9 note above.
+    DIAG("SYS", "Azimuth step, stepping motor");
 
     y++; if(y>y_max)y=1;
 	  //Rotate stepper to next y position
@@ -3115,7 +3116,8 @@ static void MX_GPIO_Init(void)
                           |EN_P_3V3_VDD_SW_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12
+  // PD9 + PD10 retired in PR-AB.b expanded (formerly new_elevation / new_azimuth).
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_8|GPIO_PIN_11|GPIO_PIN_12
                           |STEPPER_CW_P_Pin|STEPPER_CLK_P_Pin|EN_DIS_RFPA_VDD_Pin|EN_DIS_COOLING_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
@@ -3169,9 +3171,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD8 PD9 PD10 PD11 PD12
-                           STEPPER_CW_P_Pin STEPPER_CLK_P_Pin EN_DIS_RFPA_VDD_Pin EN_DIS_COOLING_Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12
+  /*Configure GPIO pins : PD8 PD11 PD12
+                           STEPPER_CW_P_Pin STEPPER_CLK_P_Pin EN_DIS_RFPA_VDD_Pin EN_DIS_COOLING_Pin
+                           (PD9 / PD10 retired in PR-AB.b expanded — default high-Z input) */
+  GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_11|GPIO_PIN_12
                           |STEPPER_CW_P_Pin|STEPPER_CLK_P_Pin|EN_DIS_RFPA_VDD_Pin|EN_DIS_COOLING_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
