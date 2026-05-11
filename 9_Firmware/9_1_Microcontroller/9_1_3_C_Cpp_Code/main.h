@@ -162,6 +162,17 @@ void Error_Handler(void);
 #define FPGA_FRAME_PULSE_GPIO_Port FPGA_DIG6_GPIO_Port
 #define FPGA_FRAME_PULSE_EXTI_IRQn EXTI15_10_IRQn
 
+/* PR-AB.b expanded commit 5: DIG_0 (PD8) carries the MCU per-beam-pattern
+ * ready toggle into the FPGA's chirp_scheduler beam-ready handshake.
+ * runRadarPulseSequence toggles this pin once per setCustomBeamPattern16(RX)
+ * call after the SPI burst completes, so the FPGA only starts the next 48-
+ * chirp frame once the new beam pattern is in place. The FPGA-side stall is
+ * gated by opcode 0x1A (host_handshake_enable, cold-reset = 0) so flashing
+ * the bitstream before the GUI enables the feature leaves the radar in its
+ * legacy open-loop cadence. */
+#define FPGA_BEAM_READY_Pin       GPIO_PIN_8
+#define FPGA_BEAM_READY_GPIO_Port GPIOD
+
 #define ADF4382_RX_CE_Pin GPIO_PIN_9
 #define ADF4382_RX_CE_GPIO_Port GPIOG
 #define ADF4382_RX_CS_Pin GPIO_PIN_10

@@ -95,7 +95,7 @@ class TestState:
 def load_captured_frame_hex(path: str) -> bytes:
     """Read iverilog $writememh output (one byte per line, 2-hex-digit)."""
     out = bytearray()
-    with open(path, 'r') as f:
+    with open(path) as f:
         for line in f:
             tok = line.strip()
             if not tok or tok.startswith('//'):

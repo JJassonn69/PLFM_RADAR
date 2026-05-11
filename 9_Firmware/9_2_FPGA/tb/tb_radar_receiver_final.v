@@ -185,7 +185,14 @@ radar_receiver_final dut (
     .doppler_frame_done_out(),
 
     // PR-E: pin mixers_enable HIGH so the scheduler runs in this TB
-    .mixers_enable_100m(1'b1)
+    .mixers_enable_100m(1'b1),
+
+    // PR-AB.b expanded commit 5: beam-ready handshake — tie off for this TB
+    // (legacy open-loop cadence). Tests for the handshake live in their own
+    // dedicated tb_chirp_scheduler_handshake.v unit TB.
+    .stm32_beam_ready_async(1'b0),
+    .host_handshake_enable(1'b0),
+    .beam_handshake_watchdog_fired()
 );
 
 // ============================================================================

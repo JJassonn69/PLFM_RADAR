@@ -173,6 +173,11 @@ module usb_data_interface_ft2232h (
     input wire        status_range_decim_watchdog,  // audit F-6.4
     input wire        status_ddc_cic_fir_overrun,   // audit F-1.2
 
+    // PR-AB.b expanded commit 5: beam-ready handshake watchdog (clk domain).
+    // Sticky in chirp_scheduler; 2-FF level CDC into ft_clk. Packed into
+    // status_words[4][1] — see word-4 layout below.
+    input wire        status_beam_handshake_watchdog,
+
     // PR-G: 2-tier CFAR telemetry (clk domain → status_words[6]).
     // Slow-changing per-frame values; 2-stage level CDC into ft_clk.
     input wire [7:0]  status_cfar_alpha_soft,       // current host_cfar_alpha_soft (Q4.4)
@@ -674,6 +679,10 @@ reg [6:0]                          frame_drop_sync_1;
 reg                          range_decim_watchdog_sync_1;
 (* ASYNC_REG = "TRUE" *) reg ddc_cic_fir_overrun_sync_0;
 reg                          ddc_cic_fir_overrun_sync_1;
+// PR-AB.b expanded commit 5: 2-FF level CDC for the beam-handshake watchdog
+// sticky. Same convention as the F-6.4 / F-1.2 stickies above.
+(* ASYNC_REG = "TRUE" *) reg beam_handshake_wd_sync_0;
+reg                          beam_handshake_wd_sync_1;
 
 wire stream_range_en   = stream_ctrl_sync_1[0];
 wire stream_doppler_en = stream_ctrl_sync_1[1];
@@ -803,6 +812,8 @@ always @(posedge ft_clk or negedge ft_effective_reset_n) begin
         range_decim_watchdog_sync_1 <= 1'b0;
         ddc_cic_fir_overrun_sync_0  <= 1'b0;
         ddc_cic_fir_overrun_sync_1  <= 1'b0;
+        beam_handshake_wd_sync_0    <= 1'b0;
+        beam_handshake_wd_sync_1    <= 1'b0;
         // PR-G: 2-tier CFAR telemetry CDC reset
         alpha_soft_sync_0     <= 8'd0;
         alpha_soft_sync_1     <= 8'd0;
@@ -861,6 +872,8 @@ always @(posedge ft_clk or negedge ft_effective_reset_n) begin
         range_decim_watchdog_sync_1 <= range_decim_watchdog_sync_0;
         ddc_cic_fir_overrun_sync_0  <= status_ddc_cic_fir_overrun;
         ddc_cic_fir_overrun_sync_1  <= ddc_cic_fir_overrun_sync_0;
+        beam_handshake_wd_sync_0    <= status_beam_handshake_watchdog;
+        beam_handshake_wd_sync_1    <= beam_handshake_wd_sync_0;
 
         // PR-G: 2-tier CFAR telemetry CDC (clk → ft_clk for status read)
         alpha_soft_sync_0     <= status_cfar_alpha_soft;
@@ -879,13 +892,23 @@ always @(posedge ft_clk or negedge ft_effective_reset_n) begin
             status_words[1] <= {status_long_chirp, status_long_listen};
             status_words[2] <= {status_guard, status_short_chirp};
             status_words[3] <= {status_short_listen, 10'd0, status_chirps_per_elev};
-            status_words[4] <= {status_agc_current_gain,        // [31:28]
-                                status_agc_peak_magnitude,      // [27:20]
-                                status_agc_saturation_count,    // [19:12]
-                                status_agc_enable,              // [11]
-                                status_chirps_mismatch,         // [10] TX-G mismatch flag
-                                alpha_soft_sync_1,              // [9:2] PR-G: host_cfar_alpha_soft echo (Q4.4)
-                                2'd0};                          // [1:0] reserved (was range_mode, retired PR-AB.b expanded)
+            // Word 4 layout (post PR-AB.b expanded commit 5):
+            //   [31:28] agc_current_gain
+            //   [27:20] agc_peak_magnitude
+            //   [19:12] agc_saturation_count
+            //   [11]    agc_enable
+            //   [10]    chirps_mismatch (TX-G)
+            //   [9:2]   alpha_soft echo (Q4.4)
+            //   [1]     beam_handshake_watchdog_fired (sticky, reset_n clear)
+            //   [0]     reserved 0 (range_mode bit retired PR-AB.b expanded)
+            status_words[4] <= {status_agc_current_gain,
+                                status_agc_peak_magnitude,
+                                status_agc_saturation_count,
+                                status_agc_enable,
+                                status_chirps_mismatch,
+                                alpha_soft_sync_1,
+                                beam_handshake_wd_sync_1,
+                                1'd0};
             // Word 5: {frame_drop_count[31:25], self_test_busy[24],
             //          reserved[23:16], self_test_detail[15:8], reserved[7],
             //          cic_fir_overrun[6], range_decim_watchdog[5],

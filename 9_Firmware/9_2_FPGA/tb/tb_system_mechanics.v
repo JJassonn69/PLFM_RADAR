@@ -16,7 +16,11 @@
 //        mixer-disable propagation)
 //   G7.3 TX chirp counter CDC (120MHz -> 100MHz)
 //        — G7.1 (STM32→FPGA chirp toggle CDC stress) retired in PR-AB.b
-//          expanded; stm32_new_chirp port is gone.
+//          expanded; the stm32_new_chirp port was renamed to
+//          stm32_beam_ready in commit 5 (beam-ready handshake) and is
+//          tied 1'b0 here so the cold-reset default of host_handshake_enable
+//          (=0) keeps the FSM out of S_BEAM_WAIT and the open-loop cadence
+//          intact.
 //
 // DUT is radar_system_top with USB_MODE=1 (production FT2232H path); the
 // FT2232H ports are wired so a stream_control opcode (0x04) can be sent at
@@ -155,6 +159,7 @@ radar_system_top #(.USB_MODE(1)) dut (
     .adc_or_p(1'b0), .adc_or_n(1'b1),
     .adc_pwdn(adc_pwdn),
 
+    .stm32_beam_ready(1'b0),  // commit 5: handshake disabled by cold-reset default
     .stm32_mixers_enable(stm32_mixers_enable),
 
     .ft601_data(ft601_data),

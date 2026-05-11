@@ -136,6 +136,7 @@ class Opcode(IntEnum):
         0x17  host_medium_chirp_cycles  (PR-G G2)
         0x18  host_medium_listen_cycles (PR-G G2)
         0x19  host_subframe_enable      (PR-U / M-8 — 3-bit {LONG, MED, SHORT} mask)
+        0x1A  host_handshake_enable     (PR-AB.b expanded commit 5 — beam-ready stall)
 
     PR-AB.b expanded retired opcodes 0x01 (host_radar_mode),
     0x02 (host_trigger_pulse), 0x20 (host_range_mode).
@@ -165,6 +166,12 @@ class Opcode(IntEnum):
     # host CRT downgrades confidence to UNKNOWN (dbin // 16 attribution would
     # otherwise be wrong when the scheduler skips a sub-frame).
     SUBFRAME_ENABLE     = 0x19
+    # PR-AB.b expanded commit 5: beam-ready handshake enable. value[0]=1 makes
+    # chirp_scheduler stall in S_BEAM_WAIT after frame_pulse until the MCU
+    # toggles PD8, or the ~80 ms watchdog expires (status word 4 bit [1] is
+    # the sticky watchdog flag). FPGA cold-reset = 0 — host opts in once the
+    # MCU PD8 wiring is verified on the bench.
+    HANDSHAKE_ENABLE    = 0x1A
 
     # --- Signal processing (0x21-0x27;
     #     0x20 host_range_mode retired in PR-AB.b expanded) ---
@@ -260,14 +267,20 @@ class StatusResponse:
     agc_saturation_count: int = 0  # 8-bit saturation count [7:0]
     agc_enable: int = 0          # 1-bit AGC enable readback
     chirps_mismatch: int = 0     # TX-G: 1 if FPGA clamped/rejected host chirps_per_elev
+    # PR-AB.b expanded commit 5: sticky watchdog from chirp_scheduler S_BEAM_WAIT.
+    # 1 means at least one frame elapsed without an MCU PD8 ack within ~80 ms;
+    # cleared only by full reset_n on the FPGA. Reserved 0 when host has not
+    # enabled the handshake (opcode 0x1A=1).
+    beam_handshake_watchdog: int = 0  # word 4 bit [1]
     # PR-G 2-tier CFAR telemetry (word 6)
     detect_count_cand: int = 0   # 16-bit count of CAND-tier detections per frame
     detect_threshold_soft: int = 0  # 16-bit soft-CFAR threshold readback (saturates 0xFFFF)
     # AUDIT-S10 control-fault flags (word 5 high half)
     frame_drop_count: int = 0    # frame-drop counter from RTL
     # M-5 MEDIUM PRI readback (word 7) — closes 161-µs MEDIUM visibility gap.
-    medium_chirp: int = 0        # opcode 0x17 readback (16-bit, default RP_DEF_MEDIUM_CHIRP_CYCLES)
-    medium_listen: int = 0       # opcode 0x18 readback (16-bit, default RP_DEF_MEDIUM_LISTEN_CYCLES)
+    # opcode 0x17/0x18 readback (16-bit each, default RP_DEF_MEDIUM_*_CYCLES).
+    medium_chirp: int = 0
+    medium_listen: int = 0
 
 
 # ============================================================================
@@ -373,9 +386,12 @@ class RadarProtocol:
         # Word 3: {short_listen[31:16], 10'd0, chirps_per_elev[5:0]}
         sr.chirps_per_elev = words[3] & 0x3F
         sr.short_listen = (words[3] >> 16) & 0xFFFF
-        # Word 4 layout: gain[31:28] peak[27:20] sat[19:12] agc_en[11] mismatch[10] reserved[1:0]
-        # PR-AB.b expanded: bits [1:0] formerly range_mode, now reserved 0.
+        # Word 4 layout: gain[31:28] peak[27:20] sat[19:12] agc_en[11]
+        # mismatch[10] alpha_soft[9:2] beam_handshake_watchdog[1] reserved[0]
+        # PR-AB.b expanded commit 5 reclaimed bit [1] for the handshake watchdog
+        # sticky (FPGA chirp_scheduler S_BEAM_WAIT, ~80 ms timeout).
         sr.chirps_mismatch = (words[4] >> 10) & 0x01
+        sr.beam_handshake_watchdog = (words[4] >> 1) & 0x01
         sr.agc_enable = (words[4] >> 11) & 0x01
         sr.agc_saturation_count = (words[4] >> 12) & 0xFF
         sr.agc_peak_magnitude = (words[4] >> 20) & 0xFF

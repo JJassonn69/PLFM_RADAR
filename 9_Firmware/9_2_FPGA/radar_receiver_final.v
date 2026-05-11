@@ -67,6 +67,16 @@ module radar_receiver_final (
     // so it stays in S_IDLE until the operator turns the radar on.
     input wire mixers_enable_100m,
 
+    // PR-AB.b expanded commit 5: beam-ready handshake plumbing.
+    // stm32_beam_ready_async is the raw MCU PD8 toggle (CDC-synchronized
+    // inside chirp_scheduler on `clk`). host_handshake_enable gates whether
+    // the scheduler stalls in S_BEAM_WAIT after each frame_pulse.
+    // beam_handshake_watchdog_fired is sticky (cleared only on reset_n) and
+    // surfaces in status_words[4][1] at the top level.
+    input  wire stm32_beam_ready_async,
+    input  wire host_handshake_enable,
+    output wire beam_handshake_watchdog_fired,
+
     // CFAR integration: expose Doppler frame_complete to top level
     output wire doppler_frame_done_out,
 
@@ -236,6 +246,10 @@ chirp_scheduler sched (
     .host_long_listen_cycles(host_long_listen_cycles),
     .host_guard_cycles(host_guard_cycles),
     .host_chirps_per_subframe(6'd`RP_DEF_CHIRPS_PER_SUBFRAME),
+    // PR-AB.b expanded commit 5: beam-ready handshake. CDC-sync happens
+    // inside chirp_scheduler so the raw async GPIO can be routed directly.
+    .beam_ready_async(stm32_beam_ready_async),
+    .host_handshake_enable(host_handshake_enable),
     .wave_sel(wave_sel),
     .chirp_pulse(chirp_pulse),
     .subframe_pulse(subframe_pulse),
@@ -244,7 +258,8 @@ chirp_scheduler sched (
     .subframe_id(sched_subframe_id),
     .cfg_chirp_cycles (sched_cfg_chirp_cycles),
     .cfg_listen_cycles(sched_cfg_listen_cycles),
-    .cfg_guard_cycles (sched_cfg_guard_cycles)
+    .cfg_guard_cycles (sched_cfg_guard_cycles),
+    .beam_handshake_watchdog_fired(beam_handshake_watchdog_fired)
 );
 
 // PR-E: forward scheduler pulses + wave_sel to the TX-side CDC bridge in

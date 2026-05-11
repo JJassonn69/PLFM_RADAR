@@ -133,6 +133,7 @@ class TestRadarProtocol(unittest.TestCase):
                             st_flags=0, st_detail=0, st_busy=0,
                             agc_gain=0, agc_peak=0, agc_sat=0, agc_enable=0,
                             chirps_mismatch=0,
+                            beam_handshake_watchdog=0,
                             cand_count=0, thr_soft=0, frame_drop=0,
                             medium_chirp=0, medium_listen=0):
         """Build an M-5 34-byte status response matching FPGA format."""
@@ -156,13 +157,18 @@ class TestRadarProtocol(unittest.TestCase):
         w3 = ((short_listen & 0xFFFF) << 16) | (chirps & 0x3F)
         pkt += struct.pack(">I", w3)
 
-        # Word 4: {agc_current_gain[3:0], agc_peak_magnitude[7:0],
-        #          agc_saturation_count[7:0], agc_enable,
-        #          chirps_mismatch[10], 10'd0 reserved [9:0]}
-        # PR-AB.b expanded: bits [1:0] formerly range_mode, now reserved 0.
+        # Word 4: {agc_current_gain[31:28], agc_peak_magnitude[27:20],
+        #          agc_saturation_count[19:12], agc_enable[11],
+        #          chirps_mismatch[10], reserved[9:2],
+        #          beam_handshake_watchdog[1], reserved[0]}
+        # PR-AB.b expanded commit 5: bit [1] is the chirp_scheduler
+        # S_BEAM_WAIT sticky watchdog flag (reset_n clear). The 8-bit
+        # alpha_soft echo at [9:2] is FT2232H-only; this co-spec
+        # builder leaves [9:2] reserved-0 like the FT601 path.
         w4 = (((agc_gain & 0x0F) << 28) | ((agc_peak & 0xFF) << 20) |
               ((agc_sat & 0xFF) << 12) | ((agc_enable & 0x01) << 11) |
-              ((chirps_mismatch & 0x01) << 10))
+              ((chirps_mismatch & 0x01) << 10) |
+              ((beam_handshake_watchdog & 0x01) << 1))
         pkt += struct.pack(">I", w4)
 
         # Word 5: {frame_drop[31:25], self_test_busy[24], 8'd0,
@@ -196,6 +202,7 @@ class TestRadarProtocol(unittest.TestCase):
         self.assertEqual(sr.short_listen, 17450)
         self.assertEqual(sr.chirps_per_elev, 32)
         self.assertEqual(sr.chirps_mismatch, 0)
+        self.assertEqual(sr.beam_handshake_watchdog, 0)
 
     def test_parse_status_chirps_mismatch(self):
         # TX-G: bit 10 of word 4 must round-trip without disturbing neighbours.
@@ -203,6 +210,16 @@ class TestRadarProtocol(unittest.TestCase):
         sr = RadarProtocol.parse_status_packet(raw)
         self.assertEqual(sr.chirps_mismatch, 1)
         self.assertEqual(sr.agc_enable, 1)
+        self.assertEqual(sr.beam_handshake_watchdog, 0)
+
+    def test_parse_status_beam_handshake_watchdog(self):
+        # PR-AB.b expanded commit 5: bit 1 of word 4 must round-trip without
+        # bleeding into chirps_mismatch (bit 10) or the reserved [0] bit.
+        raw = self._make_status_packet(beam_handshake_watchdog=1)
+        sr = RadarProtocol.parse_status_packet(raw)
+        self.assertEqual(sr.beam_handshake_watchdog, 1)
+        self.assertEqual(sr.chirps_mismatch, 0)
+        self.assertEqual(sr.agc_enable, 0)
 
     def test_parse_status_too_short(self):
         # Anything under STATUS_PACKET_SIZE (34 post-M-5) must be rejected.
@@ -262,14 +279,20 @@ class TestRadarProtocol(unittest.TestCase):
         usb_data_interface_ft2232h.v:675-679 — exactly one source of truth
         in this test, so any future drift between FPGA and GUI trips here:
 
-            [31:28] agc_current_gain     (4-bit)
-            [27:20] agc_peak_magnitude   (8-bit)
-            [19:12] agc_saturation_count (8-bit)
-            [11]    agc_enable           (1-bit)
-            [10]    chirps_mismatch      (1-bit, TX-G)
-            [9:0]   reserved             (10 bits, must be zero from builder)
-                    (was [9:2] + range_mode[1:0]; range_mode retired in
-                     PR-AB.b expanded)
+            [31:28] agc_current_gain         (4-bit)
+            [27:20] agc_peak_magnitude       (8-bit)
+            [19:12] agc_saturation_count     (8-bit)
+            [11]    agc_enable               (1-bit)
+            [10]    chirps_mismatch          (1-bit, TX-G)
+            [9:2]   reserved / alpha_soft    (8 bits — FT601 leaves zero; FT2232H
+                                              echoes host_cfar_alpha_soft. This
+                                              co-spec builder uses the FT601
+                                              layout so the builder remains
+                                              path-agnostic.)
+            [1]     beam_handshake_watchdog  (1-bit sticky, PR-AB.b expanded
+                                              commit 5)
+            [0]     reserved                 (1-bit; was range_mode[0], retired
+                                              in PR-AB.b expanded)
 
         For each field we set ONLY that field to its max, build the packet,
         parse, and assert (a) the field reads back correctly and (b) every
@@ -278,16 +301,19 @@ class TestRadarProtocol(unittest.TestCase):
         """
         layout = [
             # (field_name, builder_kwarg, lsb, width, parsed_attr)
-            ("agc_current_gain",     "agc_gain",        28, 4, "agc_current_gain"),
-            ("agc_peak_magnitude",   "agc_peak",        20, 8, "agc_peak_magnitude"),
-            ("agc_saturation_count", "agc_sat",         12, 8, "agc_saturation_count"),
-            ("agc_enable",           "agc_enable",      11, 1, "agc_enable"),
-            ("chirps_mismatch",      "chirps_mismatch", 10, 1, "chirps_mismatch"),
+            ("agc_current_gain",        "agc_gain",        28, 4, "agc_current_gain"),
+            ("agc_peak_magnitude",      "agc_peak",        20, 8, "agc_peak_magnitude"),
+            ("agc_saturation_count",    "agc_sat",         12, 8, "agc_saturation_count"),
+            ("agc_enable",              "agc_enable",      11, 1, "agc_enable"),
+            ("chirps_mismatch",         "chirps_mismatch", 10, 1, "chirps_mismatch"),
+            ("beam_handshake_watchdog", "beam_handshake_watchdog",
+                                                            1, 1, "beam_handshake_watchdog"),
         ]
-        # Sanity: layout fields + reserved [9:0] must cover exactly 32 bits.
+        # Sanity: layout fields + reserved [9:2] (8 bits) + reserved [0] (1 bit)
+        # must cover exactly 32 bits.
         used = sum(width for _, _, _, width, _ in layout)
-        self.assertEqual(used + 10, 32,
-            "word 4 layout (incl. reserved [9:0]) must total 32 bits")
+        self.assertEqual(used + 9, 32,
+            "word 4 layout (incl. reserved [9:2] + [0]) must total 32 bits")
 
         # No two fields may overlap.
         occupied = set()
@@ -1002,6 +1028,10 @@ class TestOpcodeEnum(unittest.TestCase):
         self.assertEqual(Opcode.DETECT_THRESHOLD, 0x03)
         self.assertEqual(Opcode.STREAM_CONTROL, 0x04)
 
+    def test_handshake_enable_opcode(self):
+        """PR-AB.b expanded commit 5: beam-ready handshake opcode = 0x1A."""
+        self.assertEqual(Opcode.HANDSHAKE_ENABLE, 0x1A)
+
     def test_all_rtl_opcodes_present(self):
         """Every RTL opcode (from radar_system_top.v) has a matching Opcode enum member.
 
@@ -1010,6 +1040,7 @@ class TestOpcodeEnum(unittest.TestCase):
         """
         expected = {0x03, 0x04,
                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+                    0x17, 0x18, 0x19, 0x1A,
                     0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
                     0x28, 0x29, 0x2A, 0x2B, 0x2C,
                     0x30, 0x31, 0xFF}

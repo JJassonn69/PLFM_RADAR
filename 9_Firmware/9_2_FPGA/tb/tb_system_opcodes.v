@@ -158,6 +158,7 @@ radar_system_top #(
     .adc_or_p(1'b0), .adc_or_n(1'b1),
     .adc_pwdn(adc_pwdn),
 
+    .stm32_beam_ready(1'b0),  // commit 5: handshake gated off by host_handshake_enable cold-reset = 0
     .stm32_mixers_enable(stm32_mixers_enable),
 
     // FT601 ports — tied off / unused in USB_MODE=1

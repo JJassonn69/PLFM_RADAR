@@ -358,7 +358,7 @@ def check_mf_invariants(result: CheckResult):
         f"twin={twin_peak}, ref={ref_peak}"
     )
 
-    # Sidelobe behaviour: peak should be ≥ 5× the median magnitude. Under
+    # Sidelobe behaviour: peak should be at least 5x the median magnitude. Under
     # scaled-mode at amp=4000 the peak rises to ~977 while sidelobes stay
     # near the LSB floor, easily clearing the threshold.
     twin_peak_val = float(twin_mag[delay])

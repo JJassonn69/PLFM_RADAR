@@ -78,9 +78,12 @@ module radar_system_top (
     
     // STM32 → FPGA control (PD8/PD11). PD9/PD10 (was stm32_new_elevation /
     // stm32_new_azimuth) retired in PR-AB.b expanded — see commit 3 for the
-    // XDC + MCU GPIO scrub. stm32_new_chirp will be renamed to
-    // stm32_beam_ready in commit 5 (beam-ready handshake).
-    input wire stm32_new_chirp,
+    // XDC + MCU GPIO scrub. stm32_beam_ready (PD8) is the MCU's per-pattern
+    // ready toggle for the beam-ready handshake added in PR-AB.b expanded
+    // commit 5; CDC-sync is owned by chirp_scheduler.v on `clk`. The
+    // handshake itself is gated by opcode 0x1A (host_handshake_enable);
+    // cold-reset default 1'b0 keeps the open-loop legacy cadence in place.
+    input wire stm32_beam_ready,
     input wire stm32_mixers_enable,
     
     // ========== FT601 USB 3.0 INTERFACE ==========
@@ -248,6 +251,12 @@ end
 // sample has been silently dropped between the 400 MHz CIC and 100 MHz FIR.
 // Already sticky in source (ddc_400m.v:697-702), no extra latch needed.
 wire        rx_ddc_cic_fir_overrun;
+// PR-AB.b expanded commit 5: sticky from chirp_scheduler. High = at least one
+// frame fired without an MCU PD8 ack within the ~80 ms watchdog. Packed into
+// status_words[4][1] so the host can spot patterns falling behind. Sticky is
+// owned by the scheduler (clk_100m source domain); CDC across to ft_clk is
+// done inside usb_data_interface_ft2232h alongside the other status stickies.
+wire        rx_beam_handshake_watchdog;
 
 // Data packing for USB
 wire [31:0] usb_range_profile;
@@ -297,6 +306,12 @@ reg [5:0]  host_chirps_per_elev;      // Opcode 0x15 (default 48 = RP_CHIRPS_PER
 // bit 1 MEDIUM, bit 2 LONG. Default 3'b111 keeps the production 3-PRI ladder.
 // Mirrored into v2 frame byte 2 bits[5:3] (usb_data_interface_ft2232h.v).
 reg [2:0]  host_subframe_enable;      // Opcode 0x19 (default RP_DEF_SUBFRAME_ENABLE = 3'b111)
+// PR-AB.b expanded commit 5: opcode 0x1A enables the beam-ready handshake
+// inside chirp_scheduler. Cold-reset default = 1'b0 (legacy open-loop
+// cadence) so existing TBs and any production deployment without the MCU
+// PD8 toggle wired up keep their old behavior. Host (GUI) writes 1 once
+// the MCU has been verified to be toggling PD8 each beam pattern.
+reg        host_handshake_enable;
 reg        host_status_request;       // Opcode 0xFF (self-clearing pulse)
 
 // Fix 4: Doppler/chirps mismatch protection
@@ -627,6 +642,14 @@ radar_receiver_final rx_inst (
     .host_agc_holdoff(host_agc_holdoff),
     // PR-E: master enable for the scheduler (CDC-sync'd to clk_100m above)
     .mixers_enable_100m(stm32_mixers_enable_100m),
+    // PR-AB.b expanded commit 5: beam-ready handshake plumbing. stm32_beam_ready
+    // is the raw MCU PD8 GPIO (sync'd inside chirp_scheduler on `clk`).
+    // host_handshake_enable is the opcode-0x1A register, sampled on clk_100m
+    // (quasi-static, no extra CDC). beam_handshake_watchdog_fired is sticky in
+    // the source domain and packed into status_words[4][1] downstream.
+    .stm32_beam_ready_async(stm32_beam_ready),
+    .host_handshake_enable(host_handshake_enable),
+    .beam_handshake_watchdog_fired(rx_beam_handshake_watchdog),
     // CFAR: Doppler frame-complete pulse
     .doppler_frame_done_out(rx_frame_complete),
     // Ground clutter removal
@@ -903,7 +926,13 @@ if (USB_MODE == 0) begin : gen_ft601
         // (level signal) so the ft_clk synchronizer cannot miss a 10 ns
         // source-domain pulse. F-1.2 overrun is already sticky in source.
         .status_range_decim_watchdog(rx_range_decim_watchdog_sticky),
-        .status_ddc_cic_fir_overrun(rx_ddc_cic_fir_overrun)
+        .status_ddc_cic_fir_overrun(rx_ddc_cic_fir_overrun),
+
+        // PR-AB.b expanded commit 5: beam-ready handshake watchdog sticky.
+        // Packed into status_words[4][1] in the FT601 path too so the host
+        // sees the same fault bit regardless of which USB build it's talking
+        // to (FT601 200T premium vs FT2232H 50T production).
+        .status_beam_handshake_watchdog(rx_beam_handshake_watchdog)
     );
 
     // FT2232H ports unused in FT601 mode — tie off
@@ -1002,7 +1031,15 @@ end else begin : gen_ft2232h
         // PR-G: 2-tier CFAR telemetry (status_words[6])
         .status_cfar_alpha_soft(host_cfar_alpha_soft),
         .status_detect_threshold_soft(cfar_detect_threshold_soft),
-        .status_detect_count_cand(cfar_detect_count_cand)
+        .status_detect_count_cand(cfar_detect_count_cand),
+
+        // PR-AB.b expanded commit 5: beam-ready handshake watchdog sticky.
+        // Source domain is clk_100m; usb_data_interface_ft2232h hands it to
+        // ft_clk through the same status-bit CDC convention used for the
+        // F-6.4 watchdog and F-1.2 overrun stickies above. Packed into
+        // status_words[4][1] downstream — see word-4 layout note in
+        // usb_data_interface_ft2232h.v.
+        .status_beam_handshake_watchdog(rx_beam_handshake_watchdog)
     );
 
     // FT601 ports unused in FT2232H mode — tie off
@@ -1096,6 +1133,10 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
         host_chirps_per_elev      <= 6'd48;
         // PR-U / M-8: 3'b111 = SHORT|MEDIUM|LONG all on (production 3-PRI ladder).
         host_subframe_enable      <= `RP_DEF_SUBFRAME_ENABLE;
+        // PR-AB.b expanded commit 5: handshake disabled at cold-reset so any
+        // host or TB that doesn't drive PD8 keeps the legacy open-loop cadence.
+        // Production GUI writes 0x1A=1 after MCU has been verified.
+        host_handshake_enable     <= 1'b0;
         host_status_request     <= 1'b0;
         chirps_mismatch_error   <= 1'b0;
         // CFAR defaults (disabled by default — backward-compatible)
@@ -1150,6 +1191,11 @@ always @(posedge clk_100m_buf or negedge sys_reset_n) begin
                 // bits[5:3] so host CRT can detect mask != 3'b111 and degrade
                 // confidence rather than mis-attribute the SF axis.
                 8'h19: host_subframe_enable      <= usb_cmd_value[2:0];
+                // PR-AB.b expanded commit 5: beam-ready handshake enable.
+                // value[0]=1 makes chirp_scheduler stall in S_BEAM_WAIT after
+                // each frame_pulse until the MCU toggles PD8 (or watchdog
+                // ~80 ms). value[0]=0 reverts to the legacy open-loop cadence.
+                8'h1A: host_handshake_enable     <= usb_cmd_value[0];
                 8'h15: begin
                     // Fix 4: Clamp chirps_per_elev to the fixed Doppler frame size.
                     // If host requests a different value, clamp and set error flag.

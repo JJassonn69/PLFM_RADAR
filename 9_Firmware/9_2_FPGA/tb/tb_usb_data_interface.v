@@ -144,7 +144,9 @@ module tb_usb_data_interface;
         .status_agc_enable          (status_agc_enable),
         // AUDIT-S10: control-fault flags tied off (pre-existing TB scope)
         .status_range_decim_watchdog(1'b0),
-        .status_ddc_cic_fir_overrun (1'b0)
+        .status_ddc_cic_fir_overrun (1'b0),
+        // PR-AB.b expanded commit 5: beam-handshake watchdog tied off
+        .status_beam_handshake_watchdog(1'b0)
     );
 
     // ── Test bookkeeping ───────────────────────────────────────

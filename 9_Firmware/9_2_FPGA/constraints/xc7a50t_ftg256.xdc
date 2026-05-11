@@ -222,12 +222,12 @@ set_property IOSTANDARD LVCMOS18 [get_ports {stm32_*_1v8}]
 # DIG_0..DIG_4 are STM32 outputs (PD8-PD12) → FPGA inputs (control)
 # DIG_5..DIG_7 are STM32 inputs (PD13-PD15) ← FPGA outputs (status / sync)
 
-set_property PACKAGE_PIN F13 [get_ports {stm32_new_chirp}]       ;# DIG_0 (PD8)
+set_property PACKAGE_PIN F13 [get_ports {stm32_beam_ready}]       ;# DIG_0 (PD8)
 # DIG_1 (PD9) + DIG_2 (PD10) retired in PR-AB.b expanded — formerly
 # stm32_new_elevation / stm32_new_azimuth. MCU side init is also stripped
 # (see commit 3); the pins default to high-Z inputs after MCU reset.
 set_property PACKAGE_PIN F15 [get_ports {stm32_mixers_enable}]   ;# DIG_3 (PD11)
-set_property IOSTANDARD LVCMOS33 [get_ports {stm32_new_chirp}]
+set_property IOSTANDARD LVCMOS33 [get_ports {stm32_beam_ready}]
 set_property IOSTANDARD LVCMOS33 [get_ports {stm32_mixers_enable}]
 # reset_n is DIG_4 (PD12) — constrained above in the RESET section
 

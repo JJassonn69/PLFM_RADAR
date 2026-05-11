@@ -68,8 +68,10 @@ module radar_system_top_50t (
 
     // ===== STM32 Control (Bank 15: 3.3V) =====
     // PR-AB.b expanded: stm32_new_elevation/azimuth retired (no consumer).
-    // stm32_new_chirp becomes stm32_beam_ready in commit 5.
-    input wire stm32_new_chirp,
+    // stm32_beam_ready (PD8) is the MCU per-pattern ready toggle for the
+    // beam-ready handshake landed in commit 5; gated by opcode 0x1A inside
+    // radar_system_top (host_handshake_enable). Cold-reset = legacy off.
+    input wire stm32_beam_ready,
     input wire stm32_mixers_enable,
 
     // ===== FT2232H USB 2.0 Interface (Bank 35: 3.3V) =====
@@ -178,7 +180,7 @@ module radar_system_top_50t (
         .adc_pwdn               (adc_pwdn),
 
         // ----- STM32 Control -----
-        .stm32_new_chirp        (stm32_new_chirp),
+        .stm32_beam_ready       (stm32_beam_ready),
         .stm32_mixers_enable    (stm32_mixers_enable),
 
         // ----- FT2232H USB 2.0 (active on 50T, USB_MODE=1) -----

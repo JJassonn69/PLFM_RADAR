@@ -574,6 +574,10 @@ run_test "DIG6 frame-pulse stretcher (PR-AB.b)" \
     tb/tb_dig6_frame_pulse.vvp \
     tb/tb_dig6_frame_pulse.v
 
+run_test "Chirp Scheduler beam-ready handshake (PR-AB.b expanded c5)" \
+    tb/tb_chirp_scheduler_handshake.vvp \
+    tb/tb_chirp_scheduler_handshake.v chirp_scheduler.v
+
 run_test "NUM_CELLS sizing 50T (AUDIT-C16)" \
     tb/tb_audit_c16_num_cells_50t.vvp \
     tb/tb_audit_c16_num_cells.v

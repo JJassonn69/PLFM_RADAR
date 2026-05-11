@@ -98,16 +98,15 @@ HOST_DC_NOTCH_WIDTH = 1
 # ============================================================================
 # Target placement -> expected bin coordinates
 # ============================================================================
-# range_bin = round(2 * R / c * fs / decim)
-#   = round(2 * 100 / 3e8 * 400e6 / 4)
-#   = round(66.667) = 67
-EXPECTED_RANGE_BIN = int(round(2.0 * TARGET_RANGE_M / C_LIGHT * RANGE_BIN_HZ))
+# Range bin formula: round(2 * R / c * fs / decim). For R=100m, fs=400 MHz,
+# decim=4 -> round(2 * 100 / 3e8 * 100e6) = round(66.667) = 67.
+EXPECTED_RANGE_BIN = round(2.0 * TARGET_RANGE_M / C_LIGHT * RANGE_BIN_HZ)
 
 # Per-sub-frame doppler bin (folding into 16-pt FFT). For our 5 m/s target
 # this is intentionally non-folding -> 1 in all three sub-frames.
 F_DOPPLER_HZ = 2.0 * TARGET_VEL_MPS * F_CARRIER / C_LIGHT
 EXPECTED_DOPPLER_BIN_PER_SF = tuple(
-    int(round(F_DOPPLER_HZ * DOPPLER_FFT_SIZE * pri)) % DOPPLER_FFT_SIZE
+    round(F_DOPPLER_HZ * DOPPLER_FFT_SIZE * pri) % DOPPLER_FFT_SIZE
     for pri in PRI_BY_SF
 )
 # Flat 48-bin doppler-axis expected cells (sub_frame << 4 | bin).
@@ -160,8 +159,8 @@ def generate_range_decim_frame(seed: int = SCENE_SEED) -> tuple[np.ndarray, np.n
 
         # Target injection at the expected range bin.
         phi = _target_phase_rad(c)
-        sig_i = int(round(TARGET_AMPLITUDE * np.cos(phi)))
-        sig_q = int(round(TARGET_AMPLITUDE * np.sin(phi)))
+        sig_i = round(TARGET_AMPLITUDE * np.cos(phi))
+        sig_q = round(TARGET_AMPLITUDE * np.sin(phi))
         frame_i[c, EXPECTED_RANGE_BIN] += sig_i
         frame_q[c, EXPECTED_RANGE_BIN] += sig_q
 
@@ -231,7 +230,7 @@ def main() -> int:
           f"shape={frame_i.shape}")
 
     if n_lines != expected_lines:
-        print(f"  ERROR: line count mismatch", file=sys.stderr)
+        print("  ERROR: line count mismatch", file=sys.stderr)
         return 1
 
     # Sanity: target peak should dominate at the expected range bin.

@@ -229,13 +229,13 @@ set_property IOSTANDARD LVCMOS33 [get_ports {stm32_*_3v3}]
 # STM32 DIG BUS — Control signals (Bank 15, VCCO = 3.3V)
 # ============================================================================
 # Pin: L18 = IO_L16N_T2_A27_15
-set_property PACKAGE_PIN L18 [get_ports {stm32_new_chirp}]
+set_property PACKAGE_PIN L18 [get_ports {stm32_beam_ready}]
 # N18 / N19 retired in PR-AB.b expanded — formerly stm32_new_elevation /
 # stm32_new_azimuth. MCU side init is also stripped (see commit 3); the
 # pins default to high-Z inputs after MCU reset.
 # Pin: N20 = IO_L18P_T2_A24_15
 set_property PACKAGE_PIN N20 [get_ports {stm32_mixers_enable}]
-set_property IOSTANDARD LVCMOS33 [get_ports {stm32_new_chirp}]
+set_property IOSTANDARD LVCMOS33 [get_ports {stm32_beam_ready}]
 set_property IOSTANDARD LVCMOS33 [get_ports {stm32_mixers_enable}]
 
 # ============================================================================

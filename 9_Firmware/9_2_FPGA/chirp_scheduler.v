@@ -24,6 +24,15 @@
  * Pulse outputs (chirp_pulse, subframe_pulse, frame_pulse) are 1-cycle
  * positive pulses, not toggles.
  *
+ * PR-AB.b expanded commit 5 — beam-ready handshake: when
+ * host_handshake_enable=1, the FSM enters S_BEAM_WAIT after frame_pulse
+ * and only fires the next frame's first chirp once it observes an edge on
+ * beam_ready_async (MCU PD8 toggle) or the ~80 ms watchdog expires.
+ * Watchdog timeout sets the sticky output beam_handshake_watchdog_fired
+ * (cleared only by reset_n) so the host can spot patterns falling behind
+ * the chirp ladder. host_handshake_enable=0 preserves the legacy
+ * always-on chirp cadence.
+ *
  * Clock domain: clk (100 MHz), async-low reset.
  */
 
@@ -55,6 +64,15 @@ module chirp_scheduler (
     // TX-side cdc_async_fifo before mixers come up.
     input  wire mixers_enable,
 
+    // PR-AB.b expanded commit 5: beam-ready handshake. beam_ready_async is the
+    // raw MCU PD8 GPIO toggle (CDC-synchronized inside this module on `clk`).
+    // host_handshake_enable gates whether the FSM stalls in S_BEAM_WAIT after
+    // each frame_pulse. Cold-reset default at the top level is 1'b0 (legacy
+    // open-loop cadence) — host enables via opcode 0x1A once the MCU's PD8
+    // toggle wiring is in place.
+    input  wire beam_ready_async,
+    input  wire host_handshake_enable,
+
     // ====== Outputs ======
     output reg  [1:0]  wave_sel,         // canonical waveform identity
     output reg         chirp_pulse,      // 1-cycle pulse: chirp begins this clk
@@ -66,7 +84,11 @@ module chirp_scheduler (
     // Currently selected timing for the in-flight chirp (PR-E TX async FIFO)
     output wire [15:0] cfg_chirp_cycles,
     output wire [15:0] cfg_listen_cycles,
-    output wire [15:0] cfg_guard_cycles
+    output wire [15:0] cfg_guard_cycles,
+
+    // PR-AB.b expanded commit 5: sticky handshake watchdog flag, cleared
+    // only by reset_n. Plumbed into status_words[4][1] at the top level.
+    output reg         beam_handshake_watchdog_fired
 );
 
 // ============================================================================
@@ -141,16 +163,45 @@ assign cfg_listen_cycles = sel_listen_cycles;
 assign cfg_guard_cycles  = host_guard_cycles;
 
 // ============================================================================
+// Beam-ready CDC + edge detection (PR-AB.b expanded commit 5).
+// beam_ready_async is a slow MCU GPIO toggle (PD8). Two ASYNC_REG flops bring
+// it into clk, then a one-cycle delay lets us detect any transition (rising or
+// falling) — the MCU drives via HAL_GPIO_TogglePin once per beam pattern, so
+// successive frames see alternating polarities.
+// ============================================================================
+(* ASYNC_REG = "TRUE" *) reg [1:0] beam_ready_sync;
+reg                                beam_ready_q_prev;
+always @(posedge clk or negedge reset_n) begin
+    if (!reset_n) begin
+        beam_ready_sync   <= 2'b00;
+        beam_ready_q_prev <= 1'b0;
+    end else begin
+        beam_ready_sync   <= {beam_ready_sync[0], beam_ready_async};
+        beam_ready_q_prev <= beam_ready_sync[1];
+    end
+end
+wire beam_ready_q    = beam_ready_sync[1];
+wire beam_ready_edge = (beam_ready_q != beam_ready_q_prev);
+
+// ============================================================================
 // Main FSM — auto-scan over enabled sub-frames.
 // ============================================================================
-localparam S_IDLE    = 3'd0;
-localparam S_CHIRP   = 3'd1;
-localparam S_LISTEN  = 3'd2;
-localparam S_GUARD   = 3'd3;
-localparam S_ADVANCE = 3'd4;
+localparam S_IDLE      = 3'd0;
+localparam S_CHIRP     = 3'd1;
+localparam S_LISTEN    = 3'd2;
+localparam S_GUARD     = 3'd3;
+localparam S_ADVANCE   = 3'd4;
+localparam S_BEAM_WAIT = 3'd5;
+
+// Beam-ready watchdog: 23 bits at 100 MHz → ~83.9 ms = ~8 nominal frames
+// (frame ≈ 8.05 ms full 3-PRI ladder, less when subframes are masked). Long
+// enough to absorb MCU SPI bursts + scheduling jitter without auto-advancing,
+// short enough to keep the radar moving when a pattern write actually drops.
+localparam [22:0] BEAM_WATCHDOG_MAX = 23'd8_000_000;
 
 reg [2:0]  state;
 reg [16:0] timer;             // 17 bits cover LONG+listen+guard worst case
+reg [22:0] beam_watchdog;     // counts clk cycles while in S_BEAM_WAIT
 
 // Pre-computed wires used inside the FSM advance logic so non-blocking
 // updates to subframe_id / wave_sel see the correct next value in the same
@@ -168,14 +219,19 @@ always @(posedge clk or negedge reset_n) begin
         frame_pulse    <= 1'b0;
         chirp_counter  <= 6'd0;
         subframe_id    <= 2'd0;
+        beam_watchdog  <= 23'd0;
+        beam_handshake_watchdog_fired <= 1'b0;
     end else if (!mixers_enable) begin
         // Master disable — quiesce the FSM so chirp_pulse never asserts and
-        // the TX side stays at idle.
+        // the TX side stays at idle. beam_handshake_watchdog_fired is sticky
+        // across mixers_enable cycles so the host can see late patterns even
+        // after a soft restart.
         state          <= S_IDLE;
         timer          <= 17'd0;
         chirp_pulse    <= 1'b0;
         subframe_pulse <= 1'b0;
         frame_pulse    <= 1'b0;
+        beam_watchdog  <= 23'd0;
     end else begin
         // Pulses default low — set high for one cycle on relevant transitions.
         chirp_pulse    <= 1'b0;
@@ -219,10 +275,39 @@ always @(posedge clk or negedge reset_n) begin
                     subframe_pulse <= 1'b1;
                     subframe_id    <= next_sf;
                     wave_sel       <= subframe_to_wave(next_sf);
-                    if (next_sf == first_sf)
+                    if (next_sf == first_sf) begin
+                        // Frame wrap — emit frame_pulse and (if enabled) stall
+                        // in S_BEAM_WAIT until the MCU acknowledges via PD8.
                         frame_pulse <= 1'b1;
-                    chirp_pulse <= 1'b1;
-                    state       <= S_CHIRP;
+                        if (host_handshake_enable) begin
+                            beam_watchdog <= 23'd0;
+                            state         <= S_BEAM_WAIT;
+                        end else begin
+                            chirp_pulse <= 1'b1;
+                            state       <= S_CHIRP;
+                        end
+                    end else begin
+                        chirp_pulse <= 1'b1;
+                        state       <= S_CHIRP;
+                    end
+                end
+            end
+            S_BEAM_WAIT: begin
+                // Wait for an MCU PD8 toggle (any edge) OR the watchdog.
+                // host_handshake_enable can drop mid-wait — release the FSM in
+                // that case so disabling the handshake never strands the
+                // radar between frames.
+                if (beam_ready_edge || !host_handshake_enable) begin
+                    beam_watchdog <= 23'd0;
+                    chirp_pulse   <= 1'b1;
+                    state         <= S_CHIRP;
+                end else if (beam_watchdog >= BEAM_WATCHDOG_MAX) begin
+                    beam_handshake_watchdog_fired <= 1'b1;
+                    beam_watchdog <= 23'd0;
+                    chirp_pulse   <= 1'b1;
+                    state         <= S_CHIRP;
+                end else begin
+                    beam_watchdog <= beam_watchdog + 23'd1;
                 end
             end
             default: state <= S_IDLE;

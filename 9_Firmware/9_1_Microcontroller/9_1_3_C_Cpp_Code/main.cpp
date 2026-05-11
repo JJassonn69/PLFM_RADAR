@@ -626,6 +626,10 @@ void runRadarPulseSequence() {
     DIAG("SYS", "Broadside reference (vector_0) — 1× per azimuth");
     adarManager.setCustomBeamPattern16(vector_0, ADAR1000Manager::BeamDirection::TX);
     adarManager.setCustomBeamPattern16(vector_0, ADAR1000Manager::BeamDirection::RX);
+    // PR-AB.b expanded commit 5: announce "beam pattern ready" to the FPGA so
+    // chirp_scheduler can release S_BEAM_WAIT. Harmless when the FPGA's
+    // host_handshake_enable=0 (legacy open-loop default).
+    HAL_GPIO_TogglePin(FPGA_BEAM_READY_GPIO_Port, FPGA_BEAM_READY_Pin);
     waitForFramePulse(FRAME_PULSE_TIMEOUT_MS);
     m += m_max/2;
 
@@ -636,12 +640,14 @@ void runRadarPulseSequence() {
         // Pattern 1: matrix1 (negative-θ scan, peak at -62°..-3°)
         adarManager.setCustomBeamPattern16(matrix1[beam_pos], ADAR1000Manager::BeamDirection::TX);
         adarManager.setCustomBeamPattern16(matrix1[beam_pos], ADAR1000Manager::BeamDirection::RX);
+        HAL_GPIO_TogglePin(FPGA_BEAM_READY_GPIO_Port, FPGA_BEAM_READY_Pin);  // commit 5 handshake
         waitForFramePulse(FRAME_PULSE_TIMEOUT_MS);
         m += m_max/2;
 
         // Pattern 2: matrix2 (positive-θ scan, peak at +3°..+62°)
         adarManager.setCustomBeamPattern16(matrix2[beam_pos], ADAR1000Manager::BeamDirection::TX);
         adarManager.setCustomBeamPattern16(matrix2[beam_pos], ADAR1000Manager::BeamDirection::RX);
+        HAL_GPIO_TogglePin(FPGA_BEAM_READY_GPIO_Port, FPGA_BEAM_READY_Pin);  // commit 5 handshake
         waitForFramePulse(FRAME_PULSE_TIMEOUT_MS);
         m += m_max/2;
 

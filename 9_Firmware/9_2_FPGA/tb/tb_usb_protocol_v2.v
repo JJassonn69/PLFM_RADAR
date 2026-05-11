@@ -157,6 +157,10 @@ module tb_usb_protocol_v2;
         .status_agc_enable(status_agc_enable),
         .status_range_decim_watchdog(status_range_decim_watchdog),
         .status_ddc_cic_fir_overrun(status_ddc_cic_fir_overrun),
+        // PR-AB.b expanded commit 5: beam-handshake watchdog tied off here;
+        // exercised by tb_chirp_scheduler_handshake.v and word-4 layout test
+        // refreshed below.
+        .status_beam_handshake_watchdog(1'b0),
         .status_cfar_alpha_soft(status_cfar_alpha_soft),
         .status_detect_threshold_soft(status_detect_threshold_soft),
         .status_detect_count_cand(status_detect_count_cand)

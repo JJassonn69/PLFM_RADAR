@@ -994,7 +994,7 @@ class RadarDashboard(QMainWindow):
         spin.setValue(default)
         # PR-AB.b: setFixedWidth (not min/max) — QHBoxLayout would otherwise
         # squeeze the spinbox toward its minimum on rows where the hint is
-        # longer than its peers (the AGC Enable hint is ~3× longer than the
+        # longer than its peers (the AGC Enable hint is ~3x longer than the
         # others and was rendering at ~90 px while siblings hit ~160).
         spin.setFixedWidth(120)
         row.addWidget(spin)
@@ -2119,7 +2119,7 @@ class RadarDashboard(QMainWindow):
         # the last StatusResponse if any, otherwise the static defaults.
         self._refresh_agc_mode_labels(self._last_status)
 
-    def _refresh_agc_mode_labels(self, st: "StatusResponse | None"):
+    def _refresh_agc_mode_labels(self, st: StatusResponse | None):
         """Update the AGC enable text on both the FPGA Control Status box
         (self._agc_labels['enable']) and the AGC Monitor strip
         (self._agc_mode_lbl). In production the firmware ignores the FPGA

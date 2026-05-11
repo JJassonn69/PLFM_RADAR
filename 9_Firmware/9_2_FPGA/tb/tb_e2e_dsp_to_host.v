@@ -361,6 +361,7 @@ module tb_e2e_dsp_to_host;
         .status_agc_enable          (1'b0),
         .status_range_decim_watchdog(1'b0),
         .status_ddc_cic_fir_overrun (1'b0),
+        .status_beam_handshake_watchdog(1'b0),  // commit 5 — tied off, e2e path doesn't model handshake
         .status_cfar_alpha_soft     (TEST_CFAR_ALPHA_SOFT),
         .status_detect_threshold_soft(17'd0),
         .status_detect_count_cand   (16'd0)

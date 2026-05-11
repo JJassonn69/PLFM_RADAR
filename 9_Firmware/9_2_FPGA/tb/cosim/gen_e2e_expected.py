@@ -62,7 +62,7 @@ import numpy as np
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, THIS_DIR)
 
-from fpga_model import DopplerProcessor, run_cfar_ca
+from fpga_model import DopplerProcessor, run_cfar_ca  # noqa: E402
 
 # Pull stimulus configuration verbatim so dimensions stay aligned.
 from gen_e2e_stimulus import (   # noqa: E402
@@ -72,8 +72,6 @@ from gen_e2e_stimulus import (   # noqa: E402
     CHIRPS_PER_FRAME,
     RANGE_BINS,
     HOST_DC_NOTCH_WIDTH,
-    EXPECTED_RANGE_BIN,
-    EXPECTED_DOPPLER_BIN_PER_SF,
     EXPECTED_DETECT_CELLS,
 )
 
@@ -263,10 +261,8 @@ def pack_bulk_frame(frame_number: int, flags: int,
                 packed = 0
                 for slot in range(4):
                     db = byte_idx * 4 + slot
-                    if db < DOPPLER_TOTAL_BINS:
-                        code = int(cfar_class[rb, db]) & 0x3
-                    else:
-                        code = 0   # padding
+                    # padding for db >= DOPPLER_TOTAL_BINS lands on slot 3
+                    code = int(cfar_class[rb, db]) & 0x3 if db < DOPPLER_TOTAL_BINS else 0
                     packed |= code << ((3 - slot) * 2)
                 out.append(packed)
 

@@ -150,6 +150,8 @@ module tb_ft2232h_frame_drop;
         // AUDIT-S10: control-fault flags tied off (frame-drop TB scope)
         .status_range_decim_watchdog(1'b0),
         .status_ddc_cic_fir_overrun(1'b0),
+        // PR-AB.b expanded commit 5: beam-handshake watchdog tied off
+        .status_beam_handshake_watchdog(1'b0),
         // PR-G: 2-tier CFAR telemetry tied off
         .status_cfar_alpha_soft(8'h18),       // RP_DEF_CFAR_ALPHA_SOFT
         .status_detect_threshold_soft(17'd0),
