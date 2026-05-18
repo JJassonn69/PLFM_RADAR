@@ -4,17 +4,39 @@
 
 /**
  * radar_system_top.v
- * 
+ *
  * Complete Radar System Top Module
  * Integrates:
  * - Radar Transmitter (PLFM chirp generation)
  * - Radar Receiver (ADC interface, DDC, matched filtering, Doppler processing)
  * - USB Data Interface (FT601 USB 3.0 or FT2232H USB 2.0, selected by USB_MODE)
- * 
+ *
  * Clock domains:
  * - clk_100m: System clock (100MHz)
  * - clk_120m_dac: DAC clock (120MHz)
  * - ft601_clk: USB interface clock (100MHz FT601 or 60MHz FT2232H)
+ *
+ * ========================================================================
+ * BUILD MATRIX — USB_MODE × SUPPORT_LONG_RANGE
+ * ========================================================================
+ *   USB_MODE | SUPPORT_LONG_RANGE | Board / Variant
+ *   ---------+--------------------+----------------------------------------
+ *      1     |  undefined         | 50T  + FT2232H — 3 km production
+ *      0     |  defined           | 200T + FT601   — 3 km + 20 km
+ *      0     |  undefined         | 200T + FT601   — 3 km only (compile-tested)
+ *      1     |  defined           | 50T  + FT2232H + LR (rare; allowed)
+ *
+ * Both USB drivers (usb_data_interface.v / usb_data_interface_ft2232h.v)
+ * emit the identical v2 bulk frame protocol (PR-G, 56330 B/frame at the
+ * default 512 range × 48 doppler × 3 sub-frames). Byte-equality is asserted
+ * end-to-end by tb/tb_usb_drivers_parity.v (PR-AD AD.2).
+ *
+ * SUPPORT_LONG_RANGE only widens the upstream pipeline (range_bin_decimator,
+ * doppler_processor BRAM, cfar magnitude memory) from 512 → 4096 range bins;
+ * the USB wire protocol stays at 512 range bins regardless. The driver
+ * builds cleanly under either flag (verified by the FT601 Long-Range
+ * compile-only check in run_regression.sh).
+ * ========================================================================
  *
  * USB_MODE parameter:
  *   0 = FT601 (32-bit, USB 3.0) — 200T premium board

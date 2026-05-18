@@ -562,6 +562,33 @@ run_test "USB Drivers Parity (PR-AD AD.2 cross-comparison)" \
     tb/tb_usb_drivers_parity.vvp \
     tb/tb_usb_drivers_parity.v usb_data_interface.v usb_data_interface_ft2232h.v
 
+# PR-AD AD.3 compile-only: prove FT601 driver builds clean under the 200T
+# long-range define. Driver wire protocol (NUM_RANGE_BINS=512) is unaffected
+# by SUPPORT_LONG_RANGE, but RP_RANGE_BIN_WIDTH_MAX widens 9→12; this guards
+# any future macro creep from breaking the long-range build path.
+printf "  %-45s " "FT601 Driver Long-Range Compile (PR-AD AD.3)"
+lr_log=/tmp/ft601_lr_compile_$$.log
+if iverilog -g2001 -DSIMULATION -DSUPPORT_LONG_RANGE -Wall \
+        -o /tmp/ft601_lr_compile_$$.vvp usb_data_interface.v 2>"$lr_log"; then
+    # Suppress informational warnings (timescale / dangling / array @* sensitivity)
+    lr_err=$(grep -vE 'sensitive to all|timescale|dangling' "$lr_log" | grep -c . || true)
+    if [[ "$lr_err" -eq 0 ]]; then
+        echo -e "${GREEN}PASS${NC} (compile clean, SUPPORT_LONG_RANGE)"
+        PASS=$((PASS + 1))
+    else
+        echo -e "${RED}FAIL${NC} ($lr_err warning(s))"
+        grep -vE 'sensitive to all|timescale|dangling' "$lr_log" | sed 's/^/    /'
+        ERRORS="$ERRORS\n  FT601 Long-Range Compile: $lr_err warning(s)"
+        FAIL=$((FAIL + 1))
+    fi
+else
+    echo -e "${RED}COMPILE FAIL${NC}"
+    sed 's/^/    /' "$lr_log"
+    ERRORS="$ERRORS\n  FT601 Long-Range Compile: iverilog compile error"
+    FAIL=$((FAIL + 1))
+fi
+rm -f /tmp/ft601_lr_compile_$$.vvp "$lr_log"
+
 run_test "Doppler Frame-Start Gate (AUDIT-S3)" \
     tb/tb_doppler_frame_start_gate.vvp \
     tb/tb_doppler_frame_start_gate.v doppler_processor.v xfft_16.v fft_engine.v
@@ -681,6 +708,12 @@ if [[ "$QUICK" -eq 0 ]]; then
     run_test "System Opcodes (tb_system_opcodes)" \
         tb/tb_system_opcodes_reg.vvp \
         tb/tb_system_opcodes.v "${SYSTEM_RTL[@]}"
+
+    # PR-AD AD.3: FT601 path opcode dispatch — guards against future drift
+    # between the two USB driver command paths (USB_MODE=0 vs USB_MODE=1).
+    run_test "System Opcodes FT601 (tb_system_opcodes_ft601)" \
+        tb/tb_system_opcodes_ft601_reg.vvp \
+        tb/tb_system_opcodes_ft601.v "${SYSTEM_RTL[@]}"
 
     run_test "System Mechanics (tb_system_mechanics)" \
         tb/tb_system_mechanics_reg.vvp \
